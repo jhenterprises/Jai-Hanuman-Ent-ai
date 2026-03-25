@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useConfig } from '../context/ConfigContext';
 import AIChatbot from '../components/AIChatbot';
 import api from '../services/api';
+import { safeFormat } from '../utils/dateUtils';
 import { 
   LayoutDashboard, 
   Users, 
@@ -13,6 +14,7 @@ import {
   Menu,
   X,
   Settings,
+  Wallet as WalletIcon,
   MessageSquare,
   Sun,
   Moon,
@@ -86,17 +88,20 @@ const DashboardLayout = () => {
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate('/login?loggedOut=true');
   };
 
   const navItems = [
-    { path: user?.role === 'user' ? '/app/user/dashboard' : (user?.role === 'staff' ? '/app/staff/dashboard' : '/app/dashboard'), label: 'Dashboard', icon: <LayoutDashboard size={20} />, roles: ['admin', 'staff', 'user'] },
+    { path: user?.role === 'user' ? '/app/user/dashboard' : (user?.role === 'admin' ? '/app/admin-dashboard' : '/app/dashboard'), label: 'Dashboard', icon: <LayoutDashboard size={20} />, roles: ['admin', 'staff', 'user'] },
+    { path: '/app/wallet', label: 'My Wallet', icon: <WalletIcon size={20} />, roles: ['admin', 'staff', 'user'] },
     { path: user?.role === 'user' ? '/app/user/applications' : (user?.role === 'staff' ? '/app/staff/applications' : '/app/applications'), label: user?.role === 'user' ? 'My Applications' : 'User Applications', icon: <FileText size={20} />, roles: ['admin', 'staff', 'user'] },
     { path: user?.role === 'admin' ? '/app/services' : (user?.role === 'staff' ? '/app/staff/apply-service' : '/app/services'), label: 'Apply for Services', icon: <Briefcase size={20} />, roles: ['admin', 'staff', 'user'] },
-    { path: '/app/services', label: 'Digital Services', icon: <Briefcase size={20} />, roles: ['admin'] },
     { path: '/app/ledger', label: 'Ledger', icon: <FileText size={20} />, roles: ['admin', 'staff'] },
     { path: '/app/users', label: 'Users List', icon: <Users size={20} />, roles: ['admin', 'staff'] },
     { path: '/app/staff-management', label: 'Staff Management', icon: <Users size={20} />, roles: ['admin'] },
+    { path: '/app/admin/wallets', label: 'Wallet Management', icon: <WalletIcon size={20} />, roles: ['admin'] },
+    { path: '/app/recycle-bin', label: 'Recycle Bin', icon: <LogOut size={20} className="rotate-180" />, roles: ['admin'] },
+    { path: '/app/settings/portal', label: 'Portal Config', icon: <Settings size={20} />, roles: ['admin'] },
     { path: '/app/settings', label: 'Settings', icon: <Settings size={20} />, roles: ['admin', 'staff', 'user'] },
     { path: '/', label: 'Public Site', icon: <Home size={20} />, roles: ['admin', 'staff', 'user'] },
   ];
@@ -237,7 +242,7 @@ const DashboardLayout = () => {
                               <p className={`text-xs leading-tight mb-1 ${!n.is_read ? 'text-slate-200 font-semibold' : 'text-slate-400'}`}>
                                 {n.message}
                               </p>
-                              <p className="text-[10px] text-slate-500">{new Date(n.created_at).toLocaleString()}</p>
+                              <p className="text-[10px] text-slate-500">{safeFormat(n.created_at, 'dd/MM/yyyy, hh:mm a')}</p>
                             </div>
                             {!n.is_read && <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mt-1.5 shrink-0" />}
                           </div>
@@ -259,11 +264,19 @@ const DashboardLayout = () => {
             <button className="text-slate-400 hover:text-white transition-colors p-2 rounded-full hover:bg-slate-700/50">
               <Settings size={20} />
             </button>
+            <button 
+              onClick={handleLogout}
+              className="text-red-400 hover:text-red-300 transition-colors p-2 rounded-full hover:bg-red-500/10 flex items-center gap-2"
+              title="Logout"
+            >
+              <LogOut size={20} />
+              <span className="hidden sm:inline text-sm font-medium">Logout</span>
+            </button>
           </div>
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto p-6">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
           <div className="max-w-7xl mx-auto relative">
             <Outlet />
           </div>

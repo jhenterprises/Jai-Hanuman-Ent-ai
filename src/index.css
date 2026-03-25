@@ -1,5 +1,49 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
+
+@layer utilities {
+  @media print {
+    .no-print {
+      display: none !important;
+    }
+  }
+
+  /* PDF Safe styles to avoid oklch errors in html2canvas */
+  .pdf-safe, .pdf-safe * {
+    /* Fallback for everything */
+    color: #1e293b !important;
+    border-color: #e2e8f0 !important;
+    outline-color: #e2e8f0 !important;
+    text-decoration-color: #1e293b !important;
+    fill: #1e293b !important;
+    stroke: #1e293b !important;
+  }
+  
+  /* Specific overrides */
+  .pdf-safe .text-white, .pdf-safe.text-white { color: #ffffff !important; }
+  .pdf-safe .text-slate-900, .pdf-safe.text-slate-900 { color: #0f172a !important; }
+  .pdf-safe .text-slate-700, .pdf-safe.text-slate-700 { color: #334155 !important; }
+  .pdf-safe .text-slate-600, .pdf-safe.text-slate-600 { color: #475569 !important; }
+  .pdf-safe .text-slate-500, .pdf-safe.text-slate-500 { color: #64748b !important; }
+  .pdf-safe .text-slate-400, .pdf-safe.text-slate-400 { color: #94a3b8 !important; }
+  .pdf-safe .text-blue-600, .pdf-safe.text-blue-600 { color: #2563eb !important; }
+  .pdf-safe .text-blue-400, .pdf-safe.text-blue-400 { color: #60a5fa !important; }
+  .pdf-safe .text-amber-400, .pdf-safe.text-amber-400 { color: #fbbf24 !important; }
+  .pdf-safe .text-emerald-600, .pdf-safe.text-emerald-600 { color: #059669 !important; }
+  .pdf-safe .text-emerald-500, .pdf-safe.text-emerald-500 { color: #10b981 !important; }
+  
+  .pdf-safe .bg-white, .pdf-safe.bg-white { background-color: #ffffff !important; }
+  .pdf-safe .bg-slate-50, .pdf-safe.bg-slate-50 { background-color: #f8fafc !important; }
+  .pdf-safe .bg-slate-100, .pdf-safe.bg-slate-100 { background-color: #f1f5f9 !important; }
+  .pdf-safe .bg-slate-900, .pdf-safe.bg-slate-900 { background-color: #0f172a !important; }
+  .pdf-safe .bg-blue-600, .pdf-safe.bg-blue-600 { background-color: #2563eb !important; }
+  .pdf-safe .bg-blue-50, .pdf-safe.bg-blue-50 { background-color: #eff6ff !important; }
+  
+  .pdf-safe .border-slate-100, .pdf-safe.border-slate-100 { border-color: #f1f5f9 !important; }
+  .pdf-safe .border-slate-200, .pdf-safe.border-slate-200 { border-color: #e2e8f0 !important; }
+  .pdf-safe .border-blue-100, .pdf-safe.border-blue-100 { border-color: #dbeafe !important; }
+  .pdf-safe .border-blue-600, .pdf-safe.border-blue-600 { border-color: #2563eb !important; }
+}
 @plugin "@tailwindcss/typography";
 
 @theme {
@@ -41,12 +85,53 @@
   --color-gold-700: #b45309;
   --color-gold-800: #92400e;
   --color-gold-900: #78350f;
+
+  /* Custom Gradients */
+  --blue-gradient: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+  --gold-gradient: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+  --blue-gold-gradient: linear-gradient(135deg, #2563eb 0%, #f59e0b 100%);
+  --red-gradient: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+}
+
+.blue-gradient {
+  background: var(--blue-gradient);
+}
+
+.gold-gradient {
+  background: var(--gold-gradient);
+}
+
+.blue-gold-gradient {
+  background: var(--blue-gold-gradient);
+}
+
+.red-gradient {
+  background: var(--red-gradient);
+}
+
+.glass {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.glow-hover:hover {
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.4);
+}
+
+.glow-gold-hover:hover {
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.4);
 }
 
 @keyframes gradient {
   0% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
   100% { background-position: 0% 50%; }
+}
+
+@keyframes shine {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
 }
 
 .animate-gradient {

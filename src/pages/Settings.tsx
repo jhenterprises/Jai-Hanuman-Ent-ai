@@ -1,18 +1,31 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Briefcase, Users, Shield, Settings as SettingsIcon, LayoutDashboard } from 'lucide-react';
+import { Briefcase, Users, Shield, Settings as SettingsIcon } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 const Settings = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
 
-  const modules = [
-    { name: 'Digital Services Control', icon: <Briefcase size={24} />, path: '/app/settings/services' },
-    { name: 'Users Management', icon: <Users size={24} />, path: '/app/settings/users' },
-    { name: 'Staff Management', icon: <Users size={24} />, path: '/app/settings/staff' },
-    { name: 'System Permissions', icon: <Shield size={24} />, path: '/app/settings/permissions' },
-    { name: 'Security Controls', icon: <Shield size={24} />, path: '/app/settings/security' },
-    { name: 'Portal Configuration', icon: <SettingsIcon size={24} />, path: '/app/settings/portal' },
+  const allModules = [
+    { name: 'Digital Services Control', icon: <Briefcase size={24} />, path: '/app/settings/services', roles: ['admin'] },
+    { name: 'Users Management', icon: <Users size={24} />, path: '/app/settings/users', roles: ['admin'] },
+    { name: 'Staff Management', icon: <Users size={24} />, path: '/app/settings/staff', roles: ['admin'] },
+    { name: 'System Permissions', icon: <Shield size={24} />, path: '/app/settings/permissions', roles: ['admin'] },
+    { name: 'Security Controls', icon: <Shield size={24} />, path: '/app/settings/security', roles: ['admin'] },
+    { name: 'Portal Configuration', icon: <SettingsIcon size={24} />, path: '/app/settings/portal', roles: ['admin'] },
   ];
+
+  const modules = allModules.filter(m => m.roles.includes(user?.role || ''));
+
+  if (modules.length === 0) {
+    return (
+      <div className="max-w-6xl mx-auto text-center py-20">
+        <h1 className="text-3xl font-bold text-white mb-4">Settings</h1>
+        <p className="text-slate-400">You do not have permission to access any settings modules.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-6xl mx-auto space-y-8">

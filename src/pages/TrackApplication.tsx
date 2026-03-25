@@ -1,11 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useParams } from 'react-router-dom';
 import api from '../services/api';
 import { useConfig } from '../context/ConfigContext';
-import { Search, FileText, CheckCircle, Clock, XCircle, ArrowRight, Download, Calendar, User, Activity, Loader2, AlertTriangle } from 'lucide-react';
+import ModernButton from '../components/ModernButton';
+import { downloadPDF } from '../utils/pdfGenerator';
+import AcknowledgementReceipt from '../components/AcknowledgementReceipt';
+import { safeFormat } from '../utils/dateUtils';
+import { Search, FileText, CheckCircle, Clock, XCircle, ArrowRight, Download, Calendar, User, Activity, Loader2, AlertTriangle, Printer } from 'lucide-react';
 
 const TrackApplication = () => {
   const location = useLocation();
+  const { ref: urlRef } = useParams();
   const { config } = useConfig();
   const [refNumber, setRefNumber] = useState('');
   const [application, setApplication] = useState<any>(null);
@@ -13,13 +18,18 @@ const TrackApplication = () => {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const ref = params.get('ref');
-    if (ref) {
-      setRefNumber(ref);
-      fetchStatus(ref);
+    if (urlRef) {
+      setRefNumber(urlRef);
+      fetchStatus(urlRef);
+    } else {
+      const params = new URLSearchParams(location.search);
+      const ref = params.get('ref');
+      if (ref) {
+        setRefNumber(ref);
+        fetchStatus(ref);
+      }
     }
-  }, [location]);
+  }, [location, urlRef]);
 
   const fetchStatus = async (ref: string) => {
     setLoading(true);
@@ -42,6 +52,18 @@ const TrackApplication = () => {
     fetchStatus(refNumber);
   };
 
+  const handleDownloadPDF = async () => {
+    if (!application) return;
+    try {
+      // Small delay to ensure styles are applied
+      setTimeout(async () => {
+        await downloadPDF('receipt-track', `Acknowledgement_${application.reference_number}`);
+      }, 100);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+    }
+  };
+
   const getStatusColor = (status: string) => {
     const s = (status || '').toLowerCase();
     if (s === 'completed' || s === 'approved') return 'text-green-400 bg-green-500/10 border-green-500/20';
@@ -59,7 +81,7 @@ const TrackApplication = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 py-20 px-6 pt-32">
+    <div className="min-h-screen bg-slate-950 pt-24 pb-16 md:pt-32 md:pb-24 px-4 sm:px-6 lg:px-8 overflow-x-hidden">
       <div className="max-w-4xl mx-auto">
         {config.enable_track_application === 0 ? (
           <div className="text-center py-20 bg-slate-900/50 backdrop-blur-xl rounded-[2.5rem] border border-slate-800">
@@ -92,14 +114,15 @@ const TrackApplication = () => {
                     required
                   />
                 </div>
-                <button 
+                <ModernButton 
+                  text="Track Status" 
+                  icon={Search} 
                   type="submit"
                   disabled={loading}
-                  className="px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-bold transition-all shadow-lg shadow-blue-600/25 flex items-center justify-center gap-2 disabled:opacity-50"
-                >
-                  {loading ? <Loader2 className="animate-spin" size={20} /> : <Search size={20} />}
-                  Track Status
-                </button>
+                  loading={loading}
+                  gradient="blue-gradient"
+                  className="w-full md:w-auto"
+                />
               </form>
 
               {error && (
@@ -123,6 +146,15 @@ const TrackApplication = () => {
                       {getStatusIcon(application.status)}
                       {(application.status || '').toUpperCase()}
                     </div>
+                    <div className="flex gap-2">
+                      <ModernButton 
+                        text="Download Acknowledgement" 
+                        icon={Download} 
+                        onClick={handleDownloadPDF}
+                        gradient="blue-gradient"
+                        className="text-xs py-2 px-4"
+                      />
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -141,7 +173,7 @@ const TrackApplication = () => {
                       </div>
                       <div>
                         <div className="text-sm text-slate-500 mb-1">Submission Date</div>
-                        <div className="text-white font-semibold">{new Date(application.created_at).toLocaleDateString()}</div>
+                        <div className="text-white font-semibold">{safeFormat(application.created_at, 'dd/MM/yyyy')}</div>
                       </div>
                     </div>
                     <div className="flex items-start gap-4">
@@ -156,8 +188,8 @@ const TrackApplication = () => {
                   </div>
                 </div>
 
-                {/* Timeline & Documents */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* Timeline */}
+                <div className="grid grid-cols-1 gap-8">
                   {/* Timeline */}
                   <div className="bg-slate-900/50 backdrop-blur-xl rounded-[2.5rem] p-8 border border-slate-800 shadow-2xl">
                     <h3 className="text-xl font-bold text-white mb-8 flex items-center gap-2">
@@ -172,7 +204,7 @@ const TrackApplication = () => {
                           <div>
                             <div className="flex items-center justify-between mb-1">
                               <div className="font-bold text-white">{update.status}</div>
-                              <div className="text-xs text-slate-500">{new Date(update.updated_at).toLocaleString()}</div>
+                              <div className="text-xs text-slate-500">{safeFormat(update.updated_at, 'dd/MM/yyyy, hh:mm a')}</div>
                             </div>
                             <p className="text-slate-400 text-sm">{update.comment}</p>
                             <div className="text-[10px] text-slate-600 mt-1 uppercase tracking-widest font-bold">Updated by {update.updated_by_name}</div>
@@ -181,35 +213,13 @@ const TrackApplication = () => {
                       ))}
                     </div>
                   </div>
-
-                  {/* Documents */}
-                  <div className="bg-slate-900/50 backdrop-blur-xl rounded-[2.5rem] p-8 border border-slate-800 shadow-2xl">
-                    <h3 className="text-xl font-bold text-white mb-8 flex items-center gap-2">
-                      <Download size={20} className="text-blue-400" /> Documents
+                  <div className="mt-12 pt-12 border-t border-slate-800">
+                    <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-3">
+                      <FileText className="text-blue-400" size={24} />
+                      Application Details
                     </h3>
-                    <div className="space-y-4">
-                      {application.documents.length === 0 ? (
-                        <p className="text-slate-500 italic text-center py-8">No documents available.</p>
-                      ) : (
-                        application.documents.map((doc: any) => (
-                          <a 
-                            key={doc.id}
-                            href={doc.file_path}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-4 p-4 bg-slate-950 border border-slate-800 rounded-2xl hover:border-blue-500/50 transition-all group"
-                          >
-                            <div className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center text-slate-400 group-hover:text-blue-400">
-                              <FileText size={20} />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="text-white font-medium truncate">{doc.file_name}</div>
-                              <div className="text-[10px] text-slate-500 uppercase tracking-wider">Uploaded on {new Date(doc.uploaded_at).toLocaleDateString()}</div>
-                            </div>
-                            <Download size={18} className="text-slate-500 group-hover:text-blue-400" />
-                          </a>
-                        ))
-                      )}
+                    <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/50">
+                      <AcknowledgementReceipt application={application} id="receipt-track" />
                     </div>
                   </div>
                 </div>

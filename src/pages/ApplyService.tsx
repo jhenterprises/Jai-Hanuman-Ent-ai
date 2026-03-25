@@ -1,198 +1,425 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useConfig } from '../context/ConfigContext';
-import { Upload, File, X, CheckCircle2, AlertCircle, User, AlertTriangle } from 'lucide-react';
+import ModernButton from '../components/ModernButton';
+import { Upload, File, X, CheckCircle2, AlertCircle, User, AlertTriangle, Download, Shield, Activity, ArrowLeft, Loader2, Printer, QrCode, Send, Rocket, Wallet as WalletIcon } from 'lucide-react';
+import { downloadPDF } from '../utils/pdfGenerator';
+import AcknowledgementReceipt from '../components/AcknowledgementReceipt';
 
 const SERVICE_CONFIGS: Record<string, any> = {
   aadhaar: {
     title: 'Aadhaar Service',
-    description: 'Unique Identification Authority of India',
-    fields: [
-      { name: 'fullName', label: 'Full Name', type: 'text', required: true },
-      { name: 'dob', label: 'Date of Birth', type: 'date', required: true },
-      { name: 'gender', label: 'Gender', type: 'select', options: ['Male', 'Female', 'Other'], required: true },
-      { name: 'mobile', label: 'Mobile Number', type: 'tel', required: true },
-      { name: 'email', label: 'Email', type: 'email', required: true },
-      { name: 'address', label: 'Address', type: 'textarea', required: true },
-      { name: 'aadhaarNumber', label: 'Aadhaar Number (for update)', type: 'text', required: false },
-      { name: 'serviceType', label: 'Service Type', type: 'select', options: ['New', 'Update', 'Download'], required: true },
+    authority: 'Unique Identification Authority of India (UIDAI)',
+    description: 'Apply for New Aadhaar or Update existing Aadhaar details.',
+    sections: [
+      {
+        id: 'personal',
+        title: 'SECTION 1 – Applicant Personal Details',
+        fields: [
+          { name: 'fullName', label: 'Full Name', type: 'text', required: true },
+          { name: 'dob', label: 'Date of Birth', type: 'date', required: true },
+          { name: 'gender', label: 'Gender', type: 'select', options: ['Male', 'Female', 'Other'], required: true },
+          { name: 'parentName', label: 'Father / Mother / Spouse Name', type: 'text', required: true },
+        ]
+      },
+      {
+        id: 'address',
+        title: 'SECTION 2 – Address Details',
+        fields: [
+          { name: 'houseNo', label: 'House Number', type: 'text', required: true },
+          { name: 'street', label: 'Street / Area', type: 'text', required: true },
+          { name: 'village', label: 'Village / City', type: 'text', required: true },
+          { name: 'district', label: 'District', type: 'text', required: true },
+          { name: 'state', label: 'State', type: 'text', required: true },
+          { name: 'pincode', label: 'Pincode', type: 'text', required: true, pattern: '^[0-9]{6}$' },
+        ]
+      },
+      {
+        id: 'identity',
+        title: 'SECTION 3 – Identity Details',
+        fields: [
+          { name: 'mobile', label: 'Mobile Number', type: 'tel', required: true, pattern: '^[0-9]{10}$' },
+          { name: 'email', label: 'Email ID', type: 'email', required: true },
+          { name: 'aadhaarNumber', label: 'Aadhaar Number (for update)', type: 'text', required: false },
+        ]
+      },
+      {
+        id: 'service',
+        title: 'SECTION 4 – Service Details',
+        fields: [
+          { name: 'serviceType', label: 'Service Type', type: 'select', options: ['New Enrollment', 'Update Details', 'Download e-Aadhaar'], required: true },
+          { name: 'updateType', label: 'Update Type (if applicable)', type: 'select', options: ['Name', 'Address', 'DOB', 'Mobile', 'Biometrics'], required: false },
+        ]
+      }
     ],
-    documents: ['Identity Proof', 'Address Proof', 'Photo']
+    documents: ['Photo', 'Identity Proof', 'Address Proof', 'Age Proof']
   },
   pan: {
     title: 'PAN Card Service',
-    description: 'Income Tax Department',
-    fields: [
-      { name: 'fullName', label: 'Full Name', type: 'text', required: true },
-      { name: 'fatherName', label: 'Father\'s Name', type: 'text', required: true },
-      { name: 'dob', label: 'Date of Birth', type: 'date', required: true },
-      { name: 'aadhaarNumber', label: 'Aadhaar Number', type: 'text', required: true },
-      { name: 'mobile', label: 'Mobile Number', type: 'tel', required: true },
-      { name: 'email', label: 'Email', type: 'email', required: true },
-      { name: 'address', label: 'Address', type: 'textarea', required: true },
-      { name: 'panType', label: 'PAN Type', type: 'select', options: ['New', 'Correction'], required: true },
+    authority: 'Income Tax Department, Govt of India',
+    description: 'Application for Permanent Account Number (PAN).',
+    sections: [
+      {
+        id: 'personal',
+        title: 'SECTION 1 – Applicant Personal Details',
+        fields: [
+          { name: 'fullName', label: 'Full Name', type: 'text', required: true },
+          { name: 'dob', label: 'Date of Birth', type: 'date', required: true },
+          { name: 'gender', label: 'Gender', type: 'select', options: ['Male', 'Female', 'Other'], required: true },
+          { name: 'fatherName', label: 'Father\'s Name', type: 'text', required: true },
+        ]
+      },
+      {
+        id: 'address',
+        title: 'SECTION 2 – Address Details',
+        fields: [
+          { name: 'houseNo', label: 'House Number', type: 'text', required: true },
+          { name: 'street', label: 'Street / Area', type: 'text', required: true },
+          { name: 'village', label: 'Village / City', type: 'text', required: true },
+          { name: 'district', label: 'District', type: 'text', required: true },
+          { name: 'state', label: 'State', type: 'text', required: true },
+          { name: 'pincode', label: 'Pincode', type: 'text', required: true, pattern: '^[0-9]{6}$' },
+        ]
+      },
+      {
+        id: 'identity',
+        title: 'SECTION 3 – Identity Details',
+        fields: [
+          { name: 'mobile', label: 'Mobile Number', type: 'tel', required: true, pattern: '^[0-9]{10}$' },
+          { name: 'email', label: 'Email ID', type: 'email', required: true },
+          { name: 'aadhaarNumber', label: 'Aadhaar Number', type: 'text', required: true },
+        ]
+      },
+      {
+        id: 'service',
+        title: 'SECTION 4 – Service Details',
+        fields: [
+          { name: 'panType', label: 'PAN Application Type', type: 'select', options: ['New PAN - Indian Citizen', 'New PAN - Foreign Citizen', 'Correction in Existing PAN'], required: true },
+        ]
+      }
     ],
-    documents: ['Aadhaar Copy', 'Photo', 'Signature']
-  },
-  passport: {
-    title: 'Passport Service',
-    description: 'Passport Seva',
-    fields: [
-      { name: 'givenName', label: 'Given Name', type: 'text', required: true },
-      { name: 'surname', label: 'Surname', type: 'text', required: true },
-      { name: 'dob', label: 'Date of Birth', type: 'date', required: true },
-      { name: 'placeOfBirth', label: 'Place of Birth', type: 'text', required: true },
-      { name: 'gender', label: 'Gender', type: 'select', options: ['Male', 'Female', 'Other'], required: true },
-      { name: 'maritalStatus', label: 'Marital Status', type: 'select', options: ['Single', 'Married', 'Divorced', 'Widowed'], required: true },
-      { name: 'education', label: 'Education', type: 'text', required: true },
-      { name: 'occupation', label: 'Occupation', type: 'text', required: true },
-      { name: 'address', label: 'Address', type: 'textarea', required: true },
-      { name: 'policeStation', label: 'Police Station', type: 'text', required: true },
-      { name: 'emergencyContact', label: 'Emergency Contact', type: 'text', required: true },
-    ],
-    documents: ['Address Proof', 'Birth Proof', 'Photo']
+    documents: ['Photo', 'Identity Proof', 'Address Proof', 'Age Proof']
   },
   voterid: {
     title: 'Voter ID Service',
-    description: 'Election Commission of India',
-    fields: [
-      { name: 'name', label: 'Name', type: 'text', required: true },
-      { name: 'dob', label: 'Date of Birth', type: 'date', required: true },
-      { name: 'gender', label: 'Gender', type: 'select', options: ['Male', 'Female', 'Other'], required: true },
-      { name: 'address', label: 'Address', type: 'textarea', required: true },
-      { name: 'constituency', label: 'Constituency', type: 'text', required: true },
-      { name: 'mobile', label: 'Mobile Number', type: 'tel', required: true },
-      { name: 'email', label: 'Email', type: 'email', required: true },
+    authority: 'Election Commission of India',
+    description: 'Form 6 - Application for inclusion of name in electoral roll.',
+    sections: [
+      {
+        id: 'personal',
+        title: 'SECTION 1 – Applicant Personal Details',
+        fields: [
+          { name: 'fullName', label: 'Full Name', type: 'text', required: true },
+          { name: 'dob', label: 'Date of Birth', type: 'date', required: true },
+          { name: 'gender', label: 'Gender', type: 'select', options: ['Male', 'Female', 'Other'], required: true },
+          { name: 'parentName', label: 'Father / Mother / Spouse Name', type: 'text', required: true },
+        ]
+      },
+      {
+        id: 'address',
+        title: 'SECTION 2 – Address Details',
+        fields: [
+          { name: 'houseNo', label: 'House Number', type: 'text', required: true },
+          { name: 'street', label: 'Street / Area', type: 'text', required: true },
+          { name: 'village', label: 'Village / City', type: 'text', required: true },
+          { name: 'district', label: 'District', type: 'text', required: true },
+          { name: 'state', label: 'State', type: 'text', required: true },
+          { name: 'pincode', label: 'Pincode', type: 'text', required: true, pattern: '^[0-9]{6}$' },
+        ]
+      },
+      {
+        id: 'identity',
+        title: 'SECTION 3 – Identity Details',
+        fields: [
+          { name: 'mobile', label: 'Mobile Number', type: 'tel', required: true, pattern: '^[0-9]{10}$' },
+          { name: 'email', label: 'Email ID', type: 'email', required: true },
+          { name: 'aadhaarNumber', label: 'Aadhaar Number', type: 'text', required: false },
+        ]
+      },
+      {
+        id: 'election',
+        title: 'SECTION 4 – Election Details',
+        fields: [
+          { name: 'constituency', label: 'Constituency', type: 'text', required: true },
+          { name: 'assemblyArea', label: 'Assembly Area', type: 'text', required: true },
+          { name: 'previousVoterId', label: 'Previous Voter ID (optional)', type: 'text', required: false },
+        ]
+      }
     ],
-    documents: ['Age Proof', 'Address Proof', 'Photo']
+    documents: ['Photo', 'Age Proof', 'Address Proof', 'Identity Proof']
   },
-  income: {
-    title: 'Income Certificate',
-    description: 'Revenue Department Services',
-    fields: [
-      { name: 'fullName', label: 'Full Name', type: 'text', required: true },
-      { name: 'fatherName', label: 'Father\'s Name', type: 'text', required: true },
-      { name: 'annualIncome', label: 'Annual Income', type: 'number', required: true },
-      { name: 'purpose', label: 'Purpose', type: 'text', required: true },
-      { name: 'address', label: 'Address', type: 'textarea', required: true },
+  passport: {
+    title: 'Passport Service',
+    authority: 'Ministry of External Affairs, Govt of India',
+    description: 'Application for Fresh Passport or Re-issue of Passport.',
+    sections: [
+      {
+        id: 'personal',
+        title: 'SECTION 1 – Applicant Personal Details',
+        fields: [
+          { name: 'givenName', label: 'Given Name', type: 'text', required: true },
+          { name: 'surname', label: 'Surname', type: 'text', required: true },
+          { name: 'dob', label: 'Date of Birth', type: 'date', required: true },
+          { name: 'placeOfBirth', label: 'Place of Birth', type: 'text', required: true },
+          { name: 'gender', label: 'Gender', type: 'select', options: ['Male', 'Female', 'Other'], required: true },
+          { name: 'maritalStatus', label: 'Marital Status', type: 'select', options: ['Single', 'Married', 'Divorced', 'Widowed'], required: true },
+        ]
+      },
+      {
+        id: 'address',
+        title: 'SECTION 2 – Address Details',
+        fields: [
+          { name: 'houseNo', label: 'House Number', type: 'text', required: true },
+          { name: 'street', label: 'Street / Area', type: 'text', required: true },
+          { name: 'village', label: 'Village / City', type: 'text', required: true },
+          { name: 'district', label: 'District', type: 'text', required: true },
+          { name: 'state', label: 'State', type: 'text', required: true },
+          { name: 'pincode', label: 'Pincode', type: 'text', required: true, pattern: '^[0-9]{6}$' },
+        ]
+      },
+      {
+        id: 'identity',
+        title: 'SECTION 3 – Identity Details',
+        fields: [
+          { name: 'mobile', label: 'Mobile Number', type: 'tel', required: true, pattern: '^[0-9]{10}$' },
+          { name: 'email', label: 'Email ID', type: 'email', required: true },
+          { name: 'aadhaarNumber', label: 'Aadhaar Number', type: 'text', required: true },
+        ]
+      },
+      {
+        id: 'service',
+        title: 'SECTION 4 – Service Details',
+        fields: [
+          { name: 'passportType', label: 'Application Type', type: 'select', options: ['Fresh Passport', 'Re-issue of Passport'], required: true },
+          { name: 'validityRequired', label: 'Validity Required', type: 'select', options: ['10 Years', '5 Years', 'Up to 18 years of age'], required: true },
+        ]
+      }
     ],
-    documents: ['Income Proof', 'Address Proof', 'Aadhaar Card']
-  },
-  caste: {
-    title: 'Caste Certificate',
-    description: 'Revenue Department Services',
-    fields: [
-      { name: 'fullName', label: 'Full Name', type: 'text', required: true },
-      { name: 'caste', label: 'Caste/Category', type: 'text', required: true },
-      { name: 'fatherName', label: 'Father\'s Name', type: 'text', required: true },
-      { name: 'address', label: 'Address', type: 'textarea', required: true },
-    ],
-    documents: ['Caste Proof', 'Address Proof', 'Aadhaar Card']
-  },
-  birth: {
-    title: 'Birth Certificate',
-    description: 'Municipal Services',
-    fields: [
-      { name: 'childName', label: 'Child\'s Name', type: 'text', required: true },
-      { name: 'dob', label: 'Date of Birth', type: 'date', required: true },
-      { name: 'placeOfBirth', label: 'Place of Birth', type: 'text', required: true },
-      { name: 'fatherName', label: 'Father\'s Name', type: 'text', required: true },
-      { name: 'motherName', label: 'Mother\'s Name', type: 'text', required: true },
-    ],
-    documents: ['Hospital Discharge Summary', 'Parent\'s ID Proof']
-  },
-  scheme: {
-    title: 'Govt Scheme Application',
-    description: 'State & Central Schemes',
-    fields: [
-      { name: 'schemeName', label: 'Scheme Name', type: 'text', required: true },
-      { name: 'fullName', label: 'Full Name', type: 'text', required: true },
-      { name: 'aadhaarNumber', label: 'Aadhaar Number', type: 'text', required: true },
-      { name: 'bankDetails', label: 'Bank A/C & IFSC', type: 'text', required: true },
-    ],
-    documents: ['Aadhaar Card', 'Bank Passbook', 'Income Certificate']
-  },
-  loan: {
-    title: 'Loan Assistance',
-    description: 'Banking & Financial Services',
-    fields: [
-      { name: 'loanType', label: 'Loan Type', type: 'select', options: ['Personal', 'Business', 'Home', 'Education'], required: true },
-      { name: 'amount', label: 'Required Amount', type: 'number', required: true },
-      { name: 'fullName', label: 'Full Name', type: 'text', required: true },
-      { name: 'income', label: 'Monthly Income', type: 'number', required: true },
-    ],
-    documents: ['Salary Slips/ITR', 'Bank Statement', 'Aadhaar & PAN']
-  },
-  utility: {
-    title: 'Utility Bill Payment',
-    description: 'Electricity, Water & Gas',
-    fields: [
-      { name: 'billType', label: 'Bill Type', type: 'select', options: ['Electricity', 'Water', 'Gas', 'Broadband'], required: true },
-      { name: 'consumerNumber', label: 'Consumer Number', type: 'text', required: true },
-      { name: 'provider', label: 'Service Provider', type: 'text', required: true },
-      { name: 'amount', label: 'Bill Amount', type: 'number', required: true },
-    ],
-    documents: ['Latest Bill Copy']
+    documents: ['Photo', 'Identity Proof', 'Address Proof', 'Age Proof']
   },
   general: {
     title: 'General Service Application',
-    description: 'Other Digital Services',
-    fields: [
-      { name: 'serviceName', label: 'Service Name', type: 'text', required: true },
-      { name: 'fullName', label: 'Full Name', type: 'text', required: true },
-      { name: 'details', label: 'Application Details', type: 'textarea', required: true },
+    authority: 'Digital Services Portal',
+    description: 'Application for various other government services.',
+    sections: [
+      {
+        id: 'personal',
+        title: 'SECTION 1 – Applicant Personal Details',
+        fields: [
+          { name: 'fullName', label: 'Full Name', type: 'text', required: true },
+          { name: 'dob', label: 'Date of Birth', type: 'date', required: true },
+          { name: 'gender', label: 'Gender', type: 'select', options: ['Male', 'Female', 'Other'], required: true },
+        ]
+      },
+      {
+        id: 'address',
+        title: 'SECTION 2 – Address Details',
+        fields: [
+          { name: 'village', label: 'Village / City', type: 'text', required: true },
+          { name: 'district', label: 'District', type: 'text', required: true },
+          { name: 'state', label: 'State', type: 'text', required: true },
+          { name: 'pincode', label: 'Pincode', type: 'text', required: true, pattern: '^[0-9]{6}$' },
+        ]
+      },
+      {
+        id: 'identity',
+        title: 'SECTION 3 – Identity Details',
+        fields: [
+          { name: 'mobile', label: 'Mobile Number', type: 'tel', required: true, pattern: '^[0-9]{10}$' },
+          { name: 'email', label: 'Email ID', type: 'email', required: true },
+        ]
+      },
+      {
+        id: 'service',
+        title: 'SECTION 4 – Service Details',
+        fields: [
+          { name: 'serviceName', label: 'Service Name', type: 'text', required: true },
+          { name: 'details', label: 'Application Details', type: 'textarea', required: true },
+        ]
+      }
     ],
-    documents: ['ID Proof', 'Supporting Document']
+    documents: ['Photo', 'Identity Proof', 'Supporting Document']
   }
 };
 
 const ApplyService = () => {
   const { serviceType } = useParams<{ serviceType: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const { config: portalConfig } = useConfig();
   const [formData, setFormData] = useState<Record<string, string>>({});
-  const [files, setFiles] = useState<File[]>([]);
+  const [files, setFiles] = useState<Record<string, File>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [showPaymentStep, setShowPaymentStep] = useState(false);
+  const [draftId, setDraftId] = useState<number | null>(null);
+  const [draftDocuments, setDraftDocuments] = useState<any[]>([]);
   const [isChecking, setIsChecking] = useState(true);
+  const [declaration, setDeclaration] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
+  const [submittedApp, setSubmittedApp] = useState<any>(null);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [serviceFee, setServiceFee] = useState<number | null>(null);
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  const [paymentStatus, setPaymentStatus] = useState<{ paid: boolean; payment_id: number | null }>({ paid: false, payment_id: null });
+  const [serviceDetails, setServiceDetails] = useState<any>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [dynamicConfig, setDynamicConfig] = useState<any>(null);
 
   useEffect(() => {
     checkServiceStatus();
-  }, [serviceType]);
+    const params = new URLSearchParams(location.search);
+    const dId = params.get('draftId');
+    if (dId) {
+      loadDraft(parseInt(dId));
+    }
+  }, [serviceType, user, location.search]);
+
+  const loadDraft = async (id: number) => {
+    try {
+      const res = await api.get(`/application-drafts/${id}`);
+      const draft = res.data;
+      setDraftId(draft.id);
+      setFormData(JSON.parse(draft.form_data));
+      if (draft.documents) {
+        try {
+          setDraftDocuments(JSON.parse(draft.documents));
+        } catch (e) {
+          console.error('Error parsing draft documents:', e);
+        }
+      }
+      // Note: We can't easily restore file objects, but we can show they were uploaded
+      // For now, we'll just let the user know they might need to re-upload if they want to change them
+    } catch (err) {
+      console.error('Error loading draft:', err);
+    }
+  };
+
+  const fetchPaymentStatus = async (serviceId: number) => {
+    try {
+      const payRes = await api.get(`/payments/status/${serviceId}`);
+      setPaymentStatus(payRes.data);
+    } catch (err) {
+      console.error('Error fetching payment status:', err);
+    }
+  };
 
   const checkServiceStatus = async () => {
     try {
-      // Check global application toggle
       if (portalConfig.enable_service_applications === 0) {
         setError('Service applications are currently disabled by the administrator.');
         setIsChecking(false);
         return;
       }
 
+      // Fetch wallet balance if user is logged in
+      if (user) {
+        try {
+          const walletRes = await api.get('/wallet/balance');
+          setWalletBalance(walletRes.data.balance || 0);
+        } catch (err) {
+          console.error('Error fetching wallet balance:', err);
+        }
+      }
+
       const res = await api.get('/services');
       const services = res.data;
+      const decodedType = decodeURIComponent(serviceType || '').toLowerCase();
+      
       const currentService = services.find((s: any) => {
+        if (!s.service_name) return false;
         const name = s.service_name.toLowerCase();
-        if (serviceType === 'aadhaar' && name.includes('aadhaar')) return true;
-        if (serviceType === 'pan' && name.includes('pan')) return true;
-        if (serviceType === 'passport' && name.includes('passport')) return true;
-        if (serviceType === 'voterid' && name.includes('voter')) return true;
-        if (serviceType === 'income' && name.includes('income')) return true;
-        if (serviceType === 'caste' && name.includes('caste')) return true;
-        if (serviceType === 'birth' && name.includes('birth')) return true;
-        if (serviceType === 'scheme' && name.includes('scheme')) return true;
-        if (serviceType === 'loan' && name.includes('loan')) return true;
-        if (serviceType === 'utility' && name.includes('bill')) return true;
-        if (serviceType === 'general') return true;
-        return false;
+        // Match exact name, or name contains type, or type contains name, or slug match
+        return name === decodedType || 
+               name.includes(decodedType) || 
+               decodedType.includes(name) || 
+               name.replace(/\s+/g, '-') === decodedType;
       });
 
       if (!currentService || currentService.active_status === 0) {
         setError('This service is currently inactive or unavailable.');
+        setIsChecking(false);
+        return;
+      }
+
+      setServiceDetails(currentService);
+      setServiceFee(currentService.fee || 0);
+      
+      if (currentService.payment_required && user?.role === 'user') {
+        fetchPaymentStatus(currentService.service_id);
+      } else {
+        setPaymentStatus({ paid: true, payment_id: null });
+      }
+
+      // Fetch custom inputs for this service
+      const schemaRes = await api.get(`/services/${currentService.service_id}/form-schema`).catch(() => ({ data: null }));
+      const fieldsRes = await api.get(`/services/${currentService.service_id}/form-fields`).catch(() => ({ data: [] }));
+      const docsRes = await api.get(`/services/${currentService.service_id}/document-requirements`).catch(() => ({ data: [] }));
+      
+      const formSchema = schemaRes.data;
+      const customFields = fieldsRes.data;
+      const customDocs = docsRes.data;
+
+      const documentNames = customDocs && customDocs.length > 0 
+        ? customDocs.map((doc: any) => doc.document_name)
+        : [];
+
+      if (formSchema && formSchema.sections && formSchema.sections.length > 0) {
+        setDynamicConfig({
+          title: currentService.service_name,
+          authority: 'Digital Services Portal',
+          description: currentService.description,
+          sections: formSchema.sections,
+          documents: documentNames
+        });
+      } else if (customFields && customFields.length > 0) {
+        // Group fields by section
+        const sectionsMap: Record<string, any[]> = {};
+        customFields.forEach((field: any) => {
+          const sectionName = field.section_name || 'General Details';
+          if (!sectionsMap[sectionName]) {
+            sectionsMap[sectionName] = [];
+          }
+          
+          let parsedOptions = undefined;
+          if (field.type === 'dropdown' && field.options) {
+            try {
+              parsedOptions = JSON.parse(field.options);
+            } catch (e) {
+              parsedOptions = field.options.split(',').map((o: string) => o.trim());
+            }
+          }
+
+          sectionsMap[sectionName].push({
+            name: field.label.replace(/\s+/g, '_').toLowerCase(),
+            label: field.label,
+            type: field.type,
+            required: field.required === 1,
+            placeholder: field.placeholder,
+            options: parsedOptions
+          });
+        });
+
+        const dynamicSections = Object.keys(sectionsMap).map((sectionName, index) => ({
+          id: `section_${index}`,
+          title: `SECTION ${index + 1} – ${sectionName}`,
+          fields: sectionsMap[sectionName]
+        }));
+
+        setDynamicConfig({
+          title: currentService.service_name,
+          authority: 'Digital Services Portal',
+          description: currentService.description,
+          sections: dynamicSections,
+          documents: documentNames.length > 0 ? documentNames : ['Identity Proof', 'Supporting Document']
+        });
+      } else if (!SERVICE_CONFIGS[serviceType || '']) {
+        // Fallback for services not in hardcoded list: use general enquiry form
+        setFormData(prev => ({ ...prev, serviceName: currentService.service_name }));
       }
     } catch (err) {
       console.error('Error checking service status:', err);
@@ -201,7 +428,81 @@ const ApplyService = () => {
     }
   };
 
-  const config = serviceType ? SERVICE_CONFIGS[serviceType] : null;
+  const handleWalletPayment = async () => {
+    if (!serviceDetails) return;
+    
+    if (walletBalance === null || walletBalance < serviceDetails.service_price) {
+      alert('Insufficient wallet balance. Please add money to your wallet.');
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to pay ₹${serviceDetails.service_price} from your wallet?`)) {
+      return;
+    }
+
+    try {
+      setIsChecking(true);
+      const res = await api.post('/payments/wallet-pay', { serviceId: serviceDetails.service_id });
+      if (res.data.success) {
+        setPaymentStatus({ paid: true, payment_id: res.data.payment_id });
+        // Refresh wallet balance
+        const walletRes = await api.get('/wallet/balance');
+        setWalletBalance(walletRes.data.balance);
+      }
+    } catch (err: any) {
+      console.error('Wallet Payment Error:', err);
+      alert(err.response?.data?.error || 'Failed to process wallet payment');
+    } finally {
+      setIsChecking(false);
+    }
+  };
+
+  const handleProceedToPayment = async () => {
+    if (!serviceDetails) return;
+    
+    try {
+      const orderRes = await api.post('/payments/create-order', { service_id: serviceDetails.service_id });
+      const order = orderRes.data;
+      
+      const options = {
+        key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_dummy',
+        amount: order.amount,
+        currency: order.currency,
+        name: portalConfig.portal_name || 'JH Digital Seva',
+        description: `Payment for ${serviceDetails.service_name}`,
+        order_id: order.id,
+        handler: async (response: any) => {
+          try {
+            await api.post('/payments/verify', {
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              service_id: serviceDetails.service_id
+            });
+            fetchPaymentStatus(serviceDetails.service_id);
+          } catch (err) {
+            alert('Payment verification failed. Please contact support.');
+          }
+        },
+        prefill: {
+          name: user?.name,
+          email: user?.email,
+          contact: user?.phone
+        },
+        theme: {
+          color: "#2563eb"
+        }
+      };
+      
+      const rzp = new (window as any).Razorpay(options);
+      rzp.open();
+    } catch (err) {
+      console.error('Payment Error:', err);
+      alert('Failed to initiate payment. Please try again.');
+    }
+  };
+
+  const config = dynamicConfig || (serviceType ? (SERVICE_CONFIGS[serviceType] || SERVICE_CONFIGS.general) : null);
 
   if (isChecking) {
     return (
@@ -232,236 +533,688 @@ const ApplyService = () => {
     );
   }
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+  const validateField = (name: string, value: string) => {
+    if (!config) return;
+    
+    let fieldConfig: any = null;
+    for (const section of config.sections) {
+      const field = section.fields.find((f: any) => f.name === name);
+      if (field) {
+        fieldConfig = field;
+        break;
+      }
+    }
+
+    if (!fieldConfig) return;
+
+    let error = '';
+    if (fieldConfig.type === 'file_upload') {
+      const hasDraftDoc = draftDocuments.some(d => d.originalname && d.originalname.startsWith(`${name}_`));
+      if (fieldConfig.required && !files[name] && !hasDraftDoc) {
+        error = `${fieldConfig.label} is required`;
+      }
+    } else {
+      if (fieldConfig.required && !value.trim()) {
+        error = `${fieldConfig.label} is required`;
+      } else if (fieldConfig.pattern && value && !new RegExp(fieldConfig.pattern).test(value)) {
+        error = `Invalid ${fieldConfig.label} format`;
+      } else if (fieldConfig.type === 'email' && value && !/\S+@\S+\.\S+/.test(value)) {
+        error = 'Invalid email address';
+      } else if (fieldConfig.type === 'tel' && value && !/^\d{10}$/.test(value)) {
+        error = 'Mobile number must be 10 digits';
+      }
+    }
+
+    setFieldErrors(prev => ({ ...prev, [name]: error }));
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const selectedFiles = Array.from(e.target.files);
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+    validateField(name, value);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, docType: string) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      const allowedTypes = ['pdf', 'jpg', 'jpeg', 'png'];
+      const ext = file.name.split('.').pop()?.toLowerCase() || '';
       
-      // Validate files
-      const allowedTypes = (portalConfig.allowed_file_types || 'pdf,jpg,png').split(',').map((t: string) => t.trim().toLowerCase());
-      const maxSizeMB = portalConfig.max_file_size || 5;
-      
-      const invalidFiles = selectedFiles.filter(f => {
-        const ext = f.name.split('.').pop()?.toLowerCase() || '';
-        const isTypeValid = allowedTypes.includes(ext);
-        const isSizeValid = f.size <= maxSizeMB * 1024 * 1024;
-        return !isTypeValid || !isSizeValid;
-      });
-      
-      if (invalidFiles.length > 0) {
-        setError(`Some files are invalid. Only ${allowedTypes.join(', ').toUpperCase()} under ${maxSizeMB}MB are allowed.`);
+      if (!allowedTypes.includes(ext)) {
+        alert('Invalid file format. Only PDF, JPG, PNG are allowed.');
         return;
       }
       
-      setFiles(prev => [...prev, ...selectedFiles].slice(0, 10)); // Max 10 files
-      setError('');
-    }
-  };
+      if (file.size > 5 * 1024 * 1024) {
+        alert('File size exceeds 5MB limit.');
+        return;
+      }
 
-  const removeFile = (index: number) => {
-    setFiles(files.filter((_, i) => i !== index));
+      setFiles(prev => ({ ...prev, [docType]: file }));
+      validateField(docType, file.name);
+      
+      // Simulate progress
+      setUploadProgress(prev => ({ ...prev, [docType]: 0 }));
+      let progress = 0;
+      const interval = setInterval(() => {
+        progress += 20;
+        setUploadProgress(prev => ({ ...prev, [docType]: progress }));
+        if (progress >= 100) clearInterval(interval);
+      }, 100);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate all fields before submission
+    const errors: Record<string, string> = {};
+    config.sections.forEach((section: any) => {
+      section.fields.forEach((field: any) => {
+        // Skip validation if the field is hidden by a condition
+        if (field.conditionField && field.conditionValue) {
+          if (formData[field.conditionField] !== field.conditionValue) {
+            return;
+          }
+        }
+
+        if (field.type === 'file_upload') {
+          const hasDraftDoc = draftDocuments.some(d => d.originalname && d.originalname.startsWith(`${field.name}_`));
+          if (field.required && !files[field.name] && !hasDraftDoc) {
+            errors[field.name] = `${field.label} is required`;
+          }
+          return;
+        }
+
+        const value = formData[field.name] || '';
+        let error = '';
+        if (field.required && !value.trim()) {
+          error = `${field.label} is required`;
+        } else if (field.pattern && value && !new RegExp(field.pattern).test(value)) {
+          error = `Invalid ${field.label} format`;
+        } else if (field.type === 'email' && value && !/\S+@\S+\.\S+/.test(value)) {
+          error = 'Invalid email address';
+        } else if (field.type === 'tel' && value && !/^\d{10}$/.test(value)) {
+          error = 'Mobile number must be 10 digits';
+        }
+        if (error) errors[field.name] = error;
+      });
+    });
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      setError('Please fix the errors in the form before submitting.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    // Validate documents
+    const missingDocs = (config.documents || []).filter((doc: string) => {
+      const hasDraftDoc = draftDocuments.some(d => d.originalname && d.originalname.startsWith(`${doc}_`));
+      return !files[doc] && !hasDraftDoc;
+    });
+    if (missingDocs.length > 0) {
+      setError(`Please upload all required documents: ${missingDocs.join(', ')}`);
+      return;
+    }
+
+    if (!declaration) {
+      alert('Please accept the declaration before submitting.');
+      return;
+    }
+
     setIsSubmitting(true);
     setError('');
 
     try {
+      // Filter out hidden fields from formData
+      const filteredFormData: Record<string, string> = {};
+      config.sections.forEach((section: any) => {
+        section.fields.forEach((field: any) => {
+          if (field.conditionField && field.conditionValue) {
+            if (formData[field.conditionField] !== field.conditionValue) {
+              return; // Skip hidden field
+            }
+          }
+          if (formData[field.name] !== undefined) {
+            filteredFormData[field.name] = formData[field.name];
+          }
+        });
+      });
+
+      // If payment is required and not yet paid, save as draft and show payment step
+      if (serviceDetails?.payment_required && serviceDetails?.service_price > 0 && !paymentStatus.paid && user?.role === 'user') {
+        const data = new FormData();
+        data.append('service_id', serviceDetails.service_id.toString());
+        data.append('service_type', serviceType || 'general');
+        data.append('form_data', JSON.stringify(filteredFormData));
+        if (draftId) {
+          data.append('draft_id', draftId.toString());
+        }
+        
+        Object.entries(files).forEach(([type, file]) => {
+          // Create a new File object with the field name prefixed to the original name
+          // This helps the admin identify which file belongs to which field
+          const renamedFile = new window.File([file], `${type}_${file.name}`, { type: file.type });
+          data.append('documents', renamedFile);
+        });
+
+        const res = await api.post('/application-drafts', data, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        setDraftId(res.data.id);
+        setShowPaymentStep(true);
+        setIsSubmitting(false);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+
+      // Direct submission for free services or staff/admin
       const data = new FormData();
       data.append('service_type', serviceType || 'general');
-      data.append('form_data', JSON.stringify(formData));
+      data.append('form_data', JSON.stringify(filteredFormData));
+      if (paymentStatus.payment_id) {
+        data.append('payment_id', paymentStatus.payment_id.toString());
+      }
       
-      files.forEach(file => {
-        data.append('documents', file);
+      Object.entries(files).forEach(([type, file]) => {
+        const renamedFile = new window.File([file], `${type}_${file.name}`, { type: file.type });
+        data.append('documents', renamedFile);
       });
 
-      await api.post('/applications', data, {
+      const res = await api.post('/applications', data, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-
+      setSubmittedApp(res.data);
       setSuccess(true);
-      setTimeout(() => navigate(user?.role === 'user' ? '/app/user/applications' : '/app/applications'), 2000);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to submit application');
+      setError(err.response?.data?.error || 'Failed to submit application. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (success) {
+  const handleFinalizeWithWallet = async () => {
+    if (!draftId || !serviceDetails) return;
+    
+    if (walletBalance === null || walletBalance < serviceDetails.service_price) {
+      alert('Insufficient wallet balance.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      // 1. Create payment record
+      const payRes = await api.post('/payments/wallet-pay', { 
+        service_id: serviceDetails.service_id,
+        amount: serviceDetails.service_price
+      });
+      
+      // 2. Finalize application
+      const res = await api.post('/applications/finalize', {
+        draft_id: draftId,
+        payment_id: payRes.data.payment_id
+      });
+      
+      setSubmittedApp(res.data);
+      setSuccess(true);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Payment failed.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleFinalizeWithRazorpay = async () => {
+    if (!draftId || !serviceDetails) return;
+    
+    try {
+      const orderRes = await api.post('/payments/create-order', { service_id: serviceDetails.service_id });
+      const order = orderRes.data;
+      
+      const options = {
+        key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_dummy',
+        amount: order.amount,
+        currency: order.currency,
+        name: portalConfig.portal_name || 'JH Digital Seva',
+        description: `Payment for ${serviceDetails.service_name}`,
+        order_id: order.id,
+        handler: async (response: any) => {
+          try {
+            const verifyRes = await api.post('/payments/verify', {
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              service_id: serviceDetails.service_id
+            });
+            
+            // Finalize
+            const res = await api.post('/applications/finalize', {
+              draft_id: draftId,
+              payment_id: verifyRes.data.payment_id
+            });
+            
+            setSubmittedApp(res.data);
+            setSuccess(true);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          } catch (err) {
+            alert('Payment verification failed. Please contact support.');
+          }
+        },
+        prefill: {
+          name: user?.name,
+          email: user?.email,
+          contact: user?.phone
+        },
+        theme: {
+          color: "#2563eb"
+        }
+      };
+      
+      const rzp = new (window as any).Razorpay(options);
+      rzp.open();
+    } catch (err) {
+      console.error('Payment Error:', err);
+      alert('Failed to initiate payment.');
+    }
+  };
+
+  const handleDownloadPDF = async () => {
+    if (!submittedApp) return;
+    setIsGeneratingPDF(true);
+    // Small delay to ensure styles are applied
+    setTimeout(async () => {
+      await downloadPDF('receipt-apply', `Acknowledgement_${submittedApp.reference_number}`);
+      setIsGeneratingPDF(false);
+    }, 100);
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  if (showPaymentStep && !success) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
-        <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mb-6">
-          <CheckCircle2 className="text-green-500 w-10 h-10" />
+      <div className="max-w-2xl mx-auto space-y-8">
+        <div className="glass rounded-[3rem] p-12 border border-white/10 shadow-2xl relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 blur-[100px] -z-10"></div>
+          
+          <div className="text-center space-y-4 mb-12">
+            <div className="w-20 h-20 bg-blue-500/20 rounded-3xl flex items-center justify-center mx-auto mb-6">
+              <WalletIcon className="text-blue-400 w-10 h-10" />
+            </div>
+            <h2 className="text-3xl font-black text-white">Complete Payment</h2>
+            <p className="text-slate-400">Your application is saved as a draft. Please complete the payment to submit it.</p>
+          </div>
+
+          <div className="bg-white/5 rounded-3xl p-8 border border-white/5 space-y-6">
+            <div className="flex justify-between items-center">
+              <span className="text-slate-400 font-medium">Service</span>
+              <span className="text-white font-bold">{serviceDetails?.service_name}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-slate-400 font-medium">Application Fee</span>
+              <span className="text-2xl font-black text-white">₹{serviceDetails?.service_price}</span>
+            </div>
+          </div>
+
+          <div className="mt-12 space-y-4">
+            <h3 className="text-white font-bold text-lg mb-4">Select Payment Method</h3>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <button
+                onClick={handleFinalizeWithWallet}
+                disabled={isSubmitting || (walletBalance || 0) < (serviceDetails?.service_price || 0)}
+                className={`p-6 rounded-2xl border transition-all flex flex-col items-center gap-3 ${
+                  (walletBalance || 0) >= (serviceDetails?.service_price || 0)
+                    ? 'border-blue-500/30 bg-blue-500/5 hover:bg-blue-500/10 text-white'
+                    : 'border-white/5 bg-white/5 opacity-50 cursor-not-allowed text-slate-500'
+                }`}
+              >
+                <WalletIcon size={32} />
+                <div className="text-center">
+                  <div className="font-bold">Pay from Wallet</div>
+                  <div className="text-[10px] opacity-60">Balance: ₹{walletBalance || 0}</div>
+                </div>
+              </button>
+
+              <button
+                onClick={handleFinalizeWithRazorpay}
+                disabled={isSubmitting}
+                className="p-6 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 text-white transition-all flex flex-col items-center gap-3"
+              >
+                <QrCode size={32} />
+                <div className="text-center">
+                  <div className="font-bold">UPI / Cards</div>
+                  <div className="text-[10px] opacity-60">Razorpay Secure</div>
+                </div>
+              </button>
+            </div>
+
+            {(walletBalance || 0) < (serviceDetails?.service_price || 0) && (
+              <div className="p-4 bg-orange-500/10 border border-orange-500/20 rounded-2xl flex items-start gap-3 mt-4">
+                <AlertTriangle className="text-orange-500 shrink-0" size={18} />
+                <p className="text-xs text-orange-200/80">
+                  Insufficient wallet balance. You can pay using UPI/Cards or <Link to="/app/wallet" className="text-orange-500 font-bold hover:underline">add money</Link> to your wallet.
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-12 pt-8 border-t border-white/5 flex justify-between items-center">
+            <button
+              onClick={() => setShowPaymentStep(false)}
+              className="text-slate-400 hover:text-white font-bold flex items-center gap-2 transition-all"
+            >
+              <ArrowLeft size={18} /> Back to Form
+            </button>
+            {isSubmitting && (
+              <div className="flex items-center gap-2 text-blue-400 font-bold">
+                <Loader2 className="animate-spin" size={18} /> Processing...
+              </div>
+            )}
+          </div>
         </div>
-        <h2 className="text-3xl font-bold text-white mb-4">Application Submitted!</h2>
-        <p className="text-slate-400 max-w-md">
-          Your application has been successfully submitted and is currently pending review. 
-          You will be redirected to your applications page shortly.
-        </p>
+      </div>
+    );
+  }
+
+  if (success && submittedApp) {
+    return (
+      <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
+        <AcknowledgementReceipt application={submittedApp} id="receipt-apply" />
+
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 no-print">
+          <ModernButton 
+            text="Download Receipt" 
+            icon={Download} 
+            onClick={handleDownloadPDF}
+            disabled={isGeneratingPDF}
+            loading={isGeneratingPDF}
+            gradient="blue-gradient"
+            className="w-full sm:w-auto"
+          />
+          <button 
+            onClick={handlePrint}
+            className="px-8 py-4 bg-white border border-slate-200 text-slate-900 font-black rounded-2xl hover:bg-slate-50 transition-all flex items-center gap-2"
+          >
+            <Printer size={20} /> Print Receipt
+          </button>
+          <ModernButton 
+            text="Track Application" 
+            icon={Activity} 
+            onClick={() => navigate(`/track/${submittedApp.reference_number}`)}
+            gradient="blue-gold-gradient"
+            className="w-full sm:w-auto"
+          />
+          <button 
+            onClick={() => navigate('/app/user/dashboard')}
+            className="px-8 py-4 text-slate-500 font-bold hover:text-white transition-all"
+          >
+            Go to Dashboard
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div className="bg-slate-800/60 backdrop-blur-xl rounded-3xl p-8 border border-slate-700/50 shadow-lg">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">{config.title}</h1>
-          <p className="text-slate-400">{config.description}</p>
+    <div className="max-w-5xl mx-auto space-y-8 pb-20 px-4 sm:px-6 lg:px-8 overflow-x-hidden">
+      {/* Header */}
+      <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-200 flex flex-col md:flex-row items-center gap-6">
+        <div className="w-20 h-20 bg-slate-50 rounded-2xl flex items-center justify-center border border-slate-100">
+          <img src="https://upload.wikimedia.org/wikipedia/commons/5/55/Emblem_of_India.svg" alt="Emblem" className="w-12 h-12" />
         </div>
+        <div className="text-center md:text-left">
+          <h1 className="text-3xl font-bold text-slate-900">{config.title}</h1>
+          <p className="text-blue-600 font-bold text-sm uppercase tracking-widest mt-1">{config.authority}</p>
+          <p className="text-slate-500 mt-2 text-sm">{config.description}</p>
+        </div>
+      </div>
 
-        {error && (
-          <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-3 text-red-400">
-            <AlertCircle size={20} />
-            <p>{error}</p>
-          </div>
-        )}
+      <form onSubmit={handleSubmit} className="space-y-8">
+        <div className="bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden">
+          {config.sections.map((section: any, sIdx: number) => (
+            <div key={section.id} className={`p-8 ${sIdx !== 0 ? 'border-t border-slate-100' : ''}`}>
+              <h2 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-3">
+                <span className="w-8 h-8 bg-blue-600 text-white rounded-lg flex items-center justify-center text-sm">{sIdx + 1}</span>
+                {section.title}
+              </h2>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {section.fields.map((field: any) => {
+                  if (field.conditionField && field.conditionValue) {
+                    if (formData[field.conditionField] !== field.conditionValue) {
+                      return null;
+                    }
+                  }
+                  
+                  return (
+                    <div key={field.name} className={field.type === 'textarea' ? 'md:col-span-2' : ''}>
+                      <label className="block text-sm font-bold text-slate-700 mb-2">
+                        {field.label} {field.required && <span className="text-red-500">*</span>}
+                      </label>
+                      {field.type === 'select' || field.type === 'dropdown' ? (
+                        <select
+                          name={field.name}
+                          required={field.required}
+                          value={formData[field.name] || ''}
+                          onChange={handleInputChange}
+                          className={`w-full px-4 py-3 bg-slate-50 border rounded-xl text-slate-900 focus:outline-none focus:ring-4 transition-all ${
+                            fieldErrors[field.name] 
+                              ? 'border-red-500 focus:border-red-500 focus:ring-red-500/10' 
+                              : 'border-slate-200 focus:border-blue-500 focus:ring-blue-500/10'
+                          }`}
+                        >
+                          <option value="">Select an option</option>
+                          {field.options && field.options.map((opt: string) => (
+                            <option key={opt} value={opt}>{opt}</option>
+                          ))}
+                        </select>
+                      ) : field.type === 'textarea' ? (
+                        <textarea
+                          name={field.name}
+                          required={field.required}
+                          value={formData[field.name] || ''}
+                          onChange={handleInputChange}
+                          rows={3}
+                          className={`w-full px-4 py-3 bg-slate-50 border rounded-xl text-slate-900 focus:outline-none focus:ring-4 transition-all ${
+                            fieldErrors[field.name] 
+                              ? 'border-red-500 focus:border-red-500 focus:ring-red-500/10' 
+                              : 'border-slate-200 focus:border-blue-500 focus:ring-blue-500/10'
+                          }`}
+                        />
+                      ) : field.type === 'file_upload' ? (
+                        <div className="relative">
+                          <input 
+                            type="file" 
+                            id={`field-file-${field.name}`}
+                            name={field.name}
+                            required={field.required}
+                            className="hidden" 
+                            onChange={(e) => handleFileChange(e, field.name)}
+                            accept=".pdf,.jpg,.jpeg,.png"
+                          />
+                          <label 
+                            htmlFor={`field-file-${field.name}`}
+                            className={`flex items-center justify-center w-full py-3 bg-slate-50 border border-dashed rounded-xl cursor-pointer hover:bg-slate-100 transition-all text-sm text-slate-500 gap-2 ${
+                              fieldErrors[field.name] ? 'border-red-500' : 'border-slate-300'
+                            }`}
+                          >
+                            <Upload size={16} /> {files[field.name] ? files[field.name].name : draftDocuments.some(d => d.originalname && d.originalname.startsWith(`${field.name}_`)) ? 'File previously uploaded (click to replace)' : 'Upload File'}
+                          </label>
+                        </div>
+                      ) : (
+                        <input
+                          type={field.type}
+                          name={field.name}
+                          required={field.required}
+                          value={formData[field.name] || ''}
+                          onChange={handleInputChange}
+                          className={`w-full px-4 py-3 bg-slate-50 border rounded-xl text-slate-900 focus:outline-none focus:ring-4 transition-all ${
+                            fieldErrors[field.name] 
+                              ? 'border-red-500 focus:border-red-500 focus:ring-red-500/10' 
+                              : 'border-slate-200 focus:border-blue-500 focus:ring-blue-500/10'
+                          }`}
+                        />
+                      )}
+                      {fieldErrors[field.name] && (
+                        <p className="mt-1.5 text-xs font-bold text-red-500 flex items-center gap-1 animate-in fade-in slide-in-from-top-1">
+                          <AlertCircle size={12} /> {fieldErrors[field.name]}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
 
-        <form onSubmit={handleSubmit} className="space-y-8">
-          {/* Customer Details for Staff */}
-          {(user?.role === 'staff' || user?.role === 'admin') && (
-            <div className="p-6 bg-blue-500/5 border border-blue-500/20 rounded-2xl space-y-4">
-              <div className="flex items-center gap-2 text-blue-400 mb-2">
-                <User size={20} />
-                <h3 className="font-bold">Customer Information</h3>
+          {/* SECTION 5 - Document Upload */}
+          {config.documents && config.documents.length > 0 && (
+            <div className="p-8 border-t border-slate-100 bg-slate-50/50">
+              <h2 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-3">
+                <span className="w-8 h-8 bg-blue-600 text-white rounded-lg flex items-center justify-center text-sm">{config.sections.length + 1}</span>
+                SECTION {config.sections.length + 1} – Document Upload
+              </h2>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {config.documents.map((doc: string) => {
+                  const hasDraftDoc = draftDocuments.some(d => d.originalname && d.originalname.startsWith(`${doc}_`));
+                  return (
+                  <div key={doc} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                    <div className="flex items-center justify-between mb-4">
+                      <label className="text-sm font-bold text-slate-700">{doc} *</label>
+                      {(files[doc] || hasDraftDoc) && <CheckCircle2 className="text-green-500" size={18} />}
+                    </div>
+                    
+                    <div className="relative">
+                      <input 
+                        type="file" 
+                        id={`file-${doc}`}
+                        className="hidden" 
+                        onChange={(e) => handleFileChange(e, doc)}
+                        accept=".pdf,.jpg,.jpeg,.png"
+                      />
+                      <label 
+                        htmlFor={`file-${doc}`}
+                        className="flex items-center justify-center w-full py-3 bg-slate-50 border border-slate-200 border-dashed rounded-xl cursor-pointer hover:bg-slate-100 transition-all text-sm text-slate-500 gap-2"
+                      >
+                        <Upload size={16} /> {files[doc] ? 'Change File' : hasDraftDoc ? 'File previously uploaded (click to replace)' : 'Upload File'}
+                      </label>
+                    </div>
+                    
+                    {files[doc] && (
+                      <div className="mt-3">
+                        <div className="flex items-center justify-between text-[10px] text-slate-500 mb-1">
+                          <span className="truncate max-w-[150px]">{files[doc].name}</span>
+                          <span>{uploadProgress[doc] || 0}%</span>
+                        </div>
+                        <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-blue-600 transition-all duration-300" 
+                            style={{ width: `${uploadProgress[doc] || 0}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )})}
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs text-slate-400 font-medium">Customer Name *</label>
-                  <input 
-                    type="text" name="customerName" required
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 focus:border-blue-500 outline-none"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs text-slate-400 font-medium">Mobile Number *</label>
-                  <input 
-                    type="tel" name="customerPhone" required
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 focus:border-blue-500 outline-none"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs text-slate-400 font-medium">Email Address *</label>
-                  <input 
-                    type="email" name="customerEmail" required
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 focus:border-blue-500 outline-none"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs text-slate-400 font-medium">Full Address *</label>
-                  <input 
-                    type="text" name="customerAddress" required
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 focus:border-blue-500 outline-none"
-                  />
-                </div>
-              </div>
-              <p className="text-[10px] text-slate-500 italic">
-                Note: If the customer has an account with this email/phone, the application will appear in their dashboard.
-              </p>
+              <p className="mt-6 text-xs text-slate-500 italic">Accepted formats: PDF, JPG, PNG. Maximum size: 5MB per file.</p>
             </div>
           )}
 
-          {/* Form Fields */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {config.fields.map((field: any) => (
-              <div key={field.name} className={field.type === 'textarea' ? 'md:col-span-2' : ''}>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
-                  {field.label} {field.required && <span className="text-red-400">*</span>}
-                </label>
-                {field.type === 'select' ? (
-                  <select
-                    name={field.name}
-                    required={field.required}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
-                  >
-                    <option value="">Select an option</option>
-                    {field.options.map((opt: string) => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                ) : field.type === 'textarea' ? (
-                  <textarea
-                    name={field.name}
-                    required={field.required}
-                    onChange={handleInputChange}
-                    rows={3}
-                    className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
-                  />
-                ) : (
-                  <input
-                    type={field.type}
-                    name={field.name}
-                    required={field.required}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
-                  />
-                )}
-              </div>
-            ))}
-          </div>
-
-          {/* Document Upload */}
-          <div className="border-t border-slate-700/50 pt-8">
-            <h3 className="text-xl font-semibold text-white mb-2">Required Documents</h3>
-            <p className="text-sm text-slate-400 mb-6">
-              Please upload: {config.documents.join(', ')} (PDF, JPG, PNG up to 5MB)
-            </p>
+          {/* SECTION 6 - Declaration */}
+          <div className="p-8 border-t border-slate-100">
+            <h2 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-3">
+              <span className="w-8 h-8 bg-blue-600 text-white rounded-lg flex items-center justify-center text-sm">
+                {config.sections.length + (config.documents && config.documents.length > 0 ? 2 : 1)}
+              </span>
+              SECTION {config.sections.length + (config.documents && config.documents.length > 0 ? 2 : 1)} – Declaration
+            </h2>
             
-            <div className="flex flex-col items-center justify-center w-full">
-              <label className="flex flex-col items-center justify-center w-full h-40 border-2 border-slate-700 border-dashed rounded-2xl cursor-pointer bg-slate-800/30 hover:bg-slate-800/50 transition-colors">
-                <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                  <Upload className="w-10 h-10 text-slate-400 mb-3" />
-                  <p className="mb-2 text-sm text-slate-300"><span className="font-semibold">Click to upload</span> or drag and drop</p>
-                  <p className="text-xs text-slate-500">PDF, PNG, JPG (MAX. 5MB)</p>
-                </div>
-                <input type="file" className="hidden" multiple onChange={handleFileChange} accept=".pdf,.jpg,.jpeg,.png" />
-              </label>
-            </div>
+            <label className="flex gap-4 p-6 bg-slate-50 border border-slate-200 rounded-2xl cursor-pointer hover:bg-slate-100/50 transition-all">
+              <input 
+                type="checkbox" 
+                checked={declaration}
+                onChange={(e) => setDeclaration(e.target.checked)}
+                className="mt-1 w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-sm text-slate-700 leading-relaxed">
+                I hereby declare that the information provided is correct and true to the best of my knowledge. 
+                I understand that any false information may lead to the rejection of my application or legal action.
+              </span>
+            </label>
+          </div>
 
-            {/* File List */}
-            {files.length > 0 && (
-              <div className="mt-6 space-y-3">
-                {files.map((file, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 bg-slate-900/50 border border-slate-700 rounded-xl">
-                    <div className="flex items-center gap-3">
-                      <File className="text-blue-400" size={20} />
-                      <span className="text-sm text-slate-300 truncate max-w-[200px] sm:max-w-md">{file.name}</span>
-                    </div>
-                    <button 
-                      type="button" 
-                      onClick={() => removeFile(index)}
-                      className="text-slate-500 hover:text-red-400 transition-colors"
-                    >
-                      <X size={18} />
-                    </button>
+          {/* Wallet Balance & Fee Info */}
+          {serviceFee !== null && serviceFee > 0 && (
+            <div className="p-8 border-t border-slate-100 bg-slate-50/50">
+              <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-blue-600/10 rounded-2xl">
+                    <WalletIcon className="text-blue-600" size={24} />
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
+                  <div>
+                    <p className="text-sm text-slate-500 font-medium uppercase tracking-wider">Wallet Balance</p>
+                    <p className="text-2xl font-black text-slate-900">₹{walletBalance?.toLocaleString() || '0'}</p>
+                  </div>
+                </div>
+                
+                <div className="h-12 w-px bg-slate-200 hidden md:block" />
 
-          {/* Submit */}
-          <div className="flex justify-end pt-6">
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="px-8 py-3 bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white font-medium rounded-xl transition-all shadow-[0_0_20px_rgba(59,130,246,0.3)] disabled:opacity-50 flex items-center gap-2"
-            >
-              {isSubmitting ? 'Submitting...' : 'Submit Application'}
-            </button>
-          </div>
-        </form>
-      </div>
+                <div className="text-center md:text-right">
+                  <p className="text-sm text-slate-500 font-medium uppercase tracking-wider">Service Fee</p>
+                  <p className="text-2xl font-black text-red-600">₹{(serviceFee || 0).toLocaleString()}</p>
+                </div>
+              </div>
+              
+              {walletBalance !== null && walletBalance < serviceFee ? (
+                <div className="mt-6 flex items-center gap-4 p-4 bg-red-50 border border-red-100 rounded-2xl text-red-600 animate-in fade-in slide-in-from-top-2">
+                  <AlertTriangle size={24} />
+                  <div className="flex-1">
+                    <p className="text-sm font-bold">Insufficient Balance</p>
+                    <p className="text-xs opacity-80">You need ₹{((serviceFee || 0) - (walletBalance || 0)).toLocaleString()} more to apply for this service.</p>
+                  </div>
+                  <ModernButton 
+                    text="Add Money" 
+                    onClick={() => navigate('/app/wallet')}
+                    className="!py-2 !px-4 text-xs"
+                    gradient="red-gradient"
+                  />
+                </div>
+              ) : (
+                <div className="mt-6 flex items-center gap-4 p-4 bg-emerald-50 border border-emerald-100 rounded-2xl text-emerald-600">
+                  <CheckCircle2 size={24} />
+                  <p className="text-sm font-bold">Balance sufficient for this application.</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Buttons */}
+        <div className="flex flex-col sm:flex-row items-center justify-end gap-4">
+          <button
+            type="button"
+            className="w-full sm:w-auto px-8 py-4 bg-white border border-slate-200 text-slate-600 font-bold rounded-2xl hover:bg-slate-50 transition-all"
+          >
+            Save Draft
+          </button>
+          <ModernButton 
+            text="Submit Application" 
+            icon={Rocket} 
+            type="submit"
+            disabled={isSubmitting || !declaration}
+            loading={isSubmitting}
+            gradient="blue-gold-gradient"
+            className="w-full sm:w-auto !px-12"
+          />
+        </div>
+      </form>
     </div>
   );
 };

@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ConfigProvider } from './context/ConfigContext';
 import DashboardLayout from './layouts/DashboardLayout';
@@ -10,21 +10,32 @@ import Contact from './pages/Contact';
 import TrackApplication from './pages/TrackApplication';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
 import Services from './pages/Services';
 import Ledger from './pages/Ledger';
 import Users from './pages/Users';
 import Applications from './pages/Applications';
 import ApplyService from './pages/ApplyService';
+import Wallet from './pages/Wallet';
 import Support from './pages/Support';
 import StaffManagement from './pages/StaffManagement';
 import Settings from './pages/Settings';
-import PortalConfig from './pages/admin/PortalConfig';
+import PortalConfig from './pages/PortalConfig';
+import RecycleBin from './pages/RecycleBin';
+import SecurityControls from './pages/admin/SecurityControls';
+import SystemPermissions from './pages/admin/SystemPermissions';
+import AdminDashboard from './pages/admin/AdminDashboard';
+import AdminWalletManagement from './pages/admin/AdminWalletManagement';
+import AdminPayments from './pages/admin/AdminPayments';
+import ServiceFormBuilder from './pages/admin/ServiceFormBuilder';
 
 const ProtectedRoute = ({ children, roles }: { children: React.ReactNode, roles?: string[] }) => {
-  const { user, isLoading } = useAuth();
+  const { user, loading } = useAuth();
+  const location = useLocation();
 
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-900">
         <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
@@ -33,11 +44,11 @@ const ProtectedRoute = ({ children, roles }: { children: React.ReactNode, roles?
   }
 
   if (!user) {
-    return <Navigate to="/login" />;
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   if (roles && !roles.includes(user.role)) {
-    return <Navigate to={user.role === 'user' ? '/app/user/dashboard' : '/app/dashboard'} />;
+    return <Navigate to={user.role === 'user' ? '/app/user/dashboard' : (user.role === 'admin' ? '/app/admin-dashboard' : '/app/dashboard')} />;
   }
 
   return <>{children}</>;
@@ -47,6 +58,9 @@ const DefaultRedirect = () => {
   const { user } = useAuth();
   if (user?.role === 'user') {
     return <Navigate to="/app/user/dashboard" replace />;
+  }
+  if (user?.role === 'admin') {
+    return <Navigate to="/app/admin-dashboard" replace />;
   }
   return <Navigate to="/app/dashboard" replace />;
 };
@@ -62,20 +76,29 @@ export default function App() {
             <Route path="/about" element={<About />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/track" element={<TrackApplication />} />
+            <Route path="/track/:ref" element={<TrackApplication />} />
           </Route>
           
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           
           <Route path="/app" element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
             <Route index element={<DefaultRedirect />} />
             <Route path="dashboard" element={<ProtectedRoute roles={['admin', 'staff']}><Dashboard /></ProtectedRoute>} />
+            <Route path="admin-dashboard" element={<ProtectedRoute roles={['admin']}><AdminDashboard /></ProtectedRoute>} />
+            <Route path="admin/wallets" element={<ProtectedRoute roles={['admin']}><AdminWalletManagement /></ProtectedRoute>} />
+            <Route path="admin/payments" element={<ProtectedRoute roles={['admin']}><AdminPayments /></ProtectedRoute>} />
             <Route path="services" element={<Services />} />
+            <Route path="services/:id/builder" element={<ProtectedRoute roles={['admin']}><ServiceFormBuilder /></ProtectedRoute>} />
             <Route path="ledger" element={<ProtectedRoute roles={['admin', 'staff']}><Ledger /></ProtectedRoute>} />
             <Route path="users" element={<ProtectedRoute roles={['admin']}><Users /></ProtectedRoute>} />
             <Route path="staff-management" element={<ProtectedRoute roles={['admin']}><StaffManagement /></ProtectedRoute>} />
             <Route path="applications" element={<ProtectedRoute roles={['admin', 'staff']}><Applications /></ProtectedRoute>} />
             <Route path="support" element={<ProtectedRoute roles={['admin', 'staff']}><Support /></ProtectedRoute>} />
+            <Route path="recycle-bin" element={<ProtectedRoute roles={['admin']}><RecycleBin /></ProtectedRoute>} />
+            <Route path="wallet" element={<Wallet />} />
             
             {/* Staff Specific Routes */}
             <Route path="staff/dashboard" element={<ProtectedRoute roles={['staff']}><Dashboard /></ProtectedRoute>} />
@@ -91,7 +114,8 @@ export default function App() {
             <Route path="settings/services" element={<ProtectedRoute roles={['admin']}><Services /></ProtectedRoute>} />
             <Route path="settings/users" element={<ProtectedRoute roles={['admin']}><Users /></ProtectedRoute>} />
             <Route path="settings/staff" element={<ProtectedRoute roles={['admin']}><Users /></ProtectedRoute>} />
-            <Route path="settings/permissions" element={<ProtectedRoute roles={['admin']}><div className="text-white">Permissions Module</div></ProtectedRoute>} />
+            <Route path="settings/permissions" element={<ProtectedRoute roles={['admin']}><SystemPermissions /></ProtectedRoute>} />
+            <Route path="settings/security" element={<ProtectedRoute roles={['admin']}><SecurityControls /></ProtectedRoute>} />
             <Route path="settings/portal" element={<ProtectedRoute roles={['admin']}><PortalConfig /></ProtectedRoute>} />
           </Route>
         </Routes>

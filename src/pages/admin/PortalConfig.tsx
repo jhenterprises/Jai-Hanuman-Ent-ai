@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import api from '../../services/api';
 import { Save } from 'lucide-react';
+import { useConfig } from '../../context/ConfigContext';
 
 const PortalConfig = () => {
+  const { refreshConfig } = useConfig();
   const [config, setConfig] = useState<any>({});
   const [loading, setLoading] = useState(true);
 
@@ -25,6 +27,7 @@ const PortalConfig = () => {
     e.preventDefault();
     try {
       await api.put('/portal-config', config);
+      await refreshConfig();
       alert('Configuration updated successfully');
     } catch (err) {
       console.error('Error updating portal config:', err);

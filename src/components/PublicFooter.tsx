@@ -67,7 +67,7 @@ const PublicFooter = () => {
               </li>
               <li className="flex items-center gap-3">
                 <Mail size={18} className="text-blue-500 shrink-0" />
-                <span className="text-sm">{config.contact_email || 'support@jhdigitalseva.com'}</span>
+                <span className="text-sm">{config.contact_email || 'support@jhdigitalsevakendra.com'}</span>
               </li>
             </ul>
           </div>

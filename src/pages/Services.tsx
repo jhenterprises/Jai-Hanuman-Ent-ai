@@ -2,23 +2,49 @@ import React, { useEffect, useState } from 'react';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import * as LucideIcons from 'lucide-react';
-import { Search, Plus, Trash2, ExternalLink, ArrowRight, X, Check, Eye, EyeOff, Power, Edit2 } from 'lucide-react';
+import { Search, Plus, Trash2, ExternalLink, ArrowRight, X, Check, Eye, EyeOff, Power, Edit2, Rocket, Settings } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import ConfirmDialog from '../components/ConfirmDialog';
+import ModernButton from '../components/ModernButton';
+
+import { useConfig } from '../context/ConfigContext';
 
 const Services = () => {
+  const { config } = useConfig();
   const [services, setServices] = useState<any[]>([]);
   const [search, setSearch] = useState('');
   const { user } = useAuth();
   const [showForm, setShowForm] = useState(false);
   const [editingService, setEditingService] = useState<any>(null);
+  const [serviceInputs, setServiceInputs] = useState<any[]>([]);
+  const [newInput, setNewInput] = useState({ input_label: '', input_type: 'text', required: true });
+  
+  // Confirm Dialog State
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
+
   const [formData, setFormData] = useState({ 
     service_name: '', 
     description: '', 
     url: '',
     type: 'internal',
     icon: '',
+    application_id: '',
     visible_status: 1,
-    active_status: 1
+    active_status: 1,
+    service_price: 0,
+    payment_required: false,
+    fee: 0,
+    staff_commission: 0
   });
   const navigate = useNavigate();
 
@@ -34,6 +60,50 @@ const Services = () => {
       console.error('Error fetching services:', err);
       alert('Services temporarily unavailable. Please contact admin.');
     }
+  };
+
+  const fetchServiceInputs = async (serviceId: number) => {
+    try {
+      const res = await api.get(`/service-inputs/${serviceId}`);
+      setServiceInputs(res.data);
+    } catch (err) {
+      console.error('Error fetching service inputs:', err);
+    }
+  };
+
+  const handleAddInput = async () => {
+    if (!editingService || !newInput.input_label) return;
+    try {
+      await api.post('/service-inputs', {
+        service_id: editingService.service_id,
+        ...newInput
+      });
+      setNewInput({ input_label: '', input_type: 'text', required: true });
+      fetchServiceInputs(editingService.service_id);
+    } catch (err) {
+      console.error('Error adding input:', err);
+      alert('Failed to add input field.');
+    }
+  };
+
+  const handleDeleteInput = (inputId: number) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Delete Input Field',
+      message: 'Are you sure you want to delete this input field?',
+      onConfirm: async () => {
+        try {
+          await api.delete(`/service-inputs/${inputId}`);
+          if (editingService) {
+            fetchServiceInputs(editingService.service_id);
+          }
+        } catch (err) {
+          console.error('Error deleting input field:', err);
+          alert('Unable to delete input field. Please try again.');
+        }
+        setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+      }
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -52,8 +122,13 @@ const Services = () => {
         url: '', 
         type: 'internal',
         icon: '',
+        application_id: '',
         visible_status: 1, 
-        active_status: 1 
+        active_status: 1,
+        service_price: 0,
+        payment_required: false,
+        fee: 0,
+        staff_commission: 0
       });
       fetchServices();
     } catch (err) {
@@ -69,27 +144,38 @@ const Services = () => {
       url: service.url || '',
       type: service.type || 'internal',
       icon: service.icon || '',
+      application_id: service.application_id || '',
       visible_status: service.visible_status,
-      active_status: service.active_status
+      active_status: service.active_status,
+      service_price: service.service_price || 0,
+      payment_required: service.payment_required === 1,
+      fee: service.fee || 0,
+      staff_commission: service.staff_commission || 0
     });
     setShowForm(true);
+    fetchServiceInputs(service.service_id);
   };
 
-  const handleDelete = async (id: string | number) => {
-    console.log('Delete button clicked for ID:', id);
-    if (confirm('Are you sure you want to delete this service? This action cannot be undone.')) {
-      try {
-        await api.delete(`/services/${id}`);
-        fetchServices();
-      } catch (err: any) {
-        if (err.response && err.response.status === 400) {
-          alert(err.response.data.error);
-        } else {
-          console.error('Error deleting service:', err);
-          alert('Failed to delete service. Please try again.');
+  const handleDelete = (id: string | number) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Delete Service',
+      message: 'Are you sure you want to delete this service? This action cannot be undone.',
+      onConfirm: async () => {
+        try {
+          await api.delete(`/services/${id}`);
+          fetchServices();
+        } catch (err: any) {
+          if (err.response && err.response.status === 400) {
+            alert(err.response.data.error);
+          } else {
+            console.error('Error deleting service:', err);
+            alert('Failed to delete service. Please try again.');
+          }
         }
+        setConfirmDialog(prev => ({ ...prev, isOpen: false }));
       }
-    }
+    });
   };
 
   const toggleVisibility = async (id: number) => {
@@ -127,11 +213,10 @@ const Services = () => {
 
   const handleApply = (service: any) => {
     const key = getServiceKey(service.service_name);
-    if (key) {
-      navigate(`/app/user/apply/${key}`);
-    } else {
-      alert('This service is currently not available for online application.');
-    }
+    // If it's a hardcoded one, use that key. 
+    // Otherwise, use the service name itself so ApplyService can find it.
+    const urlParam = (key && key !== 'general') ? key : encodeURIComponent(service.service_name);
+    navigate(`/app/user/apply/${urlParam}`);
   };
 
   const handleOpenUrl = async (service: any) => {
@@ -147,7 +232,7 @@ const Services = () => {
     }
   };
 
-  const filtered = services.filter(s => s.service_name.toLowerCase().includes(search.toLowerCase()));
+  const filtered = (services || []).filter(s => (s.service_name || '').toLowerCase().includes(search.toLowerCase()));
 
   const isAdmin = user?.role === 'admin';
   console.log('User:', user, 'isAdmin:', isAdmin);
@@ -172,7 +257,9 @@ const Services = () => {
             />
           </div>
           {isAdmin && (
-            <button 
+            <ModernButton 
+              text="Add Service" 
+              icon={Plus} 
               onClick={() => {
                 setEditingService(null);
                 setFormData({ 
@@ -181,16 +268,19 @@ const Services = () => {
                   url: '', 
                   type: 'internal',
                   icon: '',
+                  application_id: '',
                   visible_status: 1, 
-                  active_status: 1 
+                  active_status: 1,
+                  service_price: 0,
+                  payment_required: false,
+                  fee: 0,
+                  staff_commission: 0
                 });
                 setShowForm(true);
               }}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-colors"
-            >
-              <Plus size={20} />
-              <span>Add Service</span>
-            </button>
+              gradient="blue-gradient"
+              className="!px-4 !py-2 !text-sm"
+            />
           )}
         </div>
       </div>
@@ -229,6 +319,38 @@ const Services = () => {
                 <input 
                   type="url" placeholder="https://..." 
                   value={formData.url} onChange={e => setFormData({...formData, url: e.target.value})}
+                  className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 focus:border-blue-500 outline-none"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-slate-400 font-medium">Application ID</label>
+                <input 
+                  type="text" placeholder="Enter Application ID" 
+                  value={formData.application_id} onChange={e => setFormData({...formData, application_id: e.target.value})}
+                  className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 focus:border-blue-500 outline-none"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-slate-400 font-medium">Service Price (₹) - For Users</label>
+                <input 
+                  type="number" placeholder="0" 
+                  value={formData.service_price} onChange={e => setFormData({...formData, service_price: parseFloat(e.target.value) || 0})}
+                  className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 focus:border-blue-500 outline-none"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-slate-400 font-medium">Wallet Fee (₹) - For Staff/Admin</label>
+                <input 
+                  type="number" placeholder="0" 
+                  value={formData.fee} onChange={e => setFormData({...formData, fee: parseFloat(e.target.value) || 0})}
+                  className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 focus:border-blue-500 outline-none"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-slate-400 font-medium">Staff Commission (₹)</label>
+                <input 
+                  type="number" placeholder="0" 
+                  value={formData.staff_commission} onChange={e => setFormData({...formData, staff_commission: parseFloat(e.target.value) || 0})}
                   className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 focus:border-blue-500 outline-none"
                 />
               </div>
@@ -279,18 +401,53 @@ const Services = () => {
                 </div>
                 <span className="text-sm text-slate-300">Active Status</span>
               </label>
+              <label className="flex items-center gap-2 cursor-pointer group">
+                <input 
+                  type="checkbox" 
+                  checked={formData.payment_required} 
+                  onChange={e => setFormData({...formData, payment_required: e.target.checked})}
+                  className="hidden"
+                />
+                <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${formData.payment_required ? 'bg-orange-600 border-orange-600' : 'border-slate-600 group-hover:border-slate-500'}`}>
+                  {formData.payment_required && <Check size={14} className="text-white" />}
+                </div>
+                <span className="text-sm text-slate-300">Payment Required before Application</span>
+              </label>
             </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <button type="button" onClick={() => setShowForm(false)} className="px-6 py-2 text-slate-400 hover:text-white transition-colors">Cancel</button>
-              <button type="submit" className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-medium transition-all shadow-lg shadow-blue-600/20">
-                {editingService ? 'Update Service' : 'Create Service'}
-              </button>
+
+            {editingService && formData.type === 'internal' && (
+              <div className="mt-8 pt-6 border-t border-slate-700/50">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="text-lg font-bold text-white">Internal Form Builder</h3>
+                    <p className="text-sm text-slate-400">Configure dynamic input fields and document requirements.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/app/services/${editingService.service_id}/builder`)}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-medium transition-colors flex items-center gap-2"
+                  >
+                    <Settings size={16} /> Open Form Builder
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 pt-6">
+              <button type="button" onClick={() => setShowForm(false)} className="px-6 py-2 text-slate-400 hover:text-white transition-colors font-bold">Cancel</button>
+              <ModernButton 
+                text={editingService ? 'Update Service' : 'Create Service'} 
+                icon={editingService ? Edit2 : Plus} 
+                type="submit"
+                gradient="blue-gold-gradient"
+                className="!px-6 !py-2 !text-sm"
+              />
             </div>
           </form>
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-${config.grid_columns || 4} gap-6`}>
         {filtered.length > 0 ? (
           filtered.map(service => (
             <div key={service.service_id} className="group bg-slate-800/60 backdrop-blur-xl rounded-3xl p-6 border border-slate-700/50 shadow-lg hover:border-blue-500/50 transition-all hover:-translate-y-1 relative flex flex-col">
@@ -314,31 +471,53 @@ const Services = () => {
                 {getIcon(service.icon)}
               </div>
               <h3 className="text-xl font-bold text-white mb-2">{service.service_name}</h3>
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                <span className="text-xs font-bold px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30" title="User Price">
+                  User: ₹{service.service_price || 0}
+                </span>
+                {(user?.role === 'admin' || user?.role === 'staff') && (
+                  <>
+                    <span className="text-xs font-bold px-2 py-0.5 rounded bg-purple-500/20 text-purple-400 border border-purple-500/30" title="Wallet Fee">
+                      Fee: ₹{service.fee || 0}
+                    </span>
+                    <span className="text-xs font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" title="Staff Commission">
+                      Comm: ₹{service.staff_commission || 0}
+                    </span>
+                  </>
+                )}
+                {service.payment_required === 1 && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-orange-500/20 text-orange-400 border border-orange-500/30 uppercase tracking-wider">
+                    Paid Service
+                  </span>
+                )}
+              </div>
               <p className="text-slate-400 text-sm mb-6 line-clamp-3 flex-1">{service.description}</p>
               
               <div className="mt-auto flex flex-col gap-2">
                 {(user?.role === 'admin' || user?.role === 'staff') ? (
                   <>
-                    <button 
+                    <ModernButton 
+                      text="Apply for Customer" 
+                      icon={Rocket} 
                       onClick={() => handleApply(service)}
-                      className="inline-flex items-center justify-center w-full py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-all font-bold text-sm gap-2 shadow-lg shadow-blue-600/20"
-                    >
-                      Apply for Customer
-                    </button>
+                      gradient="blue-gold-gradient"
+                      className="w-full !py-2 !text-xs"
+                    />
                     <button 
                       onClick={() => handleOpenUrl(service)}
-                      className="inline-flex items-center justify-center w-full py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl transition-all font-bold text-sm gap-2"
+                      className="inline-flex items-center justify-center w-full py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl transition-all font-bold text-xs gap-2"
                     >
                       Open Service URL
                     </button>
                   </>
                 ) : (
-                  <button 
+                  <ModernButton 
+                    text="Apply Now" 
+                    icon={Rocket} 
                     onClick={() => handleApply(service)}
-                    className="inline-flex items-center justify-center w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-all font-bold text-sm gap-2 shadow-lg shadow-blue-600/20"
-                  >
-                    Apply
-                  </button>
+                    gradient="blue-gold-gradient"
+                    className="w-full !py-3 !text-sm"
+                  />
                 )}
               </div>
             </div>
@@ -349,6 +528,14 @@ const Services = () => {
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 };

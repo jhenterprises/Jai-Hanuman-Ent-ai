@@ -5,60 +5,59 @@ interface User {
   id: number;
   name: string;
   email: string;
-  role: 'admin' | 'staff' | 'user';
+  phone?: string;
+  role: 'user' | 'staff' | 'admin';
 }
 
 interface AuthContextType {
   user: User | null;
-  token: string | null;
   login: (token: string, user: User) => void;
   logout: () => void;
-  isLoading: boolean;
+  loading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const storedToken = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');
-    
-    if (storedToken && storedUser && storedUser !== 'undefined') {
+    const token = localStorage.getItem('token');
+    if (storedUser && storedUser !== 'undefined' && token) {
       try {
-        setToken(storedToken);
         setUser(JSON.parse(storedUser));
-        axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
+        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       } catch (e) {
-        console.error('Failed to parse stored user:', e);
+        console.error('Failed to parse user from localStorage', e);
         localStorage.removeItem('user');
         localStorage.removeItem('token');
       }
+    } else if (storedUser === 'undefined' || !storedUser || !token) {
+      localStorage.removeItem('user');
+      localStorage.removeItem('token');
     }
-    setIsLoading(false);
+    setLoading(false);
   }, []);
 
-  const login = (newToken: string, newUser: User) => {
-    setToken(newToken);
-    setUser(newUser);
-    localStorage.setItem('token', newToken);
-    localStorage.setItem('user', JSON.stringify(newUser));
-    axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+  const login = (token: string, userData: User) => {
+    if (!userData) return;
+    localStorage.setItem('token', token);
+    localStorage.setItem('user', JSON.stringify(userData));
+    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    setUser(userData);
   };
 
   const logout = () => {
-    setToken(null);
-    setUser(null);
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     delete axios.defaults.headers.common['Authorization'];
+    setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, login, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );

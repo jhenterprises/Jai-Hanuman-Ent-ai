@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { Search, Plus, Trash2, Shield, User, Edit2, Check, X } from 'lucide-react';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 const UsersPage = () => {
   const { user } = useAuth();
@@ -11,6 +12,19 @@ const UsersPage = () => {
   const [newUser, setNewUser] = useState({ name: '', email: '', phone: '', password: '', role: 'user' });
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editRole, setEditRole] = useState('');
+  
+  // Confirm Dialog State
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
 
   useEffect(() => {
     fetchUsers();
@@ -29,11 +43,26 @@ const UsersPage = () => {
     fetchUsers();
   };
 
-  const handleDelete = async (id: number) => {
-    if (confirm('Are you sure you want to delete this user?')) {
-      await api.delete(`/users/${id}`);
-      fetchUsers();
-    }
+  const handleDelete = (id: number) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Delete User',
+      message: 'Are you sure you want to delete this user? This action cannot be undone.',
+      onConfirm: async () => {
+        try {
+          await api.delete(`/users/${id}`);
+          fetchUsers();
+        } catch (err: any) {
+          if (err.response && err.response.status === 400) {
+            alert(err.response.data.error);
+          } else {
+            console.error('Error deleting user:', err);
+            alert('Failed to delete user. Please try again.');
+          }
+        }
+        setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+      }
+    });
   };
 
   const handleEditRole = async (id: number) => {
@@ -207,6 +236,13 @@ const UsersPage = () => {
           </table>
         </div>
       </div>
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 };

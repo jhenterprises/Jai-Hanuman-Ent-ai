@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { MessageSquare, Plus, CheckCircle, Clock, XCircle, User } from 'lucide-react';
+import { safeFormat } from '../utils/dateUtils';
 
 const Support = () => {
   const [tickets, setTickets] = useState<any[]>([]);
@@ -132,7 +133,7 @@ const Support = () => {
               ) : (
                 tickets.map(ticket => (
                   <tr key={ticket.id} className="border-b border-slate-700/30 hover:bg-slate-700/20 transition-colors">
-                    <td className="p-4 text-slate-400">{new Date(ticket.created_at).toLocaleDateString()}</td>
+                    <td className="p-4 text-slate-400">{safeFormat(ticket.created_at, 'dd/MM/yyyy')}</td>
                     {(user?.role === 'admin' || user?.role === 'staff') && (
                       <td className="p-4 text-slate-200 font-medium">
                         <div>{ticket.user_name}</div>
@@ -169,7 +170,7 @@ const Support = () => {
             <div className="p-6 border-b border-slate-700 flex items-center justify-between bg-slate-800/50">
               <div>
                 <h2 className="text-2xl font-bold text-white">Ticket Details</h2>
-                <p className="text-slate-400 text-sm mt-1">Submitted on {new Date(selectedTicket.created_at).toLocaleString()}</p>
+                <p className="text-slate-400 text-sm mt-1">Submitted on {safeFormat(selectedTicket.created_at, 'dd/MM/yyyy, hh:mm a')}</p>
               </div>
               <button onClick={() => setSelectedTicket(null)} className="text-slate-400 hover:text-white p-2 rounded-full hover:bg-slate-700">
                 <XCircle size={24} />

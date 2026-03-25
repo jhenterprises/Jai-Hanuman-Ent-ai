@@ -1,137 +1,122 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { useConfig } from '../context/ConfigContext';
+import React, { useState } from 'react';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import api from '../services/api';
-import { Lock, Mail, User, Sun, Moon, ArrowLeft, Home } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { motion } from 'framer-motion';
+import { LogIn, Mail, Lock, AlertCircle, ArrowLeft } from 'lucide-react';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [isDark, setIsDark] = useState(true);
   const { login } = useAuth();
-  const { config } = useConfig();
   const navigate = useNavigate();
-
-  useEffect(() => {
-    const savedTheme = localStorage.getItem('theme');
-    if (savedTheme === 'light') {
-      setIsDark(false);
-      document.documentElement.classList.remove('dark');
-    } else {
-      setIsDark(true);
-      document.documentElement.classList.add('dark');
-    }
-  }, []);
-
-  const toggleTheme = () => {
-    if (isDark) {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
-      setIsDark(false);
-    } else {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
-      setIsDark(true);
-    }
-  };
+  const location = useLocation();
+  
+  const isLoggedOut = new URLSearchParams(location.search).get('loggedOut') === 'true';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const response = await api.post('/auth/login', { email, password });
-      login(response.data.token, response.data.user);
-      navigate('/app');
+      const res = await api.post('/auth/login', { email, password });
+      login(res.data.token, res.data.user);
+      
+      const from = location.state?.from?.pathname || '/app';
+      navigate(from, { replace: true });
     } catch (err: any) {
       setError(err.response?.data?.error || 'Login failed');
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-800 via-slate-900 to-black p-4 relative">
-      <Link 
-        to="/"
-        className="absolute top-6 left-6 text-slate-400 hover:text-white transition-colors p-3 rounded-full hover:bg-slate-800/50 bg-slate-900/30 backdrop-blur-md border border-slate-700/50 flex items-center gap-2 group"
+    <div className="max-w-md mx-auto mt-12">
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="glass rounded-[2.5rem] p-10 space-y-8 relative"
       >
-        <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
-        <span className="text-sm font-medium pr-2">Back to Home</span>
-      </Link>
-      
-      <button 
-        onClick={toggleTheme}
-        className="absolute top-6 right-6 text-slate-400 hover:text-white transition-colors p-3 rounded-full hover:bg-slate-800/50 bg-slate-900/30 backdrop-blur-md border border-slate-700/50"
-        aria-label="Toggle theme"
-      >
-        {isDark ? <Sun size={24} /> : <Moon size={24} />}
-      </button>
-      <div className="w-full max-w-md bg-slate-800/60 backdrop-blur-xl rounded-3xl p-8 border border-slate-700/50 shadow-[0_0_40px_rgba(0,0,0,0.5)]">
-        <div className="text-center mb-10">
-          <div className="w-20 h-20 mx-auto bg-gradient-to-br from-blue-600 to-gold-500 rounded-3xl flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(245,158,11,0.3)] border border-gold-400/20 overflow-hidden">
-            {config.login_logo || config.logo ? (
-              <img src={config.login_logo || config.logo} alt="Logo" className="w-full h-full object-contain p-2" />
-            ) : (
-              <span className="text-3xl font-bold text-white">{config.portal_name ? config.portal_name.substring(0, 2).toUpperCase() : 'JH'}</span>
-            )}
+        <div className="text-center space-y-2">
+          <div className="w-16 h-16 blue-gradient rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl shadow-blue-500/20">
+            <LogIn className="text-white" size={32} />
           </div>
-          <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-gold-400 to-blue-400 bg-[length:200%_auto] animate-gradient">
-            {config.login_title || config.portal_name || 'Digital Seva Kendra'}
-          </h1>
-          <p className="text-slate-400 mt-2 font-medium">{config.tagline || 'Official Service Portal'}</p>
+          <h2 className="text-3xl font-black text-white">Welcome Back</h2>
+          <p className="text-slate-500">Sign in to your digital citizen account</p>
         </div>
 
+        {isLoggedOut && !error && (
+          <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex flex-col items-center gap-4 text-emerald-400 text-sm text-center">
+            <div className="flex items-center gap-3">
+              <AlertCircle size={18} />
+              You have been successfully signed out.
+            </div>
+            <Link to="/" className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2">
+              <ArrowLeft size={18} /> Back to Webpage
+            </Link>
+          </div>
+        )}
+
         {error && (
-          <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-3 rounded-xl mb-6 text-sm text-center">
+          <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-center gap-3 text-red-400 text-sm">
+            <AlertCircle size={18} />
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <Mail className="h-5 w-5 text-slate-400" />
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-widest text-slate-500 ml-1">Email Address</label>
+            <div className="relative">
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+              <input 
+                type="email" 
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full bg-slate-900/50 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-white focus:outline-none focus:border-blue-500 transition-colors"
+                placeholder="name@example.com"
+              />
             </div>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full pl-11 pr-4 py-3 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
-              placeholder="Email address"
-              required
-            />
           </div>
 
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <Lock className="h-5 w-5 text-slate-400" />
+          <div className="space-y-2">
+            <div className="flex items-center justify-between ml-1">
+              <label className="text-xs font-bold uppercase tracking-widest text-slate-500">Password</label>
+              <Link to="/forgot-password" className="text-xs font-bold text-blue-500 hover:text-blue-400 transition-colors">
+                Forgot Password?
+              </Link>
             </div>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full pl-11 pr-4 py-3 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
-              placeholder="Password"
-              required
-            />
+            <div className="relative">
+              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+              <input 
+                type="password" 
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full bg-slate-900/50 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-white focus:outline-none focus:border-blue-500 transition-colors"
+                placeholder="••••••••"
+              />
+            </div>
           </div>
 
-          <button
+          <button 
             type="submit"
-            className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white font-medium rounded-xl shadow-[0_0_20px_rgba(59,130,246,0.3)] transition-all transform hover:-translate-y-0.5"
+            className="w-full py-4 blue-gradient text-white font-black rounded-2xl shadow-xl shadow-blue-600/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
           >
             Sign In
           </button>
         </form>
 
-        {config.enable_user_registration !== 0 && (
-          <p className="mt-8 text-center text-slate-400 text-sm">
-            Don't have an account?{' '}
-            <Link to="/register" className="text-blue-400 hover:text-blue-300 font-medium transition-colors">
-              Register here
-            </Link>
+        <div className="text-center pt-4 space-y-4">
+          <p className="text-slate-500 text-sm">
+            Don't have an account? <Link to="/register" className="text-accent font-bold hover:underline">Register Now</Link>
           </p>
-        )}
-      </div>
+          <div className="pt-2">
+            <Link to="/" className="inline-flex items-center justify-center gap-2 text-sm font-medium text-slate-400 hover:text-white transition-colors">
+              <ArrowLeft size={16} /> Back to Webpage
+            </Link>
+          </div>
+        </div>
+      </motion.div>
     </div>
   );
 };

@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, ArrowRight, LayoutDashboard } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Menu, X, ArrowRight, LayoutDashboard, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useConfig } from '../context/ConfigContext';
+import ModernButton from './ModernButton';
 
 const PublicNavbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const location = useLocation();
-  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
   const { config } = useConfig();
 
   useEffect(() => {
@@ -62,21 +64,33 @@ const PublicNavbar = () => {
             </Link>
           ))}
           {user ? (
-            <Link 
-              to={dashboardPath} 
-              className="px-6 py-2.5 bg-gold-600 hover:bg-gold-500 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-gold-600/20 flex items-center gap-2"
-            >
-              Dashboard
-              <LayoutDashboard size={16} />
-            </Link>
+            <div className="flex items-center gap-4">
+              <ModernButton 
+                text="Dashboard" 
+                icon={LayoutDashboard} 
+                onClick={() => navigate(dashboardPath)}
+                gradient="gold-gradient"
+                className="!px-6 !py-2.5 !text-sm"
+              />
+              <button 
+                onClick={() => {
+                  logout();
+                  navigate('/login?loggedOut=true');
+                }}
+                className="text-slate-300 hover:text-red-400 transition-colors p-2"
+                title="Logout"
+              >
+                <LogOut size={20} />
+              </button>
+            </div>
           ) : (
-            <Link 
-              to="/login" 
-              className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-blue-600/20 flex items-center gap-2"
-            >
-              Login
-              <ArrowRight size={16} />
-            </Link>
+            <ModernButton 
+              text="Login" 
+              icon={ArrowRight} 
+              onClick={() => navigate('/login')}
+              gradient="blue-gradient"
+              className="!px-6 !py-2.5 !text-sm"
+            />
           )}
         </div>
 
@@ -100,21 +114,34 @@ const PublicNavbar = () => {
             </Link>
           ))}
           {user ? (
-            <Link 
-              to={dashboardPath} 
-              onClick={() => setIsOpen(false)}
-              className="block w-full py-4 bg-gold-600 text-center text-white rounded-2xl font-bold"
-            >
-              Go to Dashboard
-            </Link>
+            <div className="space-y-4">
+              <ModernButton 
+                text="Go to Dashboard" 
+                icon={LayoutDashboard} 
+                onClick={() => { setIsOpen(false); navigate(dashboardPath); }}
+                gradient="gold-gradient"
+                className="w-full"
+              />
+              <button
+                onClick={() => {
+                  setIsOpen(false);
+                  logout();
+                  navigate('/login?loggedOut=true');
+                }}
+                className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-red-400 font-medium border border-red-500/20 hover:bg-red-500/10 transition-colors"
+              >
+                <LogOut size={20} />
+                Logout
+              </button>
+            </div>
           ) : (
-            <Link 
-              to="/login" 
-              onClick={() => setIsOpen(false)}
-              className="block w-full py-4 bg-blue-600 text-center text-white rounded-2xl font-bold"
-            >
-              Login / Register
-            </Link>
+            <ModernButton 
+              text="Login / Register" 
+              icon={ArrowRight} 
+              onClick={() => { setIsOpen(false); navigate('/login'); }}
+              gradient="blue-gradient"
+              className="w-full"
+            />
           )}
         </div>
       )}

@@ -1,528 +1,245 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
-import { GoogleGenAI } from '@google/genai';
-import ReactMarkdown from 'react-markdown';
-import { 
-  IndianRupee, 
-  Users, 
-  Briefcase, 
-  TrendingUp,
-  Activity,
-  Sparkles,
-  Loader2,
-  FileText,
-  CheckCircle,
-  Clock,
-  XCircle,
-  ChevronRight,
-  MessageSquare,
-  ExternalLink,
-  Eye
-} from 'lucide-react';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend,
-  ArcElement
-} from 'chart.js';
-import { Line, Bar, Pie } from 'react-chartjs-2';
+import { motion } from 'framer-motion';
+import { FileText, ArrowRight, Plus, Download, Calendar, Loader2, Wallet, ArrowUpRight, History } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { downloadPDF } from '../utils/pdfGenerator';
+import AcknowledgementReceipt from '../components/AcknowledgementReceipt';
+import { safeFormat } from '../utils/dateUtils';
 
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend,
-  ArcElement
-);
+import { useConfig } from '../context/ConfigContext';
 
 const Dashboard = () => {
-  const { user } = useAuth();
-  const [analytics, setAnalytics] = useState<any>(null);
-  const [userApplications, setUserApplications] = useState<any[]>([]);
-  const [stats, setStats] = useState({ total: 0, approved: 0, inProgress: 0 });
-  const [aiInsight, setAiInsight] = useState<string | null>(null);
-  const [isGeneratingInsight, setIsGeneratingInsight] = useState(false);
+  const { config } = useConfig();
+  const [applications, setApplications] = useState<any[]>([]);
+  const [drafts, setDrafts] = useState<any[]>([]);
+  const [walletBalance, setWalletBalance] = useState<number>(0);
+  const [loading, setLoading] = useState(true);
+  const [downloadingId, setDownloadingId] = useState<number | null>(null);
 
   useEffect(() => {
-    if (user?.role === 'admin') {
-      api.get('/analytics').then(res => setAnalytics(res.data)).catch(console.error);
-    } else if (user?.role === 'user') {
-      api.get('/applications').then(res => {
-        const apps = res.data;
-        setUserApplications(apps.slice(0, 5));
-        setStats({
-          total: apps.length,
-          approved: apps.filter((a: any) => a.status.toLowerCase() === 'approved' || a.status.toLowerCase() === 'completed').length,
-          inProgress: apps.filter((a: any) => ['submitted', 'under review', 'processing', 'documents required'].includes(a.status.toLowerCase())).length
-        });
-      }).catch(console.error);
-    }
-  }, [user]);
+    Promise.all([
+      api.get('/applications'),
+      api.get('/application-drafts'),
+      api.get('/wallet/balance')
+    ]).then(([appRes, draftRes, walletRes]) => {
+      setApplications(appRes.data);
+      setDrafts(draftRes.data);
+      setWalletBalance(walletRes.data.balance || 0);
+    }).finally(() => setLoading(false));
+  }, []);
 
-  const generateAIInsight = async () => {
-    if (!analytics) return;
-    setIsGeneratingInsight(true);
-    try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY as string });
-      
-      const prompt = `Analyze this business data for JH Digital Seva Kendra and provide a brief, professional 3-sentence insight on performance and potential areas for growth:
-      Total Revenue: ₹${analytics.totalRevenue}
-      Total Transactions: ${analytics.totalTransactions}
-      Total Users: ${analytics.totalUsers}
-      Total Staff: ${analytics.totalStaff}
-      Total Applications: ${analytics.totalApplications}
-      Approval Rate: ${analytics.approvalRate}%
-      Top Services: ${analytics.topServices.map((s: any) => `${s.service_name} (${s.count} uses)`).join(', ')}
-      `;
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: prompt,
-      });
-
-      setAiInsight(response.text as string);
-    } catch (error) {
-      console.error('AI Error:', error);
-      setAiInsight('Failed to generate insights. Please try again later.');
-    } finally {
-      setIsGeneratingInsight(false);
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'Approved': return 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20';
+      case 'Rejected': return 'text-red-400 bg-red-400/10 border-red-400/20';
+      case 'Processing': return 'text-blue-400 bg-blue-400/10 border-blue-400/20';
+      default: return 'text-amber-400 bg-amber-400/10 border-amber-400/20';
     }
   };
 
-  if (user?.role === 'user') {
-    return (
-      <div className="space-y-8">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-white tracking-tight">Welcome, {user.name}!</h1>
-            <p className="text-slate-400 mt-1">Manage your digital service applications and track their progress.</p>
-          </div>
-          <Link 
-            to="/app/services" 
-            className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-2xl transition-all shadow-lg shadow-blue-600/25"
-          >
-            <Briefcase size={20} /> New Application
+  const handleDownload = async (app: any) => {
+    setDownloadingId(app.id);
+    try {
+      // Delay to ensure hidden receipt is rendered and styles are applied
+      setTimeout(async () => {
+        await downloadPDF(`receipt-dash-${app.id}`, `Acknowledgement_${app.reference_number}`);
+        setDownloadingId(null);
+      }, 500);
+    } catch (err) {
+      console.error('Download failed:', err);
+      setDownloadingId(null);
+    }
+  };
+
+  return (
+    <div className="space-y-10">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+        <div>
+          <h1 className="text-3xl sm:text-4xl font-black text-white">My Applications</h1>
+          <p className="text-sm sm:text-base text-slate-500">Track and manage your government service requests.</p>
+        </div>
+        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+          <Link to="/app/wallet" className="px-6 py-3 glass border-white/10 text-white font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-white/5 transition-all">
+            <Wallet size={18} /> Wallet: ₹{(walletBalance || 0).toLocaleString()}
+          </Link>
+          <Link to="/" className="px-6 py-3 gold-gradient text-slate-900 font-black rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20">
+            <Plus size={20} /> New Application
           </Link>
         </div>
+      </header>
 
-        {/* User Quick Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="bg-slate-800/60 backdrop-blur-xl p-6 rounded-3xl border border-slate-700/50 shadow-lg">
-            <div className="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-400 mb-4">
-              <FileText size={24} />
-            </div>
-            <div className="text-3xl font-bold text-white mb-1">{stats.total}</div>
-            <div className="text-sm text-slate-400 font-medium mb-2">My Applications</div>
-            <Link to="/app/applications" className="text-xs text-blue-400 font-bold hover:text-blue-300 flex items-center gap-1">
-              View All <ChevronRight size={14} />
-            </Link>
-          </div>
-          <div className="bg-slate-800/60 backdrop-blur-xl p-6 rounded-3xl border border-slate-700/50 shadow-lg">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 mb-4">
-              <CheckCircle size={24} />
-            </div>
-            <div className="text-3xl font-bold text-white mb-1">{stats.approved}</div>
-            <div className="text-sm text-slate-400 font-medium mb-1">Approved</div>
-            <div className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">Ready for download</div>
-          </div>
-          <div className="bg-slate-800/60 backdrop-blur-xl p-6 rounded-3xl border border-slate-700/50 shadow-lg">
-            <div className="w-12 h-12 rounded-2xl bg-yellow-500/10 flex items-center justify-center text-yellow-400 mb-4">
-              <Clock size={24} />
-            </div>
-            <div className="text-3xl font-bold text-white mb-1">{stats.inProgress}</div>
-            <div className="text-sm text-slate-400 font-medium mb-1">In Progress</div>
-            <div className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">Under review</div>
-          </div>
-          <div className="bg-slate-800/60 backdrop-blur-xl p-6 rounded-3xl border border-slate-700/50 shadow-lg">
-            <div className="w-12 h-12 rounded-2xl bg-purple-500/10 flex items-center justify-center text-purple-400 mb-4">
-              <MessageSquare size={24} />
-            </div>
-            <div className="text-2xl font-bold text-white mb-1">Support</div>
-            <Link to="/app/support" className="text-sm text-purple-400 font-bold hover:text-purple-300 flex items-center gap-1">
-              Get Help <ChevronRight size={14} />
-            </Link>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 bg-slate-800/60 backdrop-blur-xl rounded-[2.5rem] p-8 border border-slate-700/50 shadow-lg overflow-hidden">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                <Activity size={20} className="text-blue-400" /> My Applications
-              </h2>
-              <Link to="/app/applications" className="text-sm text-blue-400 hover:underline">View All</Link>
-            </div>
-            <div className="overflow-x-auto -mx-8">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-700/30 border-b border-slate-700/50">
-                    <th className="p-4 text-slate-300 font-semibold text-xs uppercase tracking-wider">Ref Number</th>
-                    <th className="p-4 text-slate-300 font-semibold text-xs uppercase tracking-wider">Service</th>
-                    <th className="p-4 text-slate-300 font-semibold text-xs uppercase tracking-wider">Date</th>
-                    <th className="p-4 text-slate-300 font-semibold text-xs uppercase tracking-wider">Status</th>
-                    <th className="p-4 text-slate-300 font-semibold text-xs uppercase tracking-wider text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {userApplications.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="p-8 text-center text-slate-500 italic">No applications found.</td>
-                    </tr>
-                  ) : (
-                    userApplications.map((app) => (
-                      <tr key={app.id} className="border-b border-slate-700/30 hover:bg-slate-700/20 transition-colors">
-                        <td className="p-4">
-                          <div className="text-slate-200 font-bold font-mono text-xs">{app.reference_number}</div>
-                        </td>
-                        <td className="p-4 text-slate-300 capitalize text-sm">{app.service_type}</td>
-                        <td className="p-4 text-slate-400 text-xs">{new Date(app.created_at).toLocaleDateString()}</td>
-                        <td className="p-4">
-                          <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
-                            app.status.toLowerCase() === 'approved' || app.status.toLowerCase() === 'completed' ? 'text-green-400 border-green-500/20 bg-green-500/5' :
-                            app.status.toLowerCase() === 'rejected' ? 'text-red-400 border-red-500/20 bg-red-500/5' :
-                            'text-yellow-400 border-yellow-500/20 bg-yellow-500/5'
-                          }`}>
-                            {app.status}
-                          </span>
-                        </td>
-                        <td className="p-4 text-right">
-                          <div className="flex items-center justify-end gap-3">
-                            <Link 
-                              to={`/app/user/applications?id=${app.id}`} 
-                              className="text-blue-400 hover:text-blue-300 text-xs font-bold flex items-center gap-1"
-                            >
-                              <Eye size={14} /> View
-                            </Link>
-                            <Link 
-                              to={`/track?ref=${app.reference_number}`} 
-                              className="text-slate-400 hover:text-white text-xs font-bold flex items-center gap-1"
-                            >
-                              <Activity size={14} /> Track
-                            </Link>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-          <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-8 rounded-[2.5rem] text-white shadow-xl shadow-blue-600/20 relative overflow-hidden group">
-            <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform duration-500">
-              <Sparkles size={160} />
-            </div>
-            <h3 className="text-xl font-bold mb-2">Need Assistance?</h3>
-            <p className="text-blue-100 text-sm mb-6 leading-relaxed">Our AI assistant and support team are available 24/7 to help you with your digital service needs.</p>
-            <Link 
-              to="/app/support" 
-              className="inline-flex items-center gap-2 px-6 py-3 bg-white text-blue-600 font-bold rounded-2xl hover:bg-blue-50 transition-colors"
-            >
-              Contact Support
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (user?.role === 'staff') {
-    return (
-      <div className="space-y-8">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* Wallet Quick Actions */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="md:col-span-1 glass rounded-[2rem] p-8 flex flex-col justify-between bg-blue-600/10 border-blue-500/20">
           <div>
-            <h1 className="text-3xl font-bold text-white tracking-tight">Staff Portal</h1>
-            <p className="text-slate-400 mt-1">Manage your daily ledger entries and customer services.</p>
+            <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white mb-4">
+              <Wallet size={24} />
+            </div>
+            <h3 className="text-slate-400 text-sm font-bold uppercase tracking-wider">Available Balance</h3>
+            <p className="text-4xl font-black text-white mt-1">₹{(walletBalance || 0).toLocaleString()}</p>
           </div>
-          <div className="flex items-center gap-3">
-            <Link 
-              to="/app/ledger" 
-              className="inline-flex items-center gap-2 px-6 py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-2xl transition-all border border-slate-700"
-            >
-              <FileText size={20} /> Daily Ledger
+          <div className="flex gap-2 mt-6">
+            <Link to="/app/wallet" className="flex-1 py-3 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-all">
+              <ArrowUpRight size={14} /> Add Money
             </Link>
-            <Link 
-              to="/app/applications" 
-              className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-2xl transition-all shadow-lg shadow-blue-600/25"
-            >
-              <Activity size={20} /> Manage Applications
+            <Link to="/app/wallet" className="flex-1 py-3 glass text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-white/5 transition-all">
+              <History size={14} /> History
             </Link>
           </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-slate-800/60 backdrop-blur-xl p-6 rounded-3xl border border-slate-700/50 shadow-lg">
-            <div className="text-slate-500 text-xs font-bold uppercase tracking-widest mb-1">Assigned Tasks</div>
-            <div className="text-3xl font-bold text-white">0</div>
-            <div className="mt-4 h-1.5 bg-slate-700 rounded-full overflow-hidden">
-              <div className="h-full bg-blue-500 w-0"></div>
-            </div>
-          </div>
-          <div className="bg-slate-800/60 backdrop-blur-xl p-6 rounded-3xl border border-slate-700/50 shadow-lg">
-            <div className="text-slate-500 text-xs font-bold uppercase tracking-widest mb-1">Pending Review</div>
-            <div className="text-3xl font-bold text-white">0</div>
-            <div className="mt-4 h-1.5 bg-slate-700 rounded-full overflow-hidden">
-              <div className="h-full bg-yellow-500 w-0"></div>
-            </div>
-          </div>
-          <div className="bg-slate-800/60 backdrop-blur-xl p-6 rounded-3xl border border-slate-700/50 shadow-lg">
-            <div className="text-slate-500 text-xs font-bold uppercase tracking-widest mb-1">Completed Today</div>
-            <div className="text-3xl font-bold text-white">0</div>
-            <div className="mt-4 h-1.5 bg-slate-700 rounded-full overflow-hidden">
-              <div className="h-full bg-emerald-500 w-0"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Admin Dashboard
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-white">Admin Dashboard</h1>
-        <button 
-          onClick={generateAIInsight}
-          disabled={isGeneratingInsight || !analytics}
-          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white rounded-xl transition-all shadow-[0_0_15px_rgba(59,130,246,0.3)] disabled:opacity-50"
-        >
-          {isGeneratingInsight ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
-          <span>AI Insights</span>
-        </button>
-      </div>
-
-      {/* AI Insight Box */}
-      {aiInsight && (
-        <div className="bg-gradient-to-r from-blue-900/40 to-cyan-900/40 backdrop-blur-xl rounded-3xl p-6 border border-blue-500/30 shadow-[0_0_30px_rgba(59,130,246,0.15)] relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-blue-400 to-cyan-300"></div>
-          <div className="flex items-start gap-4">
-            <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400 shrink-0 mt-1">
-              <Sparkles size={20} />
-            </div>
-            <div className="flex-1">
-              <h3 className="text-lg font-semibold text-white mb-2">AI Performance Analysis</h3>
-              <div className="prose prose-invert prose-sm max-w-none text-slate-300">
-                <ReactMarkdown>{aiInsight}</ReactMarkdown>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard 
-          title="Total Applications" 
-          value={analytics?.totalApplications || 0} 
-          icon={<FileText className="text-blue-400" size={24} />} 
-        />
-        <StatCard 
-          title="Pending Applications" 
-          value={analytics?.pendingApplications || 0} 
-          icon={<Clock className="text-yellow-400" size={24} />} 
-        />
-        <StatCard 
-          title="Approved Applications" 
-          value={analytics?.approvedApplications || 0} 
-          icon={<CheckCircle className="text-green-400" size={24} />} 
-        />
-        <StatCard 
-          title="Rejected Applications" 
-          value={analytics?.rejectedApplications || 0} 
-          icon={<XCircle className="text-red-400" size={24} />} 
-        />
-        <StatCard 
-          title="Total Revenue" 
-          value={`₹${analytics?.totalRevenue || 0}`} 
-          icon={<IndianRupee className="text-emerald-400" size={24} />} 
-        />
-        <StatCard 
-          title="Today's Revenue" 
-          value={`₹${analytics?.todayRevenue || 0}`} 
-          icon={<TrendingUp className="text-cyan-400" size={24} />} 
-        />
-        <StatCard 
-          title="Active Staff" 
-          value={analytics?.totalStaff || 0} 
-          icon={<Users className="text-purple-400" size={24} />} 
-        />
-        <StatCard 
-          title="Approval Rate" 
-          value={`${analytics?.approvalRate || 0}%`} 
-          icon={<Activity className="text-pink-400" size={24} />} 
-        />
-      </div>
-
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-slate-800/60 backdrop-blur-xl rounded-3xl p-6 border border-slate-700/50 shadow-lg">
-          <h3 className="text-lg font-semibold text-white mb-4">Monthly Revenue</h3>
-          {analytics?.monthlyRevenue && (
-            <Line 
-              data={{
-                labels: analytics.monthlyRevenue.map((d: any) => d.month).reverse(),
-                datasets: [{
-                  label: 'Revenue (₹)',
-                  data: analytics.monthlyRevenue.map((d: any) => d.revenue).reverse(),
-                  borderColor: '#3b82f6',
-                  backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                  fill: true,
-                  tension: 0.4
-                }]
-              }}
-              options={{
-                responsive: true,
-                plugins: { legend: { display: false } },
-                scales: {
-                  y: { grid: { color: 'rgba(255,255,255,0.05)' } },
-                  x: { grid: { display: false } }
-                }
-              }}
-            />
-          )}
-        </div>
-
-        <div className="bg-slate-800/60 backdrop-blur-xl rounded-3xl p-6 border border-slate-700/50 shadow-lg">
-          <h3 className="text-lg font-semibold text-white mb-4">Service Distribution</h3>
-          {analytics?.serviceApplications && (
-            <div className="h-64 flex justify-center">
-              <Pie 
-                data={{
-                  labels: analytics.serviceApplications.map((d: any) => d.service_type),
-                  datasets: [{
-                    data: analytics.serviceApplications.map((d: any) => d.count),
-                    backgroundColor: [
-                      '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'
-                    ],
-                    borderWidth: 0
-                  }]
-                }}
-                options={{
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  plugins: { 
-                    legend: { position: 'right', labels: { color: '#cbd5e1' } } 
-                  }
-                }}
-              />
-            </div>
-          )}
         </div>
         
-        <div className="bg-slate-800/60 backdrop-blur-xl rounded-3xl p-6 border border-slate-700/50 shadow-lg">
-          <h3 className="text-lg font-semibold text-white mb-4">Daily Applications</h3>
-          {analytics?.serviceApplications && (
-            <Bar 
-              data={{
-                labels: analytics.serviceApplications.map((d: any) => d.service_type),
-                datasets: [{
-                  label: 'Applications',
-                  data: analytics.serviceApplications.map((d: any) => d.count),
-                  backgroundColor: '#8b5cf6',
-                  borderRadius: 6
-                }]
-              }}
-              options={{
-                responsive: true,
-                plugins: { legend: { display: false } },
-                scales: {
-                  y: { grid: { color: 'rgba(255,255,255,0.05)' } },
-                  x: { grid: { display: false } }
-                }
-              }}
-            />
-          )}
-        </div>
-
-        <div className="bg-slate-800/60 backdrop-blur-xl rounded-3xl p-6 border border-slate-700/50 shadow-lg">
-          <h3 className="text-lg font-semibold text-white mb-4">Staff Performance Ranking</h3>
-          {analytics?.staffPerformance && (
-            <Bar 
-              data={{
-                labels: analytics.staffPerformance.map((d: any) => d.name),
-                datasets: [{
-                  label: 'Processed Applications',
-                  data: analytics.staffPerformance.map((d: any) => d.processed),
-                  backgroundColor: '#10b981',
-                  borderRadius: 6
-                }]
-              }}
-              options={{
-                responsive: true,
-                plugins: { legend: { display: false } },
-                scales: {
-                  y: { grid: { color: 'rgba(255,255,255,0.05)' } },
-                  x: { grid: { display: false } }
-                }
-              }}
-            />
-          )}
+        <div className="md:col-span-2 glass rounded-[2rem] p-8 flex flex-col justify-center bg-amber-500/5 border-amber-500/10">
+          <h3 className="text-xl font-bold text-white mb-2">Welcome to Digital Services Portal</h3>
+          <p className="text-slate-400 text-sm leading-relaxed max-w-lg">
+            Use your wallet for instant service payments. No need to enter card details every time. 
+            Add money once and enjoy a seamless application experience.
+          </p>
+          <div className="mt-6 flex items-center gap-4">
+            <div className="flex -space-x-2">
+              {[1, 2, 3, 4].map(i => (
+                <div key={i} className="w-8 h-8 rounded-full border-2 border-slate-900 bg-slate-800 flex items-center justify-center text-[10px] font-bold text-slate-400">
+                  {String.fromCharCode(64 + i)}
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-slate-500 font-medium">Trusted by 10,000+ users across India</p>
+          </div>
         </div>
       </div>
 
-      {/* Recent Activity Table */}
-      <div className="bg-slate-800/60 backdrop-blur-xl rounded-3xl border border-slate-700/50 shadow-lg overflow-hidden mt-6">
-        <div className="p-6 border-b border-slate-700/50">
-          <h3 className="text-lg font-semibold text-white">Recent Activity</h3>
+      {loading ? (
+        <div className="grid md:grid-cols-3 gap-6">
+          {[1, 2, 3].map(i => <div key={i} className="h-48 glass rounded-[2rem] animate-pulse" />)}
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-700/30 border-b border-slate-700/50">
-                <th className="p-4 text-slate-300 font-semibold">User</th>
-                <th className="p-4 text-slate-300 font-semibold">Service</th>
-                <th className="p-4 text-slate-300 font-semibold">Action</th>
-                <th className="p-4 text-slate-300 font-semibold">Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {analytics?.recentActivity?.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="p-8 text-center text-slate-500">
-                    No recent activity found.
-                  </td>
-                </tr>
-              ) : (
-                analytics?.recentActivity?.map((log: any) => (
-                  <tr key={log.id} className="border-b border-slate-700/30 hover:bg-slate-700/20 transition-colors">
-                    <td className="p-4 text-slate-200 font-medium">{log.user_name}</td>
-                    <td className="p-4 text-slate-300">{log.service_type || 'System'}</td>
-                    <td className="p-4 text-slate-400">{log.action}</td>
-                    <td className="p-4 text-slate-400">{new Date(log.timestamp).toLocaleString()}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+      ) : (
+        <div className="space-y-12">
+          {/* Drafts Section */}
+          {drafts.length > 0 && (
+            <section className="space-y-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-orange-500/20 rounded-xl flex items-center justify-center text-orange-500">
+                  <History size={20} />
+                </div>
+                <h2 className="text-2xl font-bold text-white">My Drafts</h2>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {drafts.map((draft, i) => (
+                  <motion.div
+                    key={draft.id}
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: i * 0.1 }}
+                    className="glass rounded-[2rem] p-6 border-orange-500/10 hover:border-orange-500/30 transition-all group"
+                  >
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="w-10 h-10 bg-orange-500/10 rounded-xl flex items-center justify-center text-orange-500">
+                        <FileText size={20} />
+                      </div>
+                      <span className="px-3 py-1 bg-orange-500/10 text-orange-500 text-[10px] font-black uppercase tracking-widest rounded-full border border-orange-500/20">
+                        Draft
+                      </span>
+                    </div>
+                    <h3 className="text-lg font-bold text-white mb-1">{draft.service_name}</h3>
+                    <p className="text-xs text-slate-500 mb-6">Saved on {safeFormat(draft.created_at, 'dd MMM yyyy')}</p>
+                    <Link
+                      to={`/app/user/apply/${draft.service_type.toLowerCase()}?draftId=${draft.id}`}
+                      className="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-orange-500/20"
+                    >
+                      Resume Application <ArrowRight size={14} />
+                    </Link>
+                  </motion.div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Applications Section */}
+          <section className="space-y-6">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center text-blue-500">
+                <FileText size={20} />
+              </div>
+              <h2 className="text-2xl font-bold text-white">My Applications</h2>
+            </div>
+            {applications.length === 0 ? (
+              <div className="glass rounded-[3rem] p-20 text-center space-y-6">
+                <div className="w-20 h-20 bg-slate-800 rounded-3xl flex items-center justify-center mx-auto text-slate-600">
+                  <FileText size={40} />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-2xl font-bold text-white">No applications yet</h3>
+                  <p className="text-slate-500">Start by applying for a service from the home page.</p>
+                </div>
+                <Link to="/" className="inline-block text-accent font-bold hover:underline">Browse Services &rarr;</Link>
+              </div>
+            ) : (
+              <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-${config.grid_columns || 3} gap-6`}>
+                {applications.map((app, i) => (
+                  <motion.div 
+                    key={app.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.1 }}
+                    className="glass rounded-[2rem] p-8 space-y-6 relative overflow-hidden group flex flex-col h-full"
+                  >
+                    {downloadingId === app.id && (
+                      <div className="fixed top-[-9999px] left-[-9999px] opacity-0 pointer-events-none">
+                        <AcknowledgementReceipt application={app} id={`receipt-dash-${app.id}`} />
+                      </div>
+                    )}
+                    <div className="flex justify-between items-start">
+                      <div className="w-12 h-12 blue-gradient rounded-xl flex items-center justify-center text-white">
+                        <FileText size={24} />
+                      </div>
+                      <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${getStatusColor(app.status)}`}>
+                        {app.status}
+                      </span>
+                    </div>
+
+                    <div className="flex-grow">
+                      <h3 className="text-xl font-bold text-white mb-1 line-clamp-1">{app.service_name || app.service_type}</h3>
+                      <p className="text-xs text-slate-500 font-mono">REF: {app.reference_number}</p>
+                    </div>
+
+                    <div className="space-y-3 pt-4 border-t border-white/5">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-slate-500">Submitted On</span>
+                        <span className="text-slate-300 font-bold">{safeFormat(app.created_at, 'dd/MM/yyyy')}</span>
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-slate-500">Payment</span>
+                        <span className={`font-bold ${app.payment_status === 'Paid' ? 'text-emerald-400' : 'text-red-400'}`}>
+                          {app.payment_status}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <Link 
+                        to={`/track/${app.reference_number}`}
+                        className="flex-1 py-3 glass rounded-xl text-xs font-bold text-white flex items-center justify-center gap-2 group-hover:bg-white/10 transition-all"
+                      >
+                        Track Status <ArrowRight size={14} />
+                      </Link>
+                      <button 
+                        onClick={() => handleDownload(app)}
+                        disabled={downloadingId === app.id}
+                        className="p-3 glass rounded-xl text-blue-400 hover:bg-blue-400/10 transition-all disabled:opacity-50"
+                        title="Download Acknowledgement"
+                      >
+                        {downloadingId === app.id ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                      </button>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </section>
         </div>
-      </div>
+      )}
     </div>
   );
 };
-
-const StatCard = ({ title, value, icon }: { title: string, value: string | number, icon: React.ReactNode }) => (
-  <div className="bg-slate-800/60 backdrop-blur-xl rounded-3xl p-6 border border-slate-700/50 shadow-lg flex items-center gap-4 transition-transform hover:-translate-y-1">
-    <div className="w-14 h-14 rounded-2xl bg-slate-700/50 flex items-center justify-center border border-slate-600/50">
-      {icon}
-    </div>
-    <div>
-      <p className="text-slate-400 text-sm font-medium">{title}</p>
-      <h4 className="text-2xl font-bold text-white mt-1">{value}</h4>
-    </div>
-  </div>
-);
 
 export default Dashboard;
