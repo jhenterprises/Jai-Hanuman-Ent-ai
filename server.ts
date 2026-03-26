@@ -747,14 +747,14 @@ app.get('/api/admin/wallet/transactions', authenticateToken, requireRole(['admin
   res.json(transactions);
 });
 
-app.post('/api/admin/wallet/adjust', authenticateToken, requireRole(['admin']), (req: any, res) => {
-  const { wallet_id, type, amount, description } = req.body;
+app.post('/api/admin/wallets/adjust-balance', authenticateToken, requireRole(['admin']), (req: any, res) => {
+  const { walletId, type, amount, reason } = req.body;
   
-  if (!wallet_id || !type || !amount || amount <= 0) {
+  if (!walletId || !type || !amount || amount <= 0) {
     return res.status(400).json({ error: 'Invalid adjustment data' });
   }
 
-  const wallet = db.prepare('SELECT user_id FROM wallets WHERE id = ?').get(wallet_id) as any;
+  const wallet = db.prepare('SELECT user_id FROM wallets WHERE id = ?').get(walletId) as any;
   if (!wallet) {
     return res.status(404).json({ error: 'Wallet not found' });
   }
@@ -772,7 +772,7 @@ app.post('/api/admin/wallet/adjust', authenticateToken, requireRole(['admin']), 
       }
       
       db.prepare('INSERT INTO wallet_transactions (user_id, type, amount, description, status) VALUES (?, ?, ?, ?, ?)')
-        .run(userId, type, amount, description || `Admin ${type} adjustment`, 'success');
+        .run(userId, type, amount, reason || `Admin ${type} adjustment`, 'success');
     })();
 
     res.json({ message: 'Wallet adjusted successfully' });
