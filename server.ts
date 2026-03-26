@@ -36,9 +36,24 @@ app.get('/api/health', (req, res) => {
 // Database Setup
 const dbDir = path.join(__dirname, 'data');
 if (!fs.existsSync(dbDir)) {
-  fs.mkdirSync(dbDir);
+  try {
+    fs.mkdirSync(dbDir, { recursive: true });
+    console.log('Created database directory:', dbDir);
+  } catch (err) {
+    console.error('Failed to create database directory:', err);
+  }
 }
-const db = new Database(path.join(dbDir, 'database.sqlite'));
+
+let db: any;
+try {
+  db = new Database(path.join(dbDir, 'database.sqlite'));
+  console.log('Database initialized successfully at:', path.join(dbDir, 'database.sqlite'));
+} catch (err) {
+  console.error('Failed to initialize database:', err);
+  // Fallback to in-memory database if file fails
+  db = new Database(':memory:');
+  console.log('Using in-memory database as fallback.');
+}
 
 // Initialize Database Tables
 db.exec(`
@@ -317,6 +332,7 @@ migrate();
 
 // Seed Admin, Staff, and User
 const seedUsers = () => {
+  console.log('Seeding users...');
   const usersToSeed = [
     { name: 'Super Admin', email: 'admin@jh.com', phone: '9999999999', password: 'admin', role: 'admin' },
     { name: 'Demo Staff', email: 'staff@jh.com', phone: '8888888888', password: 'staff', role: 'staff' },
@@ -327,17 +343,39 @@ const seedUsers = () => {
   const check = db.prepare('SELECT * FROM users WHERE email = ?');
 
   usersToSeed.forEach(u => {
-    if (!check.get(u.email)) {
+    const normalizedEmail = u.email.toLowerCase();
+    const existing = check.get(normalizedEmail);
+    if (!existing) {
+      console.log(`Seeding user: ${normalizedEmail}`);
       const hashedPassword = bcrypt.hashSync(u.password, 10);
-      const result = insert.run(u.name, u.email, u.phone, hashedPassword, u.role);
+      const result = insert.run(u.name, normalizedEmail, u.phone, hashedPassword, u.role);
       const userId = result.lastInsertRowid;
       
       // Create wallet for seeded users
       db.prepare('INSERT INTO wallets (user_id, role, balance) VALUES (?, ?, 0)').run(userId, u.role);
+    } else {
+      console.log(`User already exists: ${u.email}`);
     }
   });
+  console.log('Seeding completed.');
 };
 seedUsers();
+
+// Debug endpoint to check database status (remove in production)
+app.get('/api/debug/db-status', (req, res) => {
+  try {
+    const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get() as any;
+    const walletCount = db.prepare('SELECT COUNT(*) as count FROM wallets').get() as any;
+    res.json({
+      users: userCount.count,
+      wallets: walletCount.count,
+      dbPath: path.join(dbDir, 'database.sqlite'),
+      dbExists: fs.existsSync(path.join(dbDir, 'database.sqlite'))
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // Seed Initial Services
 const seedServices = () => {
@@ -533,14 +571,20 @@ app.put('/api/portal-config', authenticateToken, requireRole(['admin']), (req, r
 // Auth
 app.post('/api/auth/login', (req, res) => {
   const { email, password } = req.body;
-  console.log('Login attempt:', email);
+  const normalizedEmail = email?.toLowerCase();
+  console.log('Login attempt:', normalizedEmail);
+  console.log('Password type:', typeof password);
   try {
-    const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email) as any;
+    const user = db.prepare('SELECT * FROM users WHERE email = ?').get(normalizedEmail) as any;
     if (!user) {
       console.log('Login failed: User not found');
       return res.status(401).json({ error: 'Invalid credentials' });
     }
-    if (!bcrypt.compareSync(password, user.password)) {
+    console.log('User found:', user.email);
+    console.log('Stored hashed password:', user.password);
+    const isMatch = bcrypt.compareSync(password, user.password);
+    console.log('Password match result:', isMatch);
+    if (!isMatch) {
       console.log('Login failed: Password mismatch');
       return res.status(401).json({ error: 'Invalid credentials' });
     }
@@ -555,11 +599,12 @@ app.post('/api/auth/login', (req, res) => {
 
 app.post('/api/auth/register', (req, res) => {
   const { name, email, phone, password } = req.body;
-  console.log('Registration attempt:', email);
+  const normalizedEmail = email?.toLowerCase();
+  console.log('Registration attempt:', normalizedEmail);
   try {
     const hashedPassword = bcrypt.hashSync(password, 10);
     const result = db.prepare('INSERT INTO users (name, email, phone, password, role) VALUES (?, ?, ?, ?, ?)').run(
-      name, email, phone, hashedPassword, 'user'
+      name, normalizedEmail, phone, hashedPassword, 'user'
     );
     const userId = result.lastInsertRowid;
     
