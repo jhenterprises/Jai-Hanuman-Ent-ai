@@ -36,24 +36,9 @@ app.get('/api/health', (req, res) => {
 // Database Setup
 const dbDir = path.join(__dirname, 'data');
 if (!fs.existsSync(dbDir)) {
-  try {
-    fs.mkdirSync(dbDir, { recursive: true });
-    console.log('Created database directory:', dbDir);
-  } catch (err) {
-    console.error('Failed to create database directory:', err);
-  }
+  fs.mkdirSync(dbDir);
 }
-
-let db: any;
-try {
-  db = new Database(path.join(dbDir, 'database.sqlite'));
-  console.log('Database initialized successfully at:', path.join(dbDir, 'database.sqlite'));
-} catch (err) {
-  console.error('Failed to initialize database:', err);
-  // Fallback to in-memory database if file fails
-  db = new Database(':memory:');
-  console.log('Using in-memory database as fallback.');
-}
+const db = new Database(path.join(dbDir, 'database.sqlite'));
 
 // Initialize Database Tables
 db.exec(`
@@ -332,7 +317,6 @@ migrate();
 
 // Seed Admin, Staff, and User
 const seedUsers = () => {
-  console.log('Seeding users...');
   const usersToSeed = [
     { name: 'Super Admin', email: 'admin@jh.com', phone: '9999999999', password: 'admin', role: 'admin' },
     { name: 'Demo Staff', email: 'staff@jh.com', phone: '8888888888', password: 'staff', role: 'staff' },
@@ -343,39 +327,17 @@ const seedUsers = () => {
   const check = db.prepare('SELECT * FROM users WHERE email = ?');
 
   usersToSeed.forEach(u => {
-    const normalizedEmail = u.email.toLowerCase();
-    const existing = check.get(normalizedEmail);
-    if (!existing) {
-      console.log(`Seeding user: ${normalizedEmail}`);
+    if (!check.get(u.email)) {
       const hashedPassword = bcrypt.hashSync(u.password, 10);
-      const result = insert.run(u.name, normalizedEmail, u.phone, hashedPassword, u.role);
+      const result = insert.run(u.name, u.email, u.phone, hashedPassword, u.role);
       const userId = result.lastInsertRowid;
       
       // Create wallet for seeded users
       db.prepare('INSERT INTO wallets (user_id, role, balance) VALUES (?, ?, 0)').run(userId, u.role);
-    } else {
-      console.log(`User already exists: ${u.email}`);
     }
   });
-  console.log('Seeding completed.');
 };
 seedUsers();
-
-// Debug endpoint to check database status (remove in production)
-app.get('/api/debug/db-status', (req, res) => {
-  try {
-    const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get() as any;
-    const walletCount = db.prepare('SELECT COUNT(*) as count FROM wallets').get() as any;
-    res.json({
-      users: userCount.count,
-      wallets: walletCount.count,
-      dbPath: path.join(dbDir, 'database.sqlite'),
-      dbExists: fs.existsSync(path.join(dbDir, 'database.sqlite'))
-    });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
 
 // Seed Initial Services
 const seedServices = () => {
@@ -571,40 +533,20 @@ app.put('/api/portal-config', authenticateToken, requireRole(['admin']), (req, r
 // Auth
 app.post('/api/auth/login', (req, res) => {
   const { email, password } = req.body;
-  const normalizedEmail = email?.toLowerCase();
-  console.log('Login attempt:', normalizedEmail);
-  console.log('Password type:', typeof password);
-  try {
-    const user = db.prepare('SELECT * FROM users WHERE email = ?').get(normalizedEmail) as any;
-    if (!user) {
-      console.log('Login failed: User not found');
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
-    console.log('User found:', user.email);
-    console.log('Stored hashed password:', user.password);
-    const isMatch = bcrypt.compareSync(password, user.password);
-    console.log('Password match result:', isMatch);
-    if (!isMatch) {
-      console.log('Login failed: Password mismatch');
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
-    const token = jwt.sign({ id: user.id, role: user.role, name: user.name }, JWT_SECRET, { expiresIn: '24h' });
-    console.log('Login successful:', email);
-    res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
-  } catch (err) {
-    console.error('Login error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email) as any;
+  if (!user || !bcrypt.compareSync(password, user.password)) {
+    return res.status(401).json({ error: 'Invalid credentials' });
   }
+  const token = jwt.sign({ id: user.id, role: user.role, name: user.name }, JWT_SECRET, { expiresIn: '24h' });
+  res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
 });
 
 app.post('/api/auth/register', (req, res) => {
   const { name, email, phone, password } = req.body;
-  const normalizedEmail = email?.toLowerCase();
-  console.log('Registration attempt:', normalizedEmail);
   try {
     const hashedPassword = bcrypt.hashSync(password, 10);
     const result = db.prepare('INSERT INTO users (name, email, phone, password, role) VALUES (?, ?, ?, ?, ?)').run(
-      name, normalizedEmail, phone, hashedPassword, 'user'
+      name, email, phone, hashedPassword, 'user'
     );
     const userId = result.lastInsertRowid;
     
@@ -612,14 +554,12 @@ app.post('/api/auth/register', (req, res) => {
     db.prepare('INSERT INTO wallets (user_id, role, balance) VALUES (?, ?, 0)').run(userId, 'user');
 
     const token = jwt.sign({ id: userId, role: 'user', name }, JWT_SECRET, { expiresIn: '24h' });
-    console.log('Registration successful:', email);
     res.json({ 
       token, 
       user: { id: userId, name, email, role: 'user' },
       message: 'User registered successfully' 
     });
   } catch (err: any) {
-    console.error('Registration error:', err);
     if (err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
       res.status(400).json({ error: 'Email already exists' });
     } else {
@@ -807,14 +747,14 @@ app.get('/api/admin/wallet/transactions', authenticateToken, requireRole(['admin
   res.json(transactions);
 });
 
-app.post('/api/admin/wallets/adjust-balance', authenticateToken, requireRole(['admin']), (req: any, res) => {
-  const { walletId, type, amount, reason } = req.body;
+app.post('/api/admin/wallet/adjust', authenticateToken, requireRole(['admin']), (req: any, res) => {
+  const { wallet_id, type, amount, description } = req.body;
   
-  if (!walletId || !type || !amount || amount <= 0) {
+  if (!wallet_id || !type || !amount || amount <= 0) {
     return res.status(400).json({ error: 'Invalid adjustment data' });
   }
 
-  const wallet = db.prepare('SELECT user_id FROM wallets WHERE id = ?').get(walletId) as any;
+  const wallet = db.prepare('SELECT user_id FROM wallets WHERE id = ?').get(wallet_id) as any;
   if (!wallet) {
     return res.status(404).json({ error: 'Wallet not found' });
   }
@@ -832,7 +772,7 @@ app.post('/api/admin/wallets/adjust-balance', authenticateToken, requireRole(['a
       }
       
       db.prepare('INSERT INTO wallet_transactions (user_id, type, amount, description, status) VALUES (?, ?, ?, ?, ?)')
-        .run(userId, type, amount, reason || `Admin ${type} adjustment`, 'success');
+        .run(userId, type, amount, description || `Admin ${type} adjustment`, 'success');
     })();
 
     res.json({ message: 'Wallet adjusted successfully' });
