@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { auth } from '../lib/firebase';
 import { useConfig } from '../context/ConfigContext';
 import AIChatbot from '../components/AIChatbot';
 import api from '../services/api';
@@ -54,8 +55,7 @@ const DashboardLayout = () => {
   }, []);
 
   const fetchNotifications = async () => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
+    if (!auth.currentUser) return;
     try {
       const res = await api.get('/notifications');
       setNotifications(Array.isArray(res.data) ? res.data : []);

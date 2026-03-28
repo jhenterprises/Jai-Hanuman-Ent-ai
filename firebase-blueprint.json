@@ -1,0 +1,40 @@
+{
+  "entities": {
+    "users": {
+      "title": "User",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "name": { "type": "string", "description": "Full name" },
+        "email": { "type": "string", "format": "email", "description": "Email address" },
+        "role": { "type": "string", "enum": ["user", "staff", "admin"], "description": "User role" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" }
+      },
+      "required": ["uid", "name", "email", "role"]
+    },
+    "applications": {
+      "title": "Application",
+      "description": "Service application details",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "UID of the applicant" },
+        "serviceType": { "type": "string", "description": "Type of service applied for" },
+        "status": { "type": "string", "enum": ["pending", "processing", "approved", "rejected"], "description": "Current status" },
+        "formData": { "type": "object", "description": "Dynamic form data" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Submission timestamp" }
+      },
+      "required": ["userId", "serviceType", "status"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "users",
+      "description": "User profile documents"
+    },
+    "/applications/{applicationId}": {
+      "schema": "applications",
+      "description": "Service application documents"
+    }
+  }
+}

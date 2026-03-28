@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { auth } from '../lib/firebase';
 import { Search, FileText, CheckCircle, XCircle, Clock, Eye, Download, User, ExternalLink, Activity, Upload, MessageSquare, Filter, Shield, Loader2 } from 'lucide-react';
 import { downloadPDF } from '../utils/pdfGenerator';
 import AcknowledgementReceipt from '../components/AcknowledgementReceipt';
@@ -29,6 +30,22 @@ const Applications = () => {
   const [isUpdating, setIsUpdating] = useState(false);
   const { user } = useAuth();
   const location = useLocation();
+
+  const [authToken, setAuthToken] = useState<string>('');
+  
+  useEffect(() => {
+    const getToken = async () => {
+      if (auth.currentUser) {
+        try {
+          const token = await auth.currentUser.getIdToken();
+          setAuthToken(token);
+        } catch (err) {
+          console.error('Failed to get auth token:', err);
+        }
+      }
+    };
+    getToken();
+  }, [auth.currentUser]);
 
   useEffect(() => {
     fetchApplications();
@@ -424,7 +441,7 @@ const Applications = () => {
                               <div className="text-[9px] text-slate-400 uppercase tracking-widest mt-0.5">Uploaded {safeFormat(doc.uploaded_at, 'dd/MM/yyyy')}</div>
                             </div>
                             <a 
-                              href={`/api/admin/documents/${doc.id}?token=${localStorage.getItem('token')}`}
+                              href={`/api/admin/documents/${doc.id}?token=${authToken}`}
                               download={doc.file_name}
                               onClick={(e) => e.stopPropagation()}
                               className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-100 rounded-md transition-colors"
@@ -556,7 +573,7 @@ const Applications = () => {
               </div>
               <div className="flex items-center gap-2">
                 <a 
-                  href={`/api/admin/documents/${previewDoc.id}?token=${localStorage.getItem('token')}`}
+                  href={`/api/admin/documents/${previewDoc.id}?token=${authToken}`}
                   download={previewDoc.file_name}
                   className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors"
                   title="Download"
@@ -571,13 +588,13 @@ const Applications = () => {
             <div className="flex-1 bg-slate-950 p-4 overflow-hidden flex items-center justify-center">
               {previewDoc.file_name.toLowerCase().endsWith('.pdf') ? (
                 <iframe 
-                  src={`/api/admin/documents/${previewDoc.id}?token=${localStorage.getItem('token')}`} 
+                  src={`/api/admin/documents/${previewDoc.id}?token=${authToken}`} 
                   className="w-full h-full rounded-xl bg-white"
                   title="PDF Preview"
                 />
               ) : (
                 <img 
-                  src={`/api/admin/documents/${previewDoc.id}?token=${localStorage.getItem('token')}`} 
+                  src={`/api/admin/documents/${previewDoc.id}?token=${authToken}`} 
                   alt="Document Preview" 
                   className="max-w-full max-h-full object-contain rounded-xl"
                 />

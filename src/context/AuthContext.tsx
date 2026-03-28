@@ -1,8 +1,18 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import axios from 'axios';
+import { 
+  onAuthStateChanged, 
+  signInWithPopup, 
+  GoogleAuthProvider, 
+  signOut,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  User as FirebaseUser
+} from 'firebase/auth';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 
 interface User {
-  id: number;
+  uid: string;
   name: string;
   email: string;
   phone?: string;
@@ -11,8 +21,10 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
-  login: (token: string, user: User) => void;
-  logout: () => void;
+  loginWithGoogle: () => Promise<void>;
+  loginWithEmail: (email: string, password: string) => Promise<void>;
+  signUpWithEmail: (email: string, password: string, name: string, phone?: string) => Promise<void>;
+  logout: () => Promise<void>;
   loading: boolean;
 }
 
@@ -23,41 +35,99 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    const token = localStorage.getItem('token');
-    if (storedUser && storedUser !== 'undefined' && token) {
-      try {
-        setUser(JSON.parse(storedUser));
-        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      } catch (e) {
-        console.error('Failed to parse user from localStorage', e);
-        localStorage.removeItem('user');
-        localStorage.removeItem('token');
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        // Fetch user role from Firestore
+        const userPath = `users/${firebaseUser.uid}`;
+        try {
+          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+          if (userDoc.exists()) {
+            setUser(userDoc.data() as User);
+          } else {
+            // This case handles Google login where doc might not exist yet
+            const newUser: User = {
+              uid: firebaseUser.uid,
+              name: firebaseUser.displayName || 'User',
+              email: firebaseUser.email || '',
+              role: 'user'
+            };
+            await setDoc(doc(db, 'users', firebaseUser.uid), {
+              ...newUser,
+              createdAt: serverTimestamp()
+            });
+            setUser(newUser);
+          }
+        } catch (error) {
+          handleFirestoreError(error, OperationType.GET, userPath);
+        }
+      } else {
+        setUser(null);
       }
-    } else if (storedUser === 'undefined' || !storedUser || !token) {
-      localStorage.removeItem('user');
-      localStorage.removeItem('token');
-    }
-    setLoading(false);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
-  const login = (token: string, userData: User) => {
-    if (!userData) return;
-    localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify(userData));
-    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    setUser(userData);
+  const loginWithGoogle = async () => {
+    const provider = new GoogleAuthProvider();
+    try {
+      await signInWithPopup(auth, provider);
+    } catch (error) {
+      console.error('Login failed:', error);
+      throw error;
+    }
   };
 
-  const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    delete axios.defaults.headers.common['Authorization'];
-    setUser(null);
+  const loginWithEmail = async (email: string, password: string) => {
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+    } catch (error) {
+      console.error('Email login failed:', error);
+      throw error;
+    }
+  };
+
+  const signUpWithEmail = async (email: string, password: string, name: string, phone?: string) => {
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const firebaseUser = userCredential.user;
+      
+      const newUser: User = {
+        uid: firebaseUser.uid,
+        name,
+        email,
+        phone,
+        role: 'user'
+      };
+
+      const userPath = `users/${firebaseUser.uid}`;
+      try {
+        await setDoc(doc(db, 'users', firebaseUser.uid), {
+          ...newUser,
+          createdAt: serverTimestamp()
+        });
+      } catch (error) {
+        handleFirestoreError(error, OperationType.WRITE, userPath);
+      }
+      
+      setUser(newUser);
+    } catch (error) {
+      console.error('Sign up failed:', error);
+      throw error;
+    }
+  };
+
+  const logout = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, loginWithGoogle, loginWithEmail, signUpWithEmail, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );

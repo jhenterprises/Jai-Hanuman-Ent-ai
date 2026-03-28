@@ -8,17 +8,26 @@ import { UserPlus, Mail, Lock, User, Phone, AlertCircle } from 'lucide-react';
 const Register = () => {
   const [formData, setFormData] = useState({ name: '', email: '', phone: '', password: '' });
   const [error, setError] = useState('');
-  const { login } = useAuth();
+  const { signUpWithEmail, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
+
+  const handleGoogleLogin = async () => {
+    try {
+      await loginWithGoogle();
+      navigate('/app');
+    } catch (err: any) {
+      setError('Google registration failed');
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
     try {
-      const res = await api.post('/auth/register', formData);
-      login(res.data.token, res.data.user);
+      await signUpWithEmail(formData.email, formData.password, formData.name, formData.phone);
       navigate('/app');
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Registration failed');
+      setError(err.message || 'Registration failed. Please try again.');
     }
   };
 
@@ -106,6 +115,24 @@ const Register = () => {
             className="w-full py-4 gold-gradient text-slate-900 font-black rounded-2xl shadow-xl shadow-amber-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all mt-4"
           >
             Create Account
+          </button>
+
+          <div className="relative py-4">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-white/10"></div>
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-slate-900 px-2 text-slate-500 font-bold tracking-widest">Or continue with</span>
+            </div>
+          </div>
+
+          <button 
+            type="button"
+            onClick={handleGoogleLogin}
+            className="w-full py-4 bg-white text-slate-900 font-black rounded-2xl shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3"
+          >
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-6 h-6" />
+            Sign in with Google
           </button>
         </form>
 

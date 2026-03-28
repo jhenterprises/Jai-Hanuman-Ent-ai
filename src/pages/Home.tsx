@@ -5,6 +5,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { useConfig } from '../context/ConfigContext';
 import ModernButton from '../components/ModernButton';
+import SeedFirebase from '../components/SeedFirebase';
 
 const Home = () => {
   const { config } = useConfig();
@@ -87,6 +88,11 @@ const Home = () => {
             Track Application
           </Link>
         </motion.div>
+
+        {/* Temporary Seeding Section */}
+        <div className="max-w-md mx-auto">
+          <SeedFirebase />
+        </div>
 
         {/* Floating Stats */}
         <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-4 gap-4 pt-8 md:pt-12">

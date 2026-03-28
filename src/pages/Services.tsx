@@ -141,14 +141,14 @@ const Services = () => {
     setFormData({
       service_name: service.service_name,
       description: service.description,
-      url: service.url || '',
-      type: service.type || 'internal',
+      url: service.service_url || '',
+      type: service.application_type || 'internal',
       icon: service.icon || '',
       application_id: service.application_id || '',
-      visible_status: service.visible_status,
-      active_status: service.active_status,
+      visible_status: service.is_visible ? 1 : 0,
+      active_status: service.is_active ? 1 : 0,
       service_price: service.service_price || 0,
-      payment_required: service.payment_required === 1,
+      payment_required: !!service.payment_required,
       fee: service.fee || 0,
       staff_commission: service.staff_commission || 0
     });
@@ -178,7 +178,7 @@ const Services = () => {
     });
   };
 
-  const toggleVisibility = async (id: number) => {
+  const toggleVisibility = async (id: string | number) => {
     try {
       await api.patch(`/services/${id}/visibility`);
       fetchServices();
@@ -187,7 +187,7 @@ const Services = () => {
     }
   };
 
-  const toggleStatus = async (id: number) => {
+  const toggleStatus = async (id: string | number) => {
     try {
       await api.patch(`/services/${id}/status`);
       fetchServices();
@@ -220,13 +220,13 @@ const Services = () => {
   };
 
   const handleOpenUrl = async (service: any) => {
-    if (service.url) {
+    if (service.service_url) {
       try {
         await api.post(`/services/${service.service_id}/log-access`, { action: 'Opened Service URL' });
       } catch (err) {
         console.error('Failed to log service access', err);
       }
-      window.open(service.url, '_blank');
+      window.open(service.service_url, '_blank');
     } else {
       alert("Service URL not configured.");
     }
@@ -453,10 +453,10 @@ const Services = () => {
             <div key={service.service_id} className="group bg-slate-800/60 backdrop-blur-xl rounded-3xl p-6 border border-slate-700/50 shadow-lg hover:border-blue-500/50 transition-all hover:-translate-y-1 relative flex flex-col">
               {isAdmin && (
                 <div className="absolute top-4 right-4 flex gap-2 opacity-100 transition-opacity">
-                  <button onClick={() => toggleVisibility(service.service_id)} className={`p-1.5 rounded-lg ${service.visible_status ? 'text-blue-400' : 'text-slate-500'}`} title={service.visible_status ? 'Visible' : 'Hidden'}>
-                    {service.visible_status ? <Eye size={16} /> : <EyeOff size={16} />}
+                  <button onClick={() => toggleVisibility(service.service_id)} className={`p-1.5 rounded-lg ${service.is_visible ? 'text-blue-400' : 'text-slate-500'}`} title={service.is_visible ? 'Visible' : 'Hidden'}>
+                    {service.is_visible ? <Eye size={16} /> : <EyeOff size={16} />}
                   </button>
-                  <button onClick={() => toggleStatus(service.service_id)} className={`p-1.5 rounded-lg ${service.active_status ? 'text-green-400' : 'text-slate-500'}`} title={service.active_status ? 'Deactivate' : 'Activate'}>
+                  <button onClick={() => toggleStatus(service.service_id)} className={`p-1.5 rounded-lg ${service.is_active ? 'text-green-400' : 'text-slate-500'}`} title={service.is_active ? 'Deactivate' : 'Activate'}>
                     <Power size={16} />
                   </button>
                   <button onClick={() => handleEdit(service)} className="p-1.5 rounded-lg text-slate-400 hover:text-white" title="Edit">
@@ -485,7 +485,7 @@ const Services = () => {
                     </span>
                   </>
                 )}
-                {service.payment_required === 1 && (
+                {!!service.payment_required && (
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-orange-500/20 text-orange-400 border border-orange-500/30 uppercase tracking-wider">
                     Paid Service
                   </span>

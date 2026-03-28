@@ -9,22 +9,31 @@ const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const { login } = useAuth();
+  const { loginWithGoogle, loginWithEmail } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   
   const isLoggedOut = new URLSearchParams(location.search).get('loggedOut') === 'true';
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleGoogleLogin = async () => {
     try {
-      const res = await api.post('/auth/login', { email, password });
-      login(res.data.token, res.data.user);
-      
+      await loginWithGoogle();
       const from = location.state?.from?.pathname || '/app';
       navigate(from, { replace: true });
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Login failed');
+      setError('Google login failed');
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    try {
+      await loginWithEmail(email, password);
+      const from = location.state?.from?.pathname || '/app';
+      navigate(from, { replace: true });
+    } catch (err: any) {
+      setError(err.message || 'Login failed. Please check your credentials.');
     }
   };
 
@@ -103,6 +112,24 @@ const Login = () => {
             className="w-full py-4 blue-gradient text-white font-black rounded-2xl shadow-xl shadow-blue-600/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
           >
             Sign In
+          </button>
+
+          <div className="relative py-4">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-white/10"></div>
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-slate-900 px-2 text-slate-500 font-bold tracking-widest">Or continue with</span>
+            </div>
+          </div>
+
+          <button 
+            type="button"
+            onClick={handleGoogleLogin}
+            className="w-full py-4 bg-white text-slate-900 font-black rounded-2xl shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3"
+          >
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-6 h-6" />
+            Sign in with Google
           </button>
         </form>
 

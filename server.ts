@@ -1,7 +1,8 @@
 import 'dotenv/config';
 import express from 'express';
 import { createServer as createViteServer } from 'vite';
-import Database from 'better-sqlite3';
+import admin from 'firebase-admin';
+import { getFirestore } from 'firebase-admin/firestore';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import multer from 'multer';
@@ -10,6 +11,10 @@ import crypto from 'crypto';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import { createRequire } from 'module';
+
+const require = createRequire(import.meta.url);
+const firebaseConfig = require('./firebase-applet-config.json');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -17,6 +22,97 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-key-jai-hanuman';
+
+// Firebase Admin Setup
+let _dbInstance: admin.firestore.Firestore | null = null;
+
+// The 'db' variable will be a proxy that delegates to _dbInstance
+// This ensures that 'db' is never undefined, and provides clear errors if accessed before initialization
+const db = new Proxy({} as admin.firestore.Firestore, {
+  get(target, prop) {
+    if (!_dbInstance) {
+      throw new Error(`CRITICAL: Firestore 'db' is not initialized. Firebase Admin initialization likely failed. Check server logs.`);
+    }
+    const value = (_dbInstance as any)[prop];
+    return typeof value === 'function' ? value.bind(_dbInstance) : value;
+  }
+});
+
+if (!admin.apps.length) {
+  try {
+    const privateKey = process.env.FIREBASE_PRIVATE_KEY;
+    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+    const projectId = process.env.FIREBASE_PROJECT_ID || firebaseConfig.projectId;
+
+    if (privateKey && clientEmail) {
+      try {
+        const formattedKey = privateKey
+          .replace(/\\n/g, '\n')
+          .replace(/^"(.*)"$/, '$1')
+          .replace(/^'(.*)'$/, '$1')
+          .trim();
+
+        admin.initializeApp({
+          credential: admin.credential.cert({
+            projectId,
+            clientEmail,
+            privateKey: formattedKey,
+          })
+        });
+        console.log('Firebase Admin initialized with service account');
+      } catch (certErr) {
+        console.error('\n================================================================');
+        console.error('CRITICAL ERROR: Firebase Service Account initialization failed.');
+        console.error('The FIREBASE_PRIVATE_KEY or FIREBASE_CLIENT_EMAIL is invalid.');
+        console.error('Please ensure you copied the ENTIRE private_key string from the JSON file, including "-----BEGIN PRIVATE KEY-----" and "-----END PRIVATE KEY-----".');
+        console.error('Error details:', certErr instanceof Error ? certErr.message : certErr);
+        console.error('================================================================\n');
+        // Do not fallback to applicationDefault because it will cause PERMISSION_DENIED errors
+      }
+    } else {
+      admin.initializeApp({
+        credential: admin.credential.applicationDefault(),
+        projectId
+      });
+      console.log('Firebase Admin initialized with applicationDefault');
+    }
+  } catch (err) {
+    console.error('Firebase Admin initialization failed:', err);
+  }
+}
+
+// Initialize Firestore instance
+let firestoreDatabaseId = process.env.FIREBASE_DATABASE_ID || firebaseConfig.firestoreDatabaseId;
+
+// Validate database ID format (must be lowercase alphanumeric and hyphens, or '(default)')
+if (firestoreDatabaseId !== '(default)' && !/^[a-z]([a-z0-9-]{0,61}[a-z0-9])?$/.test(firestoreDatabaseId)) {
+  console.warn(`Invalid FIREBASE_DATABASE_ID provided: "${firestoreDatabaseId}". Falling back to config: "${firebaseConfig.firestoreDatabaseId}"`);
+  firestoreDatabaseId = firebaseConfig.firestoreDatabaseId;
+}
+
+if (admin.apps.length > 0) {
+  try {
+    _dbInstance = getFirestore(admin.app(), firestoreDatabaseId);
+    console.log(`Firestore initialized with database: ${firestoreDatabaseId}`);
+  } catch (e) {
+    console.error('Failed to get Firestore instance:', e);
+  }
+}
+
+// --- Health Check ---
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    firebase: {
+      initialized: admin.apps.length > 0,
+      firestore: _dbInstance !== null,
+      projectId: admin.apps.length > 0 ? admin.app().options.projectId : null
+    }
+  });
+});
+// Note: In some environments, you might need to use a specific database ID
+// but for now we'll stick to the default or assume the project ID handles it.
+// If a specific database is needed, it's usually configured in the project settings.
 
 // Razorpay Setup
 const razorpay = new Razorpay({
@@ -26,457 +122,213 @@ const razorpay = new Razorpay({
 
 // Middleware
 app.use(express.json());
-// app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Health Check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-// Database Setup
+// SQLite Database Setup (REMOVED)
+/*
 const dbDir = path.join(__dirname, 'data');
-if (!fs.existsSync(dbDir)) {
-  fs.mkdirSync(dbDir);
-}
-const db = new Database(path.join(dbDir, 'database.sqlite'));
+...
+*/
 
-// Initialize Database Tables
+// Initialize Database Tables (REMOVED - Using Firestore)
+/*
 db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    email TEXT UNIQUE NOT NULL,
-    phone TEXT,
-    password TEXT NOT NULL,
-    role TEXT DEFAULT 'user',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
+...
+*/
 
-  CREATE TABLE IF NOT EXISTS services (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    service_name TEXT NOT NULL,
-    description TEXT,
-    service_url TEXT,
-    is_visible BOOLEAN DEFAULT 1,
-    is_active BOOLEAN DEFAULT 1,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  CREATE TABLE IF NOT EXISTS ledger (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    customer_name TEXT NOT NULL,
-    service_name TEXT NOT NULL,
-    amount REAL NOT NULL,
-    staff_id INTEGER,
-    date TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(staff_id) REFERENCES users(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS applications (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    reference_number TEXT UNIQUE NOT NULL,
-    user_id INTEGER NOT NULL,
-    service_type TEXT NOT NULL,
-    form_data TEXT,
-    status TEXT DEFAULT 'Submitted',
-    assigned_staff INTEGER,
-    created_by TEXT DEFAULT 'user',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(user_id) REFERENCES users(id),
-    FOREIGN KEY(assigned_staff) REFERENCES users(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS application_documents (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    application_id INTEGER NOT NULL,
-    file_path TEXT NOT NULL,
-    file_name TEXT,
-    uploaded_by INTEGER,
-    uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(application_id) REFERENCES applications(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS application_updates (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    application_id INTEGER NOT NULL,
-    status TEXT NOT NULL,
-    comment TEXT,
-    updated_by INTEGER,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(application_id) REFERENCES applications(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS notifications (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    message TEXT NOT NULL,
-    is_read BOOLEAN DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(user_id) REFERENCES users(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS service_links (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    service_type TEXT UNIQUE NOT NULL,
-    process_url TEXT NOT NULL,
-    apply_url TEXT NOT NULL,
-    is_active BOOLEAN DEFAULT 1,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  CREATE TABLE IF NOT EXISTS support_tickets (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    subject TEXT NOT NULL,
-    message TEXT NOT NULL,
-    status TEXT DEFAULT 'Open',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(user_id) REFERENCES users(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS activity_logs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    action TEXT NOT NULL,
-    application_id INTEGER,
-    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(user_id) REFERENCES users(id),
-    FOREIGN KEY(application_id) REFERENCES applications(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS service_logs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    staff_id INTEGER NOT NULL,
-    service_id INTEGER NOT NULL,
-    action TEXT NOT NULL,
-    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(staff_id) REFERENCES users(id),
-    FOREIGN KEY(service_id) REFERENCES services(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS service_inputs (
-    input_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    service_id INTEGER NOT NULL,
-    input_label TEXT NOT NULL,
-    input_type TEXT NOT NULL,
-    required BOOLEAN DEFAULT 1,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(service_id) REFERENCES services(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS service_form_fields (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    service_id INTEGER NOT NULL,
-    label TEXT NOT NULL,
-    type TEXT NOT NULL,
-    required BOOLEAN DEFAULT 0,
-    placeholder TEXT,
-    section_name TEXT,
-    field_order INTEGER DEFAULT 0,
-    options TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(service_id) REFERENCES services(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS service_document_requirements (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    service_id INTEGER NOT NULL,
-    document_name TEXT NOT NULL,
-    document_type TEXT DEFAULT 'file_upload',
-    required BOOLEAN DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(service_id) REFERENCES services(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS service_payments (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    service_id INTEGER NOT NULL,
-    amount REAL NOT NULL,
-    razorpay_order_id TEXT,
-    razorpay_payment_id TEXT,
-    razorpay_signature TEXT,
-    status TEXT DEFAULT 'pending', -- 'pending', 'success', 'failed'
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(user_id) REFERENCES users(id),
-    FOREIGN KEY(service_id) REFERENCES services(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS wallets (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER UNIQUE NOT NULL,
-    role TEXT NOT NULL,
-    balance REAL DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(user_id) REFERENCES users(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS wallet_transactions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    type TEXT NOT NULL, -- 'credit' or 'debit'
-    amount REAL NOT NULL,
-    description TEXT,
-    reference_id TEXT,
-    status TEXT DEFAULT 'success', -- 'success', 'pending', 'failed'
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(user_id) REFERENCES users(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS application_drafts (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    service_id INTEGER NOT NULL,
-    service_type TEXT NOT NULL,
-    form_data TEXT,
-    documents TEXT, -- JSON array of { path, originalname }
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(user_id) REFERENCES users(id),
-    FOREIGN KEY(service_id) REFERENCES services(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS portal_config (
-    id INTEGER PRIMARY KEY CHECK (id = 1),
-    config_data TEXT NOT NULL
-  );
-`);
-
-// --- Database Migrations (Add missing columns to existing tables) ---
-const migrate = () => {
-  const migrations = [
-    { table: 'applications', column: 'reference_number', type: 'TEXT UNIQUE' },
-    { table: 'applications', column: 'assigned_staff', type: 'INTEGER' },
-    { table: 'applications', column: 'created_by', type: "TEXT DEFAULT 'user'" },
-    { table: 'users', column: 'phone', type: 'TEXT' },
-    { table: 'application_documents', column: 'file_name', type: 'TEXT' },
-    { table: 'services', column: 'is_active', type: 'BOOLEAN DEFAULT 1' },
-    { table: 'services', column: 'application_type', type: "TEXT DEFAULT 'internal'" },
-    { table: 'services', column: 'icon', type: 'TEXT' },
-    { table: 'services', column: 'application_id', type: 'TEXT' },
-    { table: 'services', column: 'created_at', type: 'DATETIME DEFAULT CURRENT_TIMESTAMP' },
-    { table: 'services', column: 'fee', type: 'REAL DEFAULT 0' },
-    { table: 'services', column: 'staff_commission', type: 'REAL DEFAULT 0' },
-    { table: 'service_links', column: 'is_active', type: 'BOOLEAN DEFAULT 1' },
-    { table: 'users', column: 'deleted_at', type: 'DATETIME' },
-    { table: 'users', column: 'reset_token', type: 'TEXT' },
-    { table: 'users', column: 'reset_token_expiry', type: 'DATETIME' },
-    { table: 'services', column: 'deleted_at', type: 'DATETIME' },
-    { table: 'applications', column: 'deleted_at', type: 'DATETIME' },
-    { table: 'services', column: 'service_price', type: 'REAL DEFAULT 0' },
-    { table: 'services', column: 'payment_required', type: 'BOOLEAN DEFAULT 0' },
-    { table: 'applications', column: 'payment_id', type: 'INTEGER' },
-    { table: 'applications', column: 'service_id', type: 'INTEGER' },
-    { table: 'applications', column: 'payment_mode', type: "TEXT DEFAULT 'gateway'" },
-    { table: 'service_payments', column: 'payment_mode', type: "TEXT DEFAULT 'gateway'" },
-    { table: 'application_documents', column: 'document_type', type: 'TEXT' },
-    { table: 'applications', column: 'payment_status', type: "TEXT DEFAULT 'Pending'" },
-    { table: 'services', column: 'service_form_schema', type: 'TEXT' }
-  ];
-
-  for (const m of migrations) {
-    try {
-      const info = db.prepare(`PRAGMA table_info(${m.table})`).all() as any[];
-      const exists = info.some(c => c.name === m.column);
-      if (!exists) {
-        try {
-          db.prepare(`ALTER TABLE ${m.table} ADD COLUMN ${m.column} ${m.type}`).run();
-          console.log(`Migration: Added column ${m.column} to ${m.table}`);
-        } catch (e) {
-          // Fallback if UNIQUE or DEFAULT causes issues on some SQLite versions
-          const simpleType = m.type.split(' ')[0];
-          db.prepare(`ALTER TABLE ${m.table} ADD COLUMN ${m.column} ${simpleType}`).run();
-          console.log(`Migration: Added column ${m.column} to ${m.table} (simple type)`);
-        }
-      }
-    } catch (err) {
-      console.error(`Migration check failed for ${m.table}:`, err);
-    }
-  }
-
-  // Ensure all users have wallets
-  try {
-    const usersWithoutWallets = db.prepare('SELECT id, role FROM users WHERE id NOT IN (SELECT user_id FROM wallets)').all() as any[];
-    if (usersWithoutWallets.length > 0) {
-      const insertWallet = db.prepare('INSERT INTO wallets (user_id, role, balance) VALUES (?, ?, 0)');
-      db.transaction(() => {
-        usersWithoutWallets.forEach((u: any) => {
-          insertWallet.run(u.id, u.role);
-        });
-      })();
-      console.log(`Migration: Created wallets for ${usersWithoutWallets.length} existing users`);
-    }
-  } catch (err) {
-    console.error('Migration: Failed to create missing wallets:', err);
-  }
-};
-migrate();
-
-// Seed Admin, Staff, and User
+// Seed initial data (REMOVED - Using SeedFirebase component)
+/*
 const seedUsers = () => {
-  const usersToSeed = [
-    { name: 'Super Admin', email: 'admin@jh.com', phone: '9999999999', password: 'admin', role: 'admin' },
-    { name: 'Demo Staff', email: 'staff@jh.com', phone: '8888888888', password: 'staff', role: 'staff' },
-    { name: 'Demo User', email: 'user@jh.com', phone: '7777777777', password: 'user', role: 'user' }
-  ];
-
-  const insert = db.prepare('INSERT INTO users (name, email, phone, password, role) VALUES (?, ?, ?, ?, ?)');
-  const check = db.prepare('SELECT * FROM users WHERE email = ?');
-
-  usersToSeed.forEach(u => {
-    if (!check.get(u.email)) {
-      const hashedPassword = bcrypt.hashSync(u.password, 10);
-      const result = insert.run(u.name, u.email, u.phone, hashedPassword, u.role);
-      const userId = result.lastInsertRowid;
-      
-      // Create wallet for seeded users
-      db.prepare('INSERT INTO wallets (user_id, role, balance) VALUES (?, ?, 0)').run(userId, u.role);
-    }
-  });
-};
+...
+}
 seedUsers();
-
-// Seed Initial Services
-const seedServices = () => {
-  const count = db.prepare('SELECT COUNT(*) as count FROM services').get() as any;
-  if (count.count === 0) {
-    const initialServices = [
-      ['Aadhaar', 'Aadhaar Services', 'https://myaadhaar.uidai.gov.in', 'fa-fingerprint'],
-      ['PAN Card', 'PAN Card Services', 'https://ruraleservices.com/agent/login', 'fa-id-card'],
-      ['Voter ID', 'Voter ID Services', 'https://voters.eci.gov.in', 'fa-id-badge'],
-      ['Airtel Payments', 'Airtel Payments Bank', 'https://portal.airtelbank.com/RetailerPortal', 'fa-money-bill-wave'],
-      ['CSC Portal', 'Digital Seva Portal', 'https://digitalseva.csc.gov.in', 'fa-laptop'],
-      ['Seva Sindhu', 'Karnataka Seva Sindhu', 'https://sevasindhuservices.karnataka.gov.in', 'fa-building'],
-      ['Gruha Jyothi', 'Gruha Jyothi Scheme', 'https://sevasindhugs.karnataka.gov.in', 'fa-lightbulb'],
-      ['Gruha Lakshmi', 'Gruha Lakshmi Scheme', 'https://sevasindhugs1.karnataka.gov.in/gl-sp', 'fa-female'],
-      ['CSC Tickets', 'CSC Safar Tickets', 'https://cscsafar.in', 'fa-ticket-alt'],
-      ['Bhoomi Land Records', 'Karnataka Land Records', 'https://landrecords.karnataka.gov.in', 'fa-map'],
-      ['Passport', 'Passport Seva', 'https://passportindia.gov.in', 'fa-passport'],
-      ['Swift Money', 'Swift Money Portal', 'https://swift.quicksekure.com/Login.aspx', 'fa-rupee-sign'],
-      ['SSP Post Matric', 'Post Matric Scholarship', 'https://ssp.postmatric.karnataka.gov.in/homepage.aspx', 'fa-graduation-cap'],
-      ['SSP Pre Matric', 'Pre Matric Scholarship', 'https://ssp.karnataka.gov.in/ssppre/PreHome', 'fa-school'],
-      ['ABHA Card', 'Ayushman Bharat Health Account', 'https://abha.abdm.gov.in/abha/v3/register', 'fa-heartbeat'],
-      ['Ayushman Card', 'PMJAY Beneficiary Portal', 'https://beneficiary.nha.gov.in', 'fa-hospital'],
-      ['Ration Card', 'Karnataka Ration Card', 'https://ahara.karnataka.gov.in', 'fa-shopping-basket'],
-      ['E-Khata', 'BBMP E-Khata', 'https://bbmpeaasthi.karnataka.gov.in', 'fa-file-invoice'],
-      ['MSME / UDYAM', 'Udyam Registration', 'https://udyamregistration.gov.in', 'fa-industry'],
-      ['Income Tax', 'Income Tax E-Filing', 'https://www.incometax.gov.in/iec/foportal', 'fa-file-invoice-dollar'],
-      ['KVS Admission', 'Kendriya Vidyalaya Admission', 'https://kvsonlineadmission.kvs.gov.in', 'fa-child'],
-      ['RTE Education', 'Right to Education Karnataka', 'https://schooleducation.karnataka.gov.in/en', 'fa-book-reader'],
-      ['BBMP Tax', 'BBMP Property Tax', 'https://bbmptax.karnataka.gov.in/Default.aspx', 'fa-landmark'],
-      ['Food License', 'FSSAI Food License', 'https://foscos.fssai.gov.in', 'fa-utensils'],
-      ['Sun Direct', 'Sun Direct Portal', 'https://www.sundirect.in', 'fa-tv'],
-      ['Railway Pass', 'Divyangjan Railway ID', 'https://divyangjanid.indianrail.gov.in', 'fa-train'],
-      ['EPFO Member Login', 'EPFO Member Portal', 'https://unifiedportal-mem.epfindia.gov.in/memberinterface/', 'fa-briefcase'],
-      ['EPFO Member Passbook', 'EPFO Passbook Portal', 'https://passbook.epfindia.gov.in/MemberPassBook/login', 'fa-book'],
-      ['TTD Tirupati', 'TTD Darshan Booking', 'https://ttdevasthanams.ap.gov.in/home/dashboard', 'fa-om']
-    ];
-    const insert = db.prepare('INSERT INTO services (service_name, description, service_url, icon, is_visible, is_active) VALUES (?, ?, ?, ?, 1, 1)');
-    initialServices.forEach(s => insert.run(s[0], s[1], s[2], s[3]));
-  }
-};
-seedServices();
+*/
 
 // Seed Service Links
-const seedServiceLinks = () => {
-  const count = db.prepare('SELECT COUNT(*) as count FROM service_links').get() as { count: number };
-  if (count.count === 0) {
-    const initialLinks = [
-      ['aadhaar', 'https://myaadhaar.uidai.gov.in', 'https://resident.uidai.gov.in'],
-      ['pan', 'https://www.incometax.gov.in', 'https://www.onlineservices.nsdl.com'],
-      ['voterid', 'https://voters.eci.gov.in', 'https://voters.eci.gov.in'],
-      ['passport', 'https://portal2.passportindia.gov.in', 'https://passportindia.gov.in'],
-      ['airtel', 'https://portal.airtelbank.com/RetailerPortal', 'https://www.airtel.in/bank'],
-      ['csc', 'https://digitalseva.csc.gov.in', 'https://register.csc.gov.in'],
-      ['sevasindhu', 'https://sevasindhuservices.karnataka.gov.in', 'https://sevasindhu.karnataka.gov.in'],
-      ['gruhajyothi', 'https://sevasindhugs.karnataka.gov.in', 'https://sevasindhu.karnataka.gov.in'],
-      ['gruhalakshmi', 'https://sevasindhugs1.karnataka.gov.in/gl-sp', 'https://sevasindhu.karnataka.gov.in'],
-      ['csctickets', 'https://cscsafar.in', 'https://cscsafar.in'],
-      ['bhoomi', 'https://landrecords.karnataka.gov.in', 'https://landrecords.karnataka.gov.in'],
-      ['swiftmoney', 'https://swift.quicksekure.com/Login.aspx', 'https://swift.quicksekure.com'],
-      ['ssp_post', 'https://ssp.postmatric.karnataka.gov.in/homepage.aspx', 'https://ssp.postmatric.karnataka.gov.in'],
-      ['ssp_pre', 'https://ssp.karnataka.gov.in/ssppre/PreHome', 'https://ssp.karnataka.gov.in'],
-      ['abha', 'https://abha.abdm.gov.in', 'https://abha.abdm.gov.in/abha/v3/register'],
-      ['ayushman', 'https://beneficiary.nha.gov.in', 'https://beneficiary.nha.gov.in'],
-      ['ration', 'https://ahara.karnataka.gov.in', 'https://ahara.karnataka.gov.in'],
-      ['ekhata', 'https://bbmpeaasthi.karnataka.gov.in', 'https://bbmpeaasthi.karnataka.gov.in'],
-      ['msme', 'https://udyamregistration.gov.in', 'https://udyamregistration.gov.in'],
-      ['incometax', 'https://www.incometax.gov.in/iec/foportal', 'https://www.incometax.gov.in'],
-      ['kvs', 'https://kvsonlineadmission.kvs.gov.in', 'https://kvsonlineadmission.kvs.gov.in'],
-      ['rte', 'https://schooleducation.karnataka.gov.in/en', 'https://schooleducation.karnataka.gov.in'],
-      ['bbmptax', 'https://bbmptax.karnataka.gov.in/Default.aspx', 'https://bbmptax.karnataka.gov.in'],
-      ['fssai', 'https://foscos.fssai.gov.in', 'https://foscos.fssai.gov.in'],
-      ['sundirect', 'https://www.sundirect.in', 'https://www.sundirect.in'],
-      ['railwaypass', 'https://divyangjanid.indianrail.gov.in', 'https://divyangjanid.indianrail.gov.in'],
-      ['epfo_login', 'https://unifiedportal-mem.epfindia.gov.in/memberinterface/', 'https://www.epfindia.gov.in'],
-      ['epfo_passbook', 'https://passbook.epfindia.gov.in/MemberPassBook/login', 'https://passbook.epfindia.gov.in'],
-      ['ttd', 'https://ttdevasthanams.ap.gov.in/home/dashboard', 'https://ttdevasthanams.ap.gov.in'],
-    ];
-    const insert = db.prepare('INSERT INTO service_links (service_type, process_url, apply_url, is_active) VALUES (?, ?, ?, 1)');
-    initialLinks.forEach(s => insert.run(s[0], s[1], s[2]));
+const seedServiceLinks = async () => {
+  try {
+    const snapshot = await db.collection('service_links').count().get();
+    if (snapshot.data().count === 0) {
+      const initialLinks = [
+        ['aadhaar', 'https://myaadhaar.uidai.gov.in', 'https://resident.uidai.gov.in'],
+        ['pan', 'https://www.incometax.gov.in', 'https://www.onlineservices.nsdl.com'],
+        ['voterid', 'https://voters.eci.gov.in', 'https://voters.eci.gov.in'],
+        ['passport', 'https://portal2.passportindia.gov.in', 'https://passportindia.gov.in'],
+        ['airtel', 'https://portal.airtelbank.com/RetailerPortal', 'https://www.airtel.in/bank'],
+        ['csc', 'https://digitalseva.csc.gov.in', 'https://register.csc.gov.in'],
+        ['sevasindhu', 'https://sevasindhuservices.karnataka.gov.in', 'https://sevasindhu.karnataka.gov.in'],
+        ['gruhajyothi', 'https://sevasindhugs.karnataka.gov.in', 'https://sevasindhu.karnataka.gov.in'],
+        ['gruhalakshmi', 'https://sevasindhugs1.karnataka.gov.in/gl-sp', 'https://sevasindhu.karnataka.gov.in'],
+        ['csctickets', 'https://cscsafar.in', 'https://cscsafar.in'],
+        ['bhoomi', 'https://landrecords.karnataka.gov.in', 'https://landrecords.karnataka.gov.in'],
+        ['swiftmoney', 'https://swift.quicksekure.com/Login.aspx', 'https://swift.quicksekure.com'],
+        ['ssp_post', 'https://ssp.postmatric.karnataka.gov.in/homepage.aspx', 'https://ssp.postmatric.karnataka.gov.in'],
+        ['ssp_pre', 'https://ssp.karnataka.gov.in/ssppre/PreHome', 'https://ssp.karnataka.gov.in'],
+        ['abha', 'https://abha.abdm.gov.in', 'https://abha.abdm.gov.in/abha/v3/register'],
+        ['ayushman', 'https://beneficiary.nha.gov.in', 'https://beneficiary.nha.gov.in'],
+        ['ration', 'https://ahara.karnataka.gov.in', 'https://ahara.karnataka.gov.in'],
+        ['ekhata', 'https://bbmpeaasthi.karnataka.gov.in', 'https://bbmpeaasthi.karnataka.gov.in'],
+        ['msme', 'https://udyamregistration.gov.in', 'https://udyamregistration.gov.in'],
+        ['incometax', 'https://www.incometax.gov.in/iec/foportal', 'https://www.incometax.gov.in'],
+        ['kvs', 'https://kvsonlineadmission.kvs.gov.in', 'https://kvsonlineadmission.kvs.gov.in'],
+        ['rte', 'https://schooleducation.karnataka.gov.in/en', 'https://schooleducation.karnataka.gov.in'],
+        ['bbmptax', 'https://bbmptax.karnataka.gov.in/Default.aspx', 'https://bbmptax.karnataka.gov.in'],
+        ['fssai', 'https://foscos.fssai.gov.in', 'https://foscos.fssai.gov.in'],
+        ['sundirect', 'https://www.sundirect.in', 'https://www.sundirect.in'],
+        ['railwaypass', 'https://divyangjanid.indianrail.gov.in', 'https://divyangjanid.indianrail.gov.in'],
+        ['epfo_login', 'https://unifiedportal-mem.epfindia.gov.in/memberinterface/', 'https://www.epfindia.gov.in'],
+        ['epfo_passbook', 'https://passbook.epfindia.gov.in/MemberPassBook/login', 'https://passbook.epfindia.gov.in'],
+        ['ttd', 'https://ttdevasthanams.ap.gov.in/home/dashboard', 'https://ttdevasthanams.ap.gov.in'],
+      ];
+      
+      const batch = db.batch();
+      initialLinks.forEach(([type, process, apply]) => {
+        const ref = db.collection('service_links').doc();
+        batch.set(ref, {
+          service_type: type,
+          process_url: process,
+          apply_url: apply,
+          is_active: 1,
+          created_at: admin.firestore.FieldValue.serverTimestamp(),
+          updated_at: admin.firestore.FieldValue.serverTimestamp()
+        });
+      });
+      await batch.commit();
+      console.log('Service links seeded successfully');
+    }
+  } catch (err) {
+    console.error('Error seeding service links:', err);
   }
 };
 seedServiceLinks();
 
 // Seed Portal Config
-const seedPortalConfig = () => {
-  const count = db.prepare('SELECT COUNT(*) as count FROM portal_config').get() as { count: number };
-  if (count.count === 0) {
-    const defaultConfig = {
-      portal_name: 'JH Digital Seva Kendra',
-      tagline: 'Official Digital Seva Portal',
-      theme_color: '#2563eb',
-      secondary_color: '#06b6d4',
-      header_bg_color: '#020617',
-      enable_animations: true,
-      organization_name: 'JH Digital Services',
-      contact_email: 'support@jh.com',
-      contact_phone: '+91 9999999999',
-      office_address: 'Main Road, Bangalore, Karnataka',
-      footer_text: '© 2024 JH Digital Seva Kendra. All rights reserved.',
-      banner_title: 'Welcome to JH Digital Seva',
-      banner_subtitle: 'Access all government and digital services in one place',
-      services_title: 'Our Premium Services',
-      about_content: 'We provide a wide range of digital services to help citizens access government portals and applications easily.',
-      login_title: 'Portal Login',
-      enable_user_registration: true,
-      enable_user_login: true,
-      enable_staff_login: true,
-      enable_admin_login: true,
-      enable_service_applications: true,
-      enable_track_application: true,
-      grid_columns: 4,
-      max_file_size: 5,
-      allowed_file_types: 'pdf,jpg,png',
-      email_notifications: true,
-      sms_notifications: false,
-      status_alerts: true,
-      session_timeout: 30,
-      enable_captcha: false,
-      enable_otp: false
-    };
-    db.prepare('INSERT INTO portal_config (id, config_data) VALUES (1, ?)').run(JSON.stringify(defaultConfig));
+const seedPortalConfig = async () => {
+  try {
+    const snapshot = await db.collection('portal_config').doc('main').get();
+    if (!snapshot.exists) {
+      const defaultConfig = {
+        portal_name: 'JH Digital Seva Kendra',
+        tagline: 'Official Digital Seva Portal',
+        theme_color: '#2563eb',
+        secondary_color: '#06b6d4',
+        header_bg_color: '#020617',
+        enable_animations: true,
+        organization_name: 'JH Digital Services',
+        contact_email: 'support@jh.com',
+        contact_phone: '+91 9999999999',
+        office_address: 'Main Road, Bangalore, Karnataka',
+        footer_text: '© 2024 JH Digital Seva Kendra. All rights reserved.',
+        banner_title: 'Welcome to JH Digital Seva',
+        banner_subtitle: 'Access all government and digital services in one place',
+        services_title: 'Our Premium Services',
+        about_content: 'We provide a wide range of digital services to help citizens access government portals and applications easily.',
+        login_title: 'Portal Login',
+        enable_user_registration: true,
+        enable_user_login: true,
+        enable_staff_login: true,
+        enable_admin_login: true,
+        enable_service_applications: true,
+        enable_track_application: true,
+        grid_columns: 4,
+        max_file_size: 5,
+        allowed_file_types: 'pdf,jpg,png',
+        email_notifications: true,
+        sms_notifications: false,
+        status_alerts: true,
+        session_timeout: 30,
+        enable_captcha: false,
+        enable_otp: false
+      };
+      await db.collection('portal_config').doc('main').set({
+        ...defaultConfig,
+        updated_at: admin.firestore.FieldValue.serverTimestamp()
+      });
+      console.log('Portal config seeded successfully');
+    }
+  } catch (err) {
+    console.error('Error seeding portal config:', err);
   }
 };
 seedPortalConfig();
 
+// Seed Services
+const seedServices = async () => {
+  try {
+    const snapshot = await db.collection('services').count().get();
+    if (snapshot.data().count === 0) {
+      const initialServices = [
+        { service_name: 'Aadhaar Card', description: 'Aadhaar related services including update and download', service_url: 'https://myaadhaar.uidai.gov.in', icon: 'fa-fingerprint', application_type: 'external' },
+        { service_name: 'PAN Card', description: 'New PAN card application and corrections', service_url: 'https://www.onlineservices.nsdl.com', icon: 'fa-id-card', application_type: 'external' },
+        { service_name: 'Voter ID', description: 'Voter registration and ID card services', service_url: 'https://voters.eci.gov.in', icon: 'fa-id-badge', application_type: 'external' },
+        { service_name: 'Passport', description: 'Passport application and renewal services', service_url: 'https://passportindia.gov.in', icon: 'fa-globe', application_type: 'external' },
+        { service_name: 'Airtel Payments', description: 'Airtel Payments Bank services', service_url: 'https://portal.airtelbank.com/RetailerPortal', icon: 'fa-university', application_type: 'external' },
+        { service_name: 'CSC Portal', description: 'Common Service Centre services', service_url: 'https://digitalseva.csc.gov.in', icon: 'fa-laptop', application_type: 'external' },
+        { service_name: 'Seva Sindhu', description: 'Karnataka government services portal', service_url: 'https://sevasindhuservices.karnataka.gov.in', icon: 'fa-landmark', application_type: 'external' },
+        { service_name: 'Gruha Jyothi', description: 'Free electricity scheme registration', service_url: 'https://sevasindhugs.karnataka.gov.in', icon: 'fa-lightbulb', application_type: 'external' },
+        { service_name: 'Gruha Lakshmi', description: 'Financial assistance for women heads of households', service_url: 'https://sevasindhugs1.karnataka.gov.in/gl-sp', icon: 'fa-female', application_type: 'external' },
+        { service_name: 'Bhoomi', description: 'Land records and RTC services', service_url: 'https://landrecords.karnataka.gov.in', icon: 'fa-map', application_type: 'external' },
+        { service_name: 'Ayushman Card', description: 'Health insurance card registration', service_url: 'https://beneficiary.nha.gov.in', icon: 'fa-heartbeat', application_type: 'external' },
+        { service_name: 'Ration Card', description: 'Ration card application and status', service_url: 'https://ahara.karnataka.gov.in', icon: 'fa-shopping-basket', application_type: 'external' }
+      ];
+
+      const batch = db.batch();
+      initialServices.forEach(s => {
+        const serviceId = s.service_name.toLowerCase().replace(/\s+/g, '_');
+        const ref = db.collection('services').doc(serviceId);
+        batch.set(ref, {
+          ...s,
+          is_active: true,
+          is_visible: true,
+          service_price: 0,
+          payment_required: false,
+          fee: 0,
+          staff_commission: 0,
+          created_at: admin.firestore.FieldValue.serverTimestamp(),
+          updated_at: admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+      });
+      await batch.commit();
+      console.log('Services seeded successfully');
+    }
+  } catch (err) {
+    console.error('Error seeding services:', err);
+  }
+};
+seedServices();
+
 // Auth Middleware
-const authenticateToken = (req: any, res: any, next: any) => {
+const authenticateToken = async (req: any, res: any, next: any) => {
   const authHeader = req.headers['authorization'];
   const token = (authHeader && authHeader.split(' ')[1]) || req.query.token;
   if (!token) return res.status(401).json({ error: 'Access denied' });
 
-  jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
-    if (err) return res.status(401).json({ error: 'Invalid token' });
-    req.user = user;
+  try {
+    const decodedToken = await admin.auth().verifyIdToken(token);
+    const userDoc = await db.collection('users').doc(decodedToken.uid).get();
+    const userData = userDoc.data();
+    
+    req.user = {
+      id: decodedToken.uid,
+      uid: decodedToken.uid,
+      email: decodedToken.email,
+      role: userData?.role || 'user',
+      ...userData
+    };
     next();
-  });
+  } catch (err: any) {
+    if (err.code !== 'auth/argument-error' && err.code !== 'auth/id-token-expired') {
+      console.error('Auth Error:', err);
+    }
+    return res.status(401).json({ error: 'Invalid token' });
+  }
 };
 
-const optionalAuthenticateToken = (req: any, res: any, next: any) => {
+const optionalAuthenticateToken = async (req: any, res: any, next: any) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
   if (!token) {
@@ -484,14 +336,23 @@ const optionalAuthenticateToken = (req: any, res: any, next: any) => {
     return next();
   }
 
-  jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
-    if (err) {
-      req.user = { role: 'guest' };
-      return next();
-    }
-    req.user = user;
+  try {
+    const decodedToken = await admin.auth().verifyIdToken(token);
+    const userDoc = await db.collection('users').doc(decodedToken.uid).get();
+    const userData = userDoc.data();
+
+    req.user = {
+      id: decodedToken.uid,
+      uid: decodedToken.uid,
+      email: decodedToken.email,
+      role: userData?.role || 'user',
+      ...userData
+    };
     next();
-  });
+  } catch (err) {
+    req.user = { role: 'guest' };
+    next();
+  }
 };
 
 const requireRole = (roles: string[]) => {
@@ -506,123 +367,240 @@ const requireRole = (roles: string[]) => {
 // --- API Routes ---
 
 // Portal Config
-app.get('/api/portal-config', (req, res) => {
-  const row = db.prepare('SELECT config_data FROM portal_config WHERE id = 1').get() as { config_data: string };
-  if (row) {
-    try {
-      res.json(JSON.parse(row.config_data));
-    } catch (e) {
-      console.error('Error parsing portal config:', e);
+app.get('/api/portal-config', async (req, res) => {
+  try {
+    const configDoc = await db.collection('portal_config').doc('main').get();
+    if (configDoc.exists) {
+      res.json(configDoc.data());
+    } else {
       res.json({});
     }
-  } else {
-    res.status(404).json({ error: 'Configuration not found' });
+  } catch (err: any) {
+    console.error('Portal Config Error:', err);
+    res.status(500).json({ error: 'Failed to fetch portal config' });
   }
 });
 
-app.put('/api/portal-config', authenticateToken, requireRole(['admin']), (req, res) => {
+app.put('/api/portal-config', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
-    db.prepare('UPDATE portal_config SET config_data = ? WHERE id = 1').run(JSON.stringify(req.body));
+    await db.collection('portal_config').doc('main').set({
+      ...req.body,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
     res.json({ message: 'Configuration updated successfully' });
-  } catch (err) {
-    console.error('Error updating portal config:', err);
+  } catch (err: any) {
+    console.error('Portal Config Update Error:', err);
     res.status(500).json({ error: 'Failed to update configuration' });
   }
 });
 
-// Auth
-app.post('/api/auth/login', (req, res) => {
-  const { email, password } = req.body;
-  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email) as any;
-  if (!user || !bcrypt.compareSync(password, user.password)) {
-    return res.status(401).json({ error: 'Invalid credentials' });
+// Admin Password Reset (for migration/recovery)
+app.post('/api/admin/reset-passwords', async (req, res) => {
+  try {
+    const usersToReset = [
+      { email: 'admin@jh.com', password: 'admin123' },
+      { email: 'staff@jh.com', password: 'staff123' },
+      { email: 'user@jh.com', password: 'user123' },
+      { email: 'pavan.tr16@gmail.com', password: 'admin123' }
+    ];
+
+    const results = [];
+    for (const u of usersToReset) {
+      try {
+        const userRecord = await admin.auth().getUserByEmail(u.email);
+        await admin.auth().updateUser(userRecord.uid, {
+          password: u.password
+        });
+        results.push({ email: u.email, status: 'reset' });
+      } catch (err: any) {
+        if (err.code === 'auth/user-not-found') {
+          results.push({ email: u.email, status: 'not_found' });
+        } else {
+          results.push({ email: u.email, status: 'error', message: err.message });
+        }
+      }
+    }
+    res.json({ results });
+  } catch (err: any) {
+    console.error('Reset Passwords Error:', err);
+    res.status(500).json({ error: 'Failed to reset passwords' });
   }
-  const token = jwt.sign({ id: user.id, role: user.role, name: user.name }, JWT_SECRET, { expiresIn: '24h' });
-  res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
 });
 
-app.post('/api/auth/register', (req, res) => {
-  const { name, email, phone, password } = req.body;
+// Auth
+app.post('/api/auth/login', async (req, res) => {
+  const { email, password } = req.body;
+  const normalizedEmail = email?.toLowerCase();
+  console.log('Login attempt:', normalizedEmail);
   try {
+    const snapshot = await db.collection('users').where('email', '==', normalizedEmail).limit(1).get();
+    if (snapshot.empty) {
+      console.log('Login failed: User not found');
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    const userDoc = snapshot.docs[0];
+    const user = userDoc.data();
+    console.log('User found:', user.email);
+    const isMatch = bcrypt.compareSync(password, user.password);
+    console.log('Password match result:', isMatch);
+    if (!isMatch) {
+      console.log('Login failed: Password mismatch');
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    const token = jwt.sign({ id: userDoc.id, role: user.role, name: user.name }, JWT_SECRET, { expiresIn: '24h' });
+    console.log('Login successful:', email);
+    res.json({ token, user: { id: userDoc.id, name: user.name, email: user.email, role: user.role } });
+  } catch (err) {
+    console.error('Login error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.post('/api/auth/register', async (req, res) => {
+  const { name, email, phone, password } = req.body;
+  const normalizedEmail = email?.toLowerCase();
+  console.log('Registration attempt:', normalizedEmail);
+  try {
+    const existingUser = await db.collection('users').where('email', '==', normalizedEmail).limit(1).get();
+    if (!existingUser.empty) {
+      return res.status(400).json({ error: 'Email already exists' });
+    }
+
     const hashedPassword = bcrypt.hashSync(password, 10);
-    const result = db.prepare('INSERT INTO users (name, email, phone, password, role) VALUES (?, ?, ?, ?, ?)').run(
-      name, email, phone, hashedPassword, 'user'
-    );
-    const userId = result.lastInsertRowid;
+    const userRef = await db.collection('users').add({
+      name,
+      email: normalizedEmail,
+      phone,
+      password: hashedPassword,
+      role: 'user',
+      created_at: admin.firestore.FieldValue.serverTimestamp()
+    });
+    const userId = userRef.id;
     
     // Create wallet for new user
-    db.prepare('INSERT INTO wallets (user_id, role, balance) VALUES (?, ?, 0)').run(userId, 'user');
+    await db.collection('wallets').doc(userId).set({
+      user_id: userId,
+      role: 'user',
+      balance: 0,
+      created_at: admin.firestore.FieldValue.serverTimestamp()
+    });
 
     const token = jwt.sign({ id: userId, role: 'user', name }, JWT_SECRET, { expiresIn: '24h' });
+    console.log('Registration successful:', email);
     res.json({ 
       token, 
       user: { id: userId, name, email, role: 'user' },
       message: 'User registered successfully' 
     });
   } catch (err: any) {
-    if (err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
-      res.status(400).json({ error: 'Email already exists' });
-    } else {
-      res.status(500).json({ error: 'Database error' });
-    }
+    console.error('Registration error:', err);
+    res.status(500).json({ error: 'Database error' });
   }
 });
 
-app.post('/api/auth/forgot-password', (req, res) => {
+app.post('/api/auth/forgot-password', async (req, res) => {
   const { email } = req.body;
-  const user = db.prepare('SELECT * FROM users WHERE email = ? OR phone = ?').get(email, email) as any;
-  
-  if (!user) {
-    // For security, don't reveal if user exists
-    return res.json({ message: 'If an account exists with this email/phone, a reset link has been sent.' });
+  try {
+    const snapshot = await db.collection('users').where('email', '==', email).limit(1).get();
+    if (snapshot.empty) {
+      return res.json({ message: 'If an account exists with this email/phone, a reset link has been sent.' });
+    }
+    const userDoc = snapshot.docs[0];
+    const user = { id: userDoc.id, ...userDoc.data() } as any;
+
+    const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    const expiry = new Date(Date.now() + 30 * 60 * 1000).toISOString(); // 30 mins
+
+    await db.collection('users').doc(user.id).update({
+      reset_token: token,
+      reset_token_expiry: expiry,
+      updated_at: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    // In a real app, send email here. For now, we'll log it and simulate.
+    const resetLink = `${req.protocol}://${req.get('host')}/reset-password?token=${token}`;
+    console.log(`Password reset link for ${user.email}: ${resetLink}`);
+
+    res.json({ 
+      message: 'If an account exists with this email/phone, a reset link has been sent.',
+      debug_link: process.env.NODE_ENV !== 'production' ? resetLink : undefined
+    });
+  } catch (err) {
+    console.error('Forgot password error:', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
-
-  const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-  const expiry = new Date(Date.now() + 30 * 60 * 1000).toISOString(); // 30 mins
-
-  db.prepare('UPDATE users SET reset_token = ?, reset_token_expiry = ? WHERE id = ?').run(token, expiry, user.id);
-
-  // In a real app, send email here. For now, we'll log it and simulate.
-  const resetLink = `${req.protocol}://${req.get('host')}/reset-password?token=${token}`;
-  console.log(`Password reset link for ${user.email}: ${resetLink}`);
-
-  res.json({ 
-    message: 'If an account exists with this email/phone, a reset link has been sent.',
-    // In dev mode, we might want to return the link for testing, but let's stick to the prompt's "send to email"
-    debug_link: process.env.NODE_ENV !== 'production' ? resetLink : undefined
-  });
 });
 
-app.post('/api/auth/reset-password', (req, res) => {
+app.post('/api/auth/reset-password', async (req, res) => {
   const { token, password } = req.body;
   
-  const user = db.prepare('SELECT * FROM users WHERE reset_token = ? AND reset_token_expiry > CURRENT_TIMESTAMP').get(token) as any;
-  
-  if (!user) {
-    return res.status(400).json({ error: 'Invalid or expired reset token' });
+  try {
+    const snapshot = await db.collection('users')
+      .where('reset_token', '==', token)
+      .limit(1)
+      .get();
+    
+    const userDoc = snapshot.docs[0];
+    if (!userDoc) {
+      return res.status(400).json({ error: 'Invalid or expired reset token' });
+    }
+    
+    const user = userDoc.data();
+    if (new Date(user.reset_token_expiry) < new Date()) {
+      return res.status(400).json({ error: 'Invalid or expired reset token' });
+    }
+
+    const hashedPassword = bcrypt.hashSync(password, 10);
+    await userDoc.ref.update({
+      password: hashedPassword,
+      reset_token: null,
+      reset_token_expiry: null,
+      updated_at: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    res.json({ message: 'Password has been reset successfully' });
+  } catch (err) {
+    console.error('Reset password error:', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
-
-  const hashedPassword = bcrypt.hashSync(password, 10);
-  db.prepare('UPDATE users SET password = ?, reset_token = NULL, reset_token_expiry = NULL WHERE id = ?').run(hashedPassword, user.id);
-
-  res.json({ message: 'Password has been reset successfully' });
 });
 
 // --- Wallet Endpoints ---
 
-app.get('/api/wallet/balance', authenticateToken, (req: any, res) => {
-  let wallet = db.prepare('SELECT * FROM wallets WHERE user_id = ?').get(req.user.id) as any;
-  if (!wallet) {
-    // Create wallet if it doesn't exist (for older users)
-    db.prepare('INSERT INTO wallets (user_id, role, balance) VALUES (?, ?, 0)').run(req.user.id, req.user.role);
-    wallet = db.prepare('SELECT * FROM wallets WHERE user_id = ?').get(req.user.id) as any;
+app.get('/api/wallet/balance', authenticateToken, async (req: any, res) => {
+  try {
+    const walletDoc = await db.collection('wallets').doc(req.user.id).get();
+    if (!walletDoc.exists) {
+      // Create wallet if it doesn't exist
+      const newWallet = {
+        user_id: req.user.id,
+        role: req.user.role,
+        balance: 0,
+        created_at: admin.firestore.FieldValue.serverTimestamp(),
+        updated_at: admin.firestore.FieldValue.serverTimestamp()
+      };
+      await db.collection('wallets').doc(req.user.id).set(newWallet);
+      return res.json(newWallet);
+    }
+    res.json({ id: walletDoc.id, ...walletDoc.data() });
+  } catch (err) {
+    console.error('Wallet Balance Error:', err);
+    res.status(500).json({ error: 'Failed to fetch wallet balance' });
   }
-  res.json(wallet);
 });
 
-app.get('/api/wallet/transactions', authenticateToken, (req: any, res) => {
-  const transactions = db.prepare('SELECT * FROM wallet_transactions WHERE user_id = ? ORDER BY created_at DESC').all(req.user.id);
-  res.json(transactions);
+app.get('/api/wallet/transactions', authenticateToken, async (req: any, res) => {
+  try {
+    const snapshot = await db.collection('wallet_transactions')
+      .where('user_id', '==', req.user.id)
+      .orderBy('created_at', 'desc')
+      .get();
+    const transactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    res.json(transactions);
+  } catch (err) {
+    console.error('Wallet Transactions Error:', err);
+    res.status(500).json({ error: 'Failed to fetch transactions' });
+  }
 });
 
 app.post('/api/wallet/add-money', authenticateToken, async (req: any, res) => {
@@ -631,183 +609,278 @@ app.post('/api/wallet/add-money', authenticateToken, async (req: any, res) => {
     return res.status(400).json({ error: 'Invalid amount' });
   }
 
-  // Check if Razorpay keys are configured
   if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET || process.env.RAZORPAY_KEY_ID === 'rzp_test_dummy_key') {
-    return res.status(500).json({ error: 'Razorpay is not configured. Please set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in environment variables.' });
+    return res.status(500).json({ error: 'Razorpay is not configured' });
   }
 
   try {
     const options = {
-      amount: Math.round(amount * 100), // Razorpay expects amount in paise
+      amount: Math.round(amount * 100),
       currency: 'INR',
       receipt: `receipt_${Date.now()}`,
     };
 
-    console.log('Creating Razorpay order with options:', options);
     const order = await razorpay.orders.create(options);
-    console.log('Razorpay order created successfully:', order.id);
     res.json(order);
   } catch (err: any) {
-    console.error('Razorpay Order Error Details:', {
-      message: err.message,
-      description: err.error?.description,
-      code: err.error?.code,
-      metadata: err.error?.metadata
-    });
-    res.status(500).json({ 
-      error: 'Failed to create payment order',
-      details: err.error?.description || err.message
-    });
+    console.error('Razorpay Order Error:', err);
+    res.status(500).json({ error: 'Failed to create payment order' });
   }
 });
 
-app.post('/api/wallet/verify-payment', authenticateToken, (req: any, res) => {
+app.post('/api/wallet/verify-payment', authenticateToken, async (req: any, res) => {
   const { razorpay_order_id, razorpay_payment_id, razorpay_signature, amount } = req.body;
   
   const secret = process.env.RAZORPAY_KEY_SECRET || 'dummy_secret';
-  const hmac = crypto.createHmac('sha256', secret);
-  hmac.update(razorpay_order_id + "|" + razorpay_payment_id);
-  const generated_signature = hmac.digest('hex');
+  const generated_signature = crypto
+    .createHmac('sha256', secret)
+    .update(razorpay_order_id + "|" + razorpay_payment_id)
+    .digest('hex');
 
   if (generated_signature !== razorpay_signature && secret !== 'dummy_secret') {
     return res.status(400).json({ error: 'Invalid payment signature' });
   }
   
-  if (!razorpay_payment_id) {
-    return res.status(400).json({ error: 'Payment verification failed' });
-  }
-
   try {
-    db.transaction(() => {
-      // Update wallet balance
-      db.prepare('UPDATE wallets SET balance = balance + ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?')
-        .run(amount, req.user.id);
+    const walletRef = db.collection('wallets').doc(req.user.id);
+    const transactionRef = db.collection('wallet_transactions').doc();
+
+    await db.runTransaction(async (transaction) => {
+      const walletDoc = await transaction.get(walletRef);
+      const currentBalance = walletDoc.exists ? (walletDoc.data()?.balance || 0) : 0;
       
-      // Record transaction
-      db.prepare('INSERT INTO wallet_transactions (user_id, type, amount, description, reference_id, status) VALUES (?, ?, ?, ?, ?, ?)')
-        .run(req.user.id, 'credit', amount, 'Added money to wallet', razorpay_payment_id, 'success');
-    })();
+      transaction.set(walletRef, {
+        balance: currentBalance + Number(amount),
+        updated_at: admin.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+
+      transaction.set(transactionRef, {
+        user_id: req.user.id,
+        type: 'credit',
+        amount: Number(amount),
+        description: 'Added money to wallet',
+        reference_id: razorpay_payment_id,
+        status: 'success',
+        created_at: admin.firestore.FieldValue.serverTimestamp()
+      });
+    });
 
     res.json({ message: 'Wallet credited successfully' });
   } catch (err) {
-    console.error('Payment Verification DB Error:', err);
+    console.error('Payment Verification Error:', err);
     res.status(500).json({ error: 'Failed to update wallet' });
   }
 });
 
-app.post('/api/wallet/pay-service', authenticateToken, (req: any, res) => {
+app.post('/api/wallet/pay-service', authenticateToken, async (req: any, res) => {
   const { serviceId, applicationId } = req.body;
   
-  const service = db.prepare('SELECT * FROM services WHERE id = ?').get(serviceId) as any;
-  if (!service || !service.fee) {
-    return res.status(400).json({ error: 'Invalid service or no fee required' });
-  }
-
-  const wallet = db.prepare('SELECT * FROM wallets WHERE user_id = ?').get(req.user.id) as any;
-  if (!wallet || wallet.balance < service.fee) {
-    return res.status(400).json({ error: 'Insufficient wallet balance' });
-  }
-
   try {
-    db.transaction(() => {
-      // Deduct from wallet
-      db.prepare('UPDATE wallets SET balance = balance - ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?')
-        .run(service.fee, req.user.id);
+    const serviceDoc = await db.collection('services').doc(serviceId).get();
+    if (!serviceDoc.exists) return res.status(404).json({ error: 'Service not found' });
+    const service = serviceDoc.data();
+    const fee = service?.fee || 0;
+
+    if (fee <= 0) return res.status(400).json({ error: 'No fee required' });
+
+    const walletRef = db.collection('wallets').doc(req.user.id);
+    const transactionRef = db.collection('wallet_transactions').doc();
+
+    await db.runTransaction(async (transaction) => {
+      const walletDoc = await transaction.get(walletRef);
+      if (!walletDoc.exists || (walletDoc.data()?.balance || 0) < fee) {
+        throw new Error('Insufficient wallet balance');
+      }
       
-      // Record transaction
-      db.prepare('INSERT INTO wallet_transactions (user_id, type, amount, description, reference_id, status) VALUES (?, ?, ?, ?, ?, ?)')
-        .run(req.user.id, 'debit', service.fee, `Payment for service: ${service.service_name}`, applicationId, 'success');
-    })();
+      transaction.update(walletRef, {
+        balance: admin.firestore.FieldValue.increment(-fee),
+        updated_at: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      transaction.set(transactionRef, {
+        user_id: req.user.id,
+        type: 'debit',
+        amount: fee,
+        description: `Payment for service: ${service?.service_name}`,
+        reference_id: applicationId,
+        status: 'success',
+        created_at: admin.firestore.FieldValue.serverTimestamp()
+      });
+    });
 
     res.json({ message: 'Payment successful' });
-  } catch (err) {
+  } catch (err: any) {
     console.error('Service Payment Error:', err);
-    res.status(500).json({ error: 'Failed to process payment' });
+    res.status(400).json({ error: err.message || 'Failed to process payment' });
   }
 });
 
 // --- Admin Wallet Endpoints ---
 
-app.get('/api/admin/wallets', authenticateToken, requireRole(['admin']), (req: any, res) => {
-  const wallets = db.prepare(`
-    SELECT u.id as user_id, u.name, u.email, COALESCE(w.balance, 0) as balance, w.id as wallet_id, u.role
-    FROM users u
-    LEFT JOIN wallets w ON u.id = w.user_id
-  `).all();
-  res.json(wallets);
+app.get('/api/admin/wallets', authenticateToken, requireRole(['admin']), async (req: any, res) => {
+  try {
+    const usersSnapshot = await db.collection('users').get();
+    const walletsSnapshot = await db.collection('wallets').get();
+    
+    const walletsMap = new Map();
+    walletsSnapshot.docs.forEach(doc => walletsMap.set(doc.id, doc.data()));
+
+    const wallets = usersSnapshot.docs.map(doc => {
+      const userData = doc.data();
+      const walletData = walletsMap.get(doc.id);
+      return {
+        user_id: doc.id,
+        name: userData.name,
+        email: userData.email,
+        role: userData.role,
+        balance: walletData?.balance || 0,
+        wallet_id: doc.id
+      };
+    });
+    res.json(wallets);
+  } catch (err) {
+    console.error('Admin Wallets Error:', err);
+    res.status(500).json({ error: 'Failed to fetch wallets' });
+  }
 });
 
-app.get('/api/admin/wallet/transactions', authenticateToken, requireRole(['admin']), (req: any, res) => {
-  const transactions = db.prepare(`
-    SELECT wt.*, u.name, u.email 
-    FROM wallet_transactions wt 
-    JOIN users u ON wt.user_id = u.id 
-    ORDER BY wt.created_at DESC
-  `).all();
-  res.json(transactions);
+app.get('/api/admin/wallet/transactions', authenticateToken, requireRole(['admin']), async (req: any, res) => {
+  try {
+    const snapshot = await db.collection('wallet_transactions').orderBy('created_at', 'desc').get();
+    const usersSnapshot = await db.collection('users').get();
+    const usersMap = new Map();
+    usersSnapshot.docs.forEach(doc => usersMap.set(doc.id, doc.data()));
+
+    const transactions = snapshot.docs.map(doc => {
+      const data = doc.data();
+      const user = usersMap.get(data.user_id);
+      return {
+        id: doc.id,
+        ...data,
+        name: user?.name,
+        email: user?.email
+      };
+    });
+    res.json(transactions);
+  } catch (err) {
+    console.error('Admin Wallet Transactions Error:', err);
+    res.status(500).json({ error: 'Failed to fetch transactions' });
+  }
 });
 
-app.post('/api/admin/wallet/adjust', authenticateToken, requireRole(['admin']), (req: any, res) => {
-  const { wallet_id, type, amount, description } = req.body;
+app.post('/api/admin/wallets/adjust-balance', authenticateToken, requireRole(['admin']), async (req: any, res) => {
+  const { walletId, type, amount, reason } = req.body;
   
-  if (!wallet_id || !type || !amount || amount <= 0) {
+  if (!walletId || !type || !amount || amount <= 0) {
     return res.status(400).json({ error: 'Invalid adjustment data' });
   }
 
-  const wallet = db.prepare('SELECT user_id FROM wallets WHERE id = ?').get(wallet_id) as any;
-  if (!wallet) {
-    return res.status(404).json({ error: 'Wallet not found' });
-  }
-
-  const userId = wallet.user_id;
-
   try {
-    db.transaction(() => {
-      if (type === 'credit') {
-        db.prepare('UPDATE wallets SET balance = balance + ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?')
-          .run(amount, userId);
-      } else {
-        db.prepare('UPDATE wallets SET balance = balance - ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?')
-          .run(amount, userId);
-      }
+    const walletRef = db.collection('wallets').doc(walletId);
+    const transactionRef = db.collection('wallet_transactions').doc();
+
+    await db.runTransaction(async (transaction) => {
+      const walletDoc = await transaction.get(walletRef);
+      if (!walletDoc.exists) throw new Error('Wallet not found');
       
-      db.prepare('INSERT INTO wallet_transactions (user_id, type, amount, description, status) VALUES (?, ?, ?, ?, ?)')
-        .run(userId, type, amount, description || `Admin ${type} adjustment`, 'success');
-    })();
+      const adjustment = type === 'credit' ? Number(amount) : -Number(amount);
+      
+      transaction.update(walletRef, {
+        balance: admin.firestore.FieldValue.increment(adjustment),
+        updated_at: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      transaction.set(transactionRef, {
+        user_id: walletId,
+        type: type,
+        amount: Number(amount),
+        description: reason || `Admin ${type} adjustment`,
+        status: 'success',
+        created_at: admin.firestore.FieldValue.serverTimestamp()
+      });
+    });
 
     res.json({ message: 'Wallet adjusted successfully' });
-  } catch (err) {
-    console.error('Admin Wallet Adjustment Error:', err);
-    res.status(500).json({ error: 'Failed to adjust wallet' });
+  } catch (err: any) {
+    console.error('Wallet Adjustment Error:', err);
+    res.status(500).json({ error: err.message || 'Failed to adjust wallet' });
   }
 });
 
-app.get('/api/admin/wallet/analytics', authenticateToken, requireRole(['admin']), (req: any, res) => {
-  const totalRevenue = db.prepare("SELECT SUM(amount) as total FROM wallet_transactions WHERE type = 'debit' AND status = 'success'").get() as any;
-  const totalBalance = db.prepare("SELECT SUM(balance) as total FROM wallets").get() as any;
-  const dailyTransactions = db.prepare(`
-    SELECT DATE(created_at) as date, COUNT(*) as count, SUM(amount) as total 
-    FROM wallet_transactions 
-    GROUP BY DATE(created_at) 
-    ORDER BY date DESC 
-    LIMIT 30
-  `).all();
-  const topUsers = db.prepare(`
-    SELECT u.name, u.email, SUM(wt.amount) as total_spent 
-    FROM wallet_transactions wt 
-    JOIN users u ON wt.user_id = u.id 
-    WHERE wt.type = 'debit' AND wt.status = 'success' 
-    GROUP BY wt.user_id 
-    ORDER BY total_spent DESC 
-    LIMIT 5
-  `).all();
+app.get('/api/admin/wallet/analytics', authenticateToken, requireRole(['admin']), async (req: any, res) => {
+  try {
+    const transactionsSnapshot = await db.collection('wallet_transactions')
+      .where('type', '==', 'debit')
+      .where('status', '==', 'success')
+      .get();
+    
+    let totalRevenue = 0;
+    transactionsSnapshot.forEach(doc => {
+      totalRevenue += (doc.data().amount || 0);
+    });
 
-  res.json({
-    totalRevenue: totalRevenue.total || 0,
-    totalBalance: totalBalance.total || 0,
-    dailyTransactions,
-    topUsers
-  });
+    const walletsSnapshot = await db.collection('wallets').get();
+    let totalBalance = 0;
+    walletsSnapshot.forEach(doc => {
+      totalBalance += (doc.data().balance || 0);
+    });
+
+    // Daily transactions (last 30 days)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    const dailySnapshot = await db.collection('wallet_transactions')
+      .where('created_at', '>=', thirtyDaysAgo)
+      .get();
+
+    const dailyMap = new Map();
+    dailySnapshot.forEach(doc => {
+      const data = doc.data();
+      const date = data.created_at?.toDate()?.toISOString().split('T')[0] || 'unknown';
+      const current = dailyMap.get(date) || { date, count: 0, total: 0 };
+      current.count += 1;
+      current.total += (data.amount || 0);
+      dailyMap.set(date, current);
+    });
+
+    const dailyTransactions = Array.from(dailyMap.values())
+      .sort((a, b) => b.date.localeCompare(a.date));
+
+    // Top Users
+    const userSpending = new Map();
+    transactionsSnapshot.forEach(doc => {
+      const data = doc.data();
+      const current = userSpending.get(data.user_id) || 0;
+      userSpending.set(data.user_id, current + (data.amount || 0));
+    });
+
+    const sortedUsers = Array.from(userSpending.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5);
+
+    const usersSnapshot = await db.collection('users').get();
+    const usersMap = new Map();
+    usersSnapshot.docs.forEach(doc => usersMap.set(doc.id, doc.data()));
+
+    const topUsers = sortedUsers.map(([userId, totalSpent]) => {
+      const user = usersMap.get(userId);
+      return {
+        name: user?.name,
+        email: user?.email,
+        total_spent: totalSpent
+      };
+    });
+
+    res.json({
+      totalRevenue,
+      totalBalance,
+      dailyTransactions,
+      topUsers
+    });
+  } catch (err) {
+    console.error('Wallet Analytics Error:', err);
+    res.status(500).json({ error: 'Failed to fetch analytics' });
+  }
 });
 
 // --- Application Drafts Endpoints ---
@@ -847,7 +920,7 @@ const upload = multer({
   fileFilter
 });
 
-app.post('/api/application-drafts', authenticateToken, upload.array('documents', 20), (req: any, res) => {
+app.post('/api/application-drafts', authenticateToken, upload.array('documents', 20), async (req: any, res) => {
   try {
     const { service_id, service_type, form_data, draft_id } = req.body;
     const files = req.files as Express.Multer.File[];
@@ -855,24 +928,34 @@ app.post('/api/application-drafts', authenticateToken, upload.array('documents',
     const documents = files ? files.map(f => ({ path: f.path, originalname: f.originalname })) : [];
     
     if (draft_id) {
-      // Update existing draft
-      // For simplicity, we'll replace the documents if new ones are uploaded, or keep old ones if not.
-      // In a real app, you'd merge them.
-      const existingDraft = db.prepare('SELECT documents FROM application_drafts WHERE id = ? AND user_id = ?').get(draft_id, req.user.id) as any;
-      if (!existingDraft) return res.status(404).json({ error: 'Draft not found' });
+      const draftRef = db.collection('application_drafts').doc(draft_id);
+      const draftDoc = await draftRef.get();
       
-      const finalDocs = documents.length > 0 ? JSON.stringify(documents) : existingDraft.documents;
+      if (!draftDoc.exists) return res.status(404).json({ error: 'Draft not found' });
       
-      db.prepare('UPDATE application_drafts SET form_data = ?, documents = ? WHERE id = ?').run(
-        form_data, finalDocs, draft_id
-      );
+      const updateData: any = {
+        form_data,
+        updated_at: admin.firestore.FieldValue.serverTimestamp()
+      };
+      
+      if (documents.length > 0) {
+        updateData.documents = documents;
+      }
+      
+      await draftRef.update(updateData);
       res.json({ id: draft_id, message: 'Draft updated successfully' });
     } else {
-      // Create new draft
-      const result = db.prepare('INSERT INTO application_drafts (user_id, service_id, service_type, form_data, documents) VALUES (?, ?, ?, ?, ?)').run(
-        req.user.id, service_id, service_type, form_data, JSON.stringify(documents)
-      );
-      res.json({ id: result.lastInsertRowid, message: 'Draft saved successfully' });
+      const newDraft = {
+        user_id: req.user.id,
+        service_id,
+        service_type,
+        form_data,
+        documents,
+        created_at: admin.firestore.FieldValue.serverTimestamp(),
+        updated_at: admin.firestore.FieldValue.serverTimestamp()
+      };
+      const result = await db.collection('application_drafts').add(newDraft);
+      res.json({ id: result.id, message: 'Draft saved successfully' });
     }
   } catch (err: any) {
     console.error('Draft save error:', err);
@@ -880,34 +963,53 @@ app.post('/api/application-drafts', authenticateToken, upload.array('documents',
   }
 });
 
-app.get('/api/application-drafts', authenticateToken, (req: any, res) => {
+app.get('/api/application-drafts', authenticateToken, async (req: any, res) => {
   try {
-    const drafts = db.prepare(`
-      SELECT d.*, s.service_name 
-      FROM application_drafts d 
-      JOIN services s ON d.service_id = s.id 
-      WHERE d.user_id = ? 
-      ORDER BY d.created_at DESC
-    `).all(req.user.id);
+    const snapshot = await db.collection('application_drafts')
+      .where('user_id', '==', req.user.id)
+      .orderBy('created_at', 'desc')
+      .get();
+    
+    const servicesSnapshot = await db.collection('services').get();
+    const servicesMap = new Map();
+    servicesSnapshot.docs.forEach(doc => servicesMap.set(doc.id, doc.data()));
+
+    const drafts = snapshot.docs.map(doc => {
+      const data = doc.data();
+      const service = servicesMap.get(data.service_id);
+      return {
+        id: doc.id,
+        ...data,
+        service_name: service?.service_name
+      };
+    });
     res.json(drafts);
   } catch (err) {
+    console.error('Fetch Drafts Error:', err);
     res.status(500).json({ error: 'Failed to fetch drafts' });
   }
 });
 
-app.get('/api/application-drafts/:id', authenticateToken, (req: any, res) => {
+app.get('/api/application-drafts/:id', authenticateToken, async (req: any, res) => {
   try {
-    const draft = db.prepare('SELECT * FROM application_drafts WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
-    if (!draft) return res.status(404).json({ error: 'Draft not found' });
-    res.json(draft);
+    const draftDoc = await db.collection('application_drafts').doc(req.params.id).get();
+    if (!draftDoc.exists || draftDoc.data()?.user_id !== req.user.id) {
+      return res.status(404).json({ error: 'Draft not found' });
+    }
+    res.json({ id: draftDoc.id, ...draftDoc.data() });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch draft' });
   }
 });
 
-app.delete('/api/application-drafts/:id', authenticateToken, (req: any, res) => {
+app.delete('/api/application-drafts/:id', authenticateToken, async (req: any, res) => {
   try {
-    db.prepare('DELETE FROM application_drafts WHERE id = ? AND user_id = ?').run(req.params.id, req.user.id);
+    const draftRef = db.collection('application_drafts').doc(req.params.id);
+    const draftDoc = await draftRef.get();
+    if (!draftDoc.exists || draftDoc.data()?.user_id !== req.user.id) {
+      return res.status(404).json({ error: 'Draft not found' });
+    }
+    await draftRef.delete();
     res.json({ message: 'Draft deleted successfully' });
   } catch (err) {
     res.status(500).json({ error: 'Failed to delete draft' });
@@ -916,35 +1018,69 @@ app.delete('/api/application-drafts/:id', authenticateToken, (req: any, res) => 
 
 
 // Users
-app.get('/api/users', authenticateToken, requireRole(['admin']), (req, res) => {
-  const users = db.prepare('SELECT id, name, email, phone, role, created_at FROM users').all();
-  res.json(users);
-});
-
-app.post('/api/users', authenticateToken, requireRole(['admin']), (req, res) => {
-  const { name, email, phone, password, role } = req.body;
+app.get('/api/users', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
-    const hashedPassword = bcrypt.hashSync(password, 10);
-    const result = db.prepare('INSERT INTO users (name, email, phone, password, role) VALUES (?, ?, ?, ?, ?)').run(
-      name, email, phone, hashedPassword, role
-    );
-    res.json({ id: result.lastInsertRowid, message: 'User created successfully' });
-  } catch (err: any) {
-    res.status(400).json({ error: 'Error creating user' });
+    const snapshot = await db.collection('users').get();
+    const users = snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+        role: data.role,
+        created_at: data.created_at
+      };
+    });
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch users' });
   }
 });
 
-app.delete('/api/users/:id', authenticateToken, requireRole(['admin']), (req: any, res) => {
-  if (req.user.id === parseInt(req.params.id)) {
+app.post('/api/users', authenticateToken, requireRole(['admin']), async (req, res) => {
+  const { name, email, phone, password, role } = req.body;
+  try {
+    const userRecord = await admin.auth().createUser({
+      email,
+      password,
+      displayName: name,
+      phoneNumber: phone
+    });
+
+    await db.collection('users').doc(userRecord.uid).set({
+      name,
+      email,
+      phone,
+      role,
+      created_at: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    res.json({ id: userRecord.uid, message: 'User created successfully' });
+  } catch (err: any) {
+    console.error('Create User Error:', err);
+    res.status(400).json({ error: err.message || 'Error creating user' });
+  }
+});
+
+app.delete('/api/users/:id', authenticateToken, requireRole(['admin']), async (req: any, res) => {
+  if (req.user.id === req.params.id) {
     return res.status(400).json({ error: 'Cannot delete yourself' });
   }
 
   try {
-    const user = db.prepare('SELECT name FROM users WHERE id = ?').get(req.params.id) as any;
-    if (!user) return res.status(404).json({ error: 'User not found' });
+    const userRef = db.collection('users').doc(req.params.id);
+    const userDoc = await userRef.get();
+    if (!userDoc.exists) return res.status(404).json({ error: 'User not found' });
 
-    db.prepare('UPDATE users SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?').run(req.params.id);
-    db.prepare('INSERT INTO activity_logs (user_id, action) VALUES (?, ?)').run(req.user.id, `Moved user to Recycle Bin: ${user.name}`);
+    await userRef.update({ deleted_at: admin.firestore.FieldValue.serverTimestamp() });
+    
+    await db.collection('activity_logs').add({
+      user_id: req.user.id,
+      action: `Moved user to Recycle Bin: ${userDoc.data()?.name}`,
+      timestamp: admin.firestore.FieldValue.serverTimestamp()
+    });
+
     res.json({ message: 'User moved to Recycle Bin' });
   } catch (err) {
     console.error('Error deleting user:', err);
@@ -952,114 +1088,197 @@ app.delete('/api/users/:id', authenticateToken, requireRole(['admin']), (req: an
   }
 });
 
-app.put('/api/users/:id/role', authenticateToken, requireRole(['admin']), (req, res) => {
+app.put('/api/users/:id/role', authenticateToken, requireRole(['admin']), async (req, res) => {
   const { role } = req.body;
   if (!['admin', 'staff', 'user'].includes(role)) {
     return res.status(400).json({ error: 'Invalid role' });
   }
-  db.prepare('UPDATE users SET role = ? WHERE id = ?').run(role, req.params.id);
-  res.json({ message: 'User role updated' });
+  try {
+    await db.collection('users').doc(req.params.id).update({ role });
+    res.json({ message: 'User role updated' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update user role' });
+  }
 });
 
 // Services
-app.get('/api/services/:name', optionalAuthenticateToken, (req, res) => {
+app.get('/api/services/:name', optionalAuthenticateToken, async (req, res) => {
   try {
-    const service = db.prepare('SELECT *, id as service_id, application_type as type, service_url as url, is_active as active_status, is_visible as visible_status FROM services WHERE LOWER(service_name) = LOWER(?) AND deleted_at IS NULL').get(req.params.name);
-    if (!service) {
+    const snapshot = await db.collection('services').where('service_name', '==', req.params.name).limit(1).get();
+    if (snapshot.empty) {
       return res.status(404).json({ error: 'Service not found' });
     }
-    res.json(service);
-  } catch (err) {
+    const service = snapshot.docs[0].data();
+    res.json({ service_id: snapshot.docs[0].id, ...service });
+  } catch (err: any) {
+    console.error('Service Detail Error:', err);
     res.status(500).json({ error: 'Failed to fetch service details' });
   }
 });
 
-app.get('/api/services', optionalAuthenticateToken, (req: any, res) => {
-  let query = 'SELECT id as service_id, service_name, application_type as type, service_url as url, is_active as active_status, is_visible as visible_status, description, icon, created_at, fee, staff_commission, service_price, payment_required FROM services WHERE deleted_at IS NULL';
-  
-  if (!req.user || req.user.role === 'user' || req.user.role === 'guest') {
-    // Users and guests should not see url
-    query = 'SELECT id as service_id, service_name, application_type as type, is_active as active_status, is_visible as visible_status, description, icon, created_at, service_price, payment_required FROM services WHERE is_active = 1 AND is_visible = 1 AND deleted_at IS NULL';
-  } else if (req.user.role === 'staff') {
-    // Staff can see all active services including url
-    query = 'SELECT id as service_id, service_name, application_type as type, service_url as url, is_active as active_status, is_visible as visible_status, description, icon, created_at, fee, staff_commission, service_price, payment_required FROM services WHERE is_active = 1 AND deleted_at IS NULL';
+app.get('/api/services', optionalAuthenticateToken, async (req: any, res) => {
+  try {
+    let query = db.collection('services');
+    
+    if (!req.user || req.user.role === 'user' || req.user.role === 'guest') {
+      // Users and guests should only see active and visible services
+      const snapshot = await query.where('is_active', '==', true).where('is_visible', '==', true).get();
+      const services = snapshot.docs.map(doc => {
+        const data = doc.data();
+        const { service_url, fee, staff_commission, ...rest } = data; // Hide sensitive fields
+        return { service_id: doc.id, ...rest };
+      });
+      return res.json(services);
+    } else if (req.user.role === 'staff') {
+      // Staff can see all active services
+      const snapshot = await query.where('is_active', '==', true).get();
+      const services = snapshot.docs.map(doc => ({ service_id: doc.id, ...doc.data() }));
+      return res.json(services);
+    } else {
+      // Admin can see all
+      const snapshot = await query.get();
+      const services = snapshot.docs.map(doc => ({ service_id: doc.id, ...doc.data() }));
+      return res.json(services);
+    }
+  } catch (err: any) {
+    console.error('Services Error:', err);
+    res.status(500).json({ error: 'Failed to fetch services' });
   }
-  
-  const services = db.prepare(query).all();
-  res.json(services);
 });
 
-app.post('/api/services/:id/log-access', authenticateToken, requireRole(['staff', 'admin']), (req: any, res) => {
+app.post('/api/services/:id/log-access', authenticateToken, requireRole(['staff', 'admin']), async (req: any, res) => {
   const { id } = req.params;
   const { action } = req.body;
   
-  db.prepare('INSERT INTO service_logs (staff_id, service_id, action) VALUES (?, ?, ?)')
-    .run(req.user.id, id, action || 'Opened Service URL');
-    
-  res.json({ success: true });
-});
-
-app.post('/api/services', authenticateToken, requireRole(['admin']), (req, res) => {
-  const { service_name, description, active_status, visible_status, type, url, icon, application_id, service_price, payment_required, fee, staff_commission } = req.body;
-  const result = db.prepare('INSERT INTO services (service_name, description, is_active, is_visible, application_type, service_url, icon, application_id, service_price, payment_required, fee, staff_commission) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
-    service_name, description, active_status ?? 1, visible_status ?? 1, type || 'internal', url || '', icon || '', application_id || '', service_price || 0, payment_required ? 1 : 0, fee || 0, staff_commission || 0
-  );
-  res.json({ id: result.lastInsertRowid, message: 'Service added' });
-});
-
-app.put('/api/services/:id', authenticateToken, requireRole(['admin']), (req, res) => {
-  const { service_name, description, active_status, visible_status, type, url, icon, application_id, service_price, payment_required, fee, staff_commission } = req.body;
-  db.prepare('UPDATE services SET service_name = ?, description = ?, is_active = ?, is_visible = ?, application_type = ?, service_url = ?, icon = ?, application_id = ?, service_price = ?, payment_required = ?, fee = ?, staff_commission = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(
-    service_name, description, active_status, visible_status, type, url, icon, application_id || '', service_price || 0, payment_required ? 1 : 0, fee || 0, staff_commission || 0, req.params.id
-  );
-  res.json({ message: 'Service updated' });
-});
-
-app.patch('/api/services/:id/status', authenticateToken, requireRole(['admin']), (req, res) => {
-  const service = db.prepare('SELECT is_active FROM services WHERE id = ?').get(req.params.id) as any;
-  if (!service) return res.status(404).json({ error: 'Service not found' });
-  const newStatus = service.is_active ? 0 : 1;
-  db.prepare('UPDATE services SET is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(newStatus, req.params.id);
-  res.json({ message: 'Status toggled', is_active: newStatus });
-});
-
-app.patch('/api/services/:id/visibility', authenticateToken, requireRole(['admin']), (req, res) => {
-  const service = db.prepare('SELECT is_visible FROM services WHERE id = ?').get(req.params.id) as any;
-  if (!service) return res.status(404).json({ error: 'Service not found' });
-  const newVisibility = service.is_visible ? 0 : 1;
-  db.prepare('UPDATE services SET is_visible = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(newVisibility, req.params.id);
-  res.json({ message: 'Visibility toggled', is_visible: newVisibility });
-});
-
-app.delete('/api/services/:id', authenticateToken, requireRole(['admin']), (req: any, res) => {
-  const service = db.prepare('SELECT service_name FROM services WHERE id = ?').get(req.params.id) as any;
-  if (!service) return res.status(404).json({ error: 'Service not found' });
-
   try {
-    db.prepare('UPDATE services SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?').run(req.params.id);
-    db.prepare('INSERT INTO activity_logs (user_id, action) VALUES (?, ?)').run(req.user.id, `Moved service to Recycle Bin: ${service.service_name}`);
+    await db.collection('service_logs').add({
+      staff_id: req.user.id,
+      service_id: id,
+      action: action || 'Opened Service URL',
+      timestamp: admin.firestore.FieldValue.serverTimestamp()
+    });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to log access' });
+  }
+});
+
+app.post('/api/services', authenticateToken, requireRole(['admin']), async (req, res) => {
+  const { service_name, description, active_status, visible_status, type, url, icon, application_id, service_price, payment_required, fee, staff_commission } = req.body;
+  try {
+    const result = await db.collection('services').add({
+      service_name,
+      description,
+      is_active: active_status ?? true,
+      is_visible: visible_status ?? true,
+      application_type: type || 'internal',
+      service_url: url || '',
+      icon: icon || '',
+      application_id: application_id || '',
+      service_price: service_price || 0,
+      payment_required: !!payment_required,
+      fee: fee || 0,
+      staff_commission: staff_commission || 0,
+      created_at: admin.firestore.FieldValue.serverTimestamp(),
+      updated_at: admin.firestore.FieldValue.serverTimestamp()
+    });
+    res.json({ id: result.id, message: 'Service added' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to add service' });
+  }
+});
+
+app.put('/api/services/:id', authenticateToken, requireRole(['admin']), async (req, res) => {
+  const { service_name, description, active_status, visible_status, type, url, icon, application_id, service_price, payment_required, fee, staff_commission } = req.body;
+  try {
+    await db.collection('services').doc(req.params.id).update({
+      service_name,
+      description,
+      is_active: active_status,
+      is_visible: visible_status,
+      application_type: type,
+      service_url: url,
+      icon,
+      application_id: application_id || '',
+      service_price: service_price || 0,
+      payment_required: !!payment_required,
+      fee: fee || 0,
+      staff_commission: staff_commission || 0,
+      updated_at: admin.firestore.FieldValue.serverTimestamp()
+    });
+    res.json({ message: 'Service updated' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update service' });
+  }
+});
+
+app.patch('/api/services/:id/status', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const serviceRef = db.collection('services').doc(req.params.id);
+    const serviceDoc = await serviceRef.get();
+    if (!serviceDoc.exists) return res.status(404).json({ error: 'Service not found' });
+    
+    const newStatus = !serviceDoc.data()?.is_active;
+    await serviceRef.update({ is_active: newStatus, updated_at: admin.firestore.FieldValue.serverTimestamp() });
+    res.json({ message: 'Status toggled', is_active: newStatus });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to toggle status' });
+  }
+});
+
+app.patch('/api/services/:id/visibility', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const serviceRef = db.collection('services').doc(req.params.id);
+    const serviceDoc = await serviceRef.get();
+    if (!serviceDoc.exists) return res.status(404).json({ error: 'Service not found' });
+    
+    const newVisibility = !serviceDoc.data()?.is_visible;
+    await serviceRef.update({ is_visible: newVisibility, updated_at: admin.firestore.FieldValue.serverTimestamp() });
+    res.json({ message: 'Visibility toggled', is_visible: newVisibility });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to toggle visibility' });
+  }
+});
+
+app.delete('/api/services/:id', authenticateToken, requireRole(['admin']), async (req: any, res) => {
+  try {
+    const serviceRef = db.collection('services').doc(req.params.id);
+    const serviceDoc = await serviceRef.get();
+    if (!serviceDoc.exists) return res.status(404).json({ error: 'Service not found' });
+
+    await serviceRef.update({ deleted_at: admin.firestore.FieldValue.serverTimestamp() });
+    
+    await db.collection('activity_logs').add({
+      user_id: req.user.id,
+      action: `Moved service to Recycle Bin: ${serviceDoc.data()?.service_name}`,
+      timestamp: admin.firestore.FieldValue.serverTimestamp()
+    });
+    
     res.json({ message: 'Service moved to Recycle Bin' });
   } catch (err) {
-    console.error('Error deleting service:', err);
     res.status(500).json({ error: 'Failed to delete service' });
   }
 });
 
 // Service Form Schema
-app.get('/api/services/:service_id/form-schema', optionalAuthenticateToken, (req, res) => {
+app.get('/api/services/:service_id/form-schema', optionalAuthenticateToken, async (req, res) => {
   try {
-    const service = db.prepare('SELECT service_form_schema FROM services WHERE id = ?').get(req.params.service_id) as any;
-    if (!service) return res.status(404).json({ error: 'Service not found' });
-    res.json(service.service_form_schema ? JSON.parse(service.service_form_schema) : null);
+    const serviceDoc = await db.collection('services').doc(req.params.service_id).get();
+    if (!serviceDoc.exists) return res.status(404).json({ error: 'Service not found' });
+    const service = serviceDoc.data();
+    res.json(service?.service_form_schema ? JSON.parse(service.service_form_schema) : null);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch form schema' });
   }
 });
 
-app.post('/api/services/:service_id/form-schema', authenticateToken, requireRole(['admin']), (req, res) => {
+app.post('/api/services/:service_id/form-schema', authenticateToken, requireRole(['admin']), async (req, res) => {
   const { schema } = req.body;
   try {
-    db.prepare('UPDATE services SET service_form_schema = ? WHERE id = ?').run(JSON.stringify(schema), req.params.service_id);
+    await db.collection('services').doc(req.params.service_id).update({
+      service_form_schema: JSON.stringify(schema),
+      updated_at: admin.firestore.FieldValue.serverTimestamp()
+    });
     res.json({ message: 'Form schema updated successfully' });
   } catch (err) {
     console.error('Update Form Schema Error:', err);
@@ -1068,27 +1287,43 @@ app.post('/api/services/:service_id/form-schema', authenticateToken, requireRole
 });
 
 // Service Form Fields
-app.get('/api/services/:service_id/form-fields', optionalAuthenticateToken, (req, res) => {
+app.get('/api/services/:service_id/form-fields', optionalAuthenticateToken, async (req, res) => {
   try {
-    const fields = db.prepare('SELECT * FROM service_form_fields WHERE service_id = ? ORDER BY field_order ASC').all(req.params.service_id);
+    const snapshot = await db.collection('service_form_fields')
+      .where('service_id', '==', req.params.service_id)
+      .orderBy('field_order', 'asc')
+      .get();
+    const fields = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     res.json(fields);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch form fields' });
   }
 });
 
-app.post('/api/services/:service_id/form-fields', authenticateToken, requireRole(['admin']), (req, res) => {
+app.post('/api/services/:service_id/form-fields', authenticateToken, requireRole(['admin']), async (req, res) => {
   const { fields } = req.body;
   const service_id = req.params.service_id;
 
   try {
-    db.transaction(() => {
-      db.prepare('DELETE FROM service_form_fields WHERE service_id = ?').run(service_id);
-      const insert = db.prepare('INSERT INTO service_form_fields (service_id, label, type, required, placeholder, section_name, field_order, options) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+    await db.runTransaction(async (transaction) => {
+      const snapshot = await transaction.get(db.collection('service_form_fields').where('service_id', '==', service_id));
+      snapshot.docs.forEach(doc => transaction.delete(doc.ref));
+      
       fields.forEach((f: any, index: number) => {
-        insert.run(service_id, f.label, f.type, f.required ? 1 : 0, f.placeholder || '', f.section_name || 'Personal', f.field_order || index, f.options ? JSON.stringify(f.options) : null);
+        const newDocRef = db.collection('service_form_fields').doc();
+        transaction.set(newDocRef, {
+          service_id,
+          label: f.label,
+          type: f.type,
+          required: !!f.required,
+          placeholder: f.placeholder || '',
+          section_name: f.section_name || 'Personal',
+          field_order: f.field_order || index,
+          options: f.options ? JSON.stringify(f.options) : null,
+          created_at: admin.firestore.FieldValue.serverTimestamp()
+        });
       });
-    })();
+    });
     res.json({ message: 'Form fields updated successfully' });
   } catch (err) {
     console.error('Update Form Fields Error:', err);
@@ -1097,27 +1332,38 @@ app.post('/api/services/:service_id/form-fields', authenticateToken, requireRole
 });
 
 // Service Document Requirements
-app.get('/api/services/:service_id/document-requirements', optionalAuthenticateToken, (req, res) => {
+app.get('/api/services/:service_id/document-requirements', optionalAuthenticateToken, async (req, res) => {
   try {
-    const requirements = db.prepare('SELECT * FROM service_document_requirements WHERE service_id = ?').all(req.params.service_id);
+    const snapshot = await db.collection('service_document_requirements')
+      .where('service_id', '==', req.params.service_id)
+      .get();
+    const requirements = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     res.json(requirements);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch document requirements' });
   }
 });
 
-app.post('/api/services/:service_id/document-requirements', authenticateToken, requireRole(['admin']), (req, res) => {
+app.post('/api/services/:service_id/document-requirements', authenticateToken, requireRole(['admin']), async (req, res) => {
   const { requirements } = req.body;
   const service_id = req.params.service_id;
 
   try {
-    db.transaction(() => {
-      db.prepare('DELETE FROM service_document_requirements WHERE service_id = ?').run(service_id);
-      const insert = db.prepare('INSERT INTO service_document_requirements (service_id, document_name, document_type, required) VALUES (?, ?, ?, ?)');
+    await db.runTransaction(async (transaction) => {
+      const snapshot = await transaction.get(db.collection('service_document_requirements').where('service_id', '==', service_id));
+      snapshot.docs.forEach(doc => transaction.delete(doc.ref));
+      
       requirements.forEach((r: any) => {
-        insert.run(service_id, r.document_name, r.document_type || 'file_upload', r.required ? 1 : 0);
+        const newDocRef = db.collection('service_document_requirements').doc();
+        transaction.set(newDocRef, {
+          service_id,
+          document_name: r.document_name,
+          document_type: r.document_type || 'file_upload',
+          required: !!r.required,
+          created_at: admin.firestore.FieldValue.serverTimestamp()
+        });
       });
-    })();
+    });
     res.json({ message: 'Document requirements updated successfully' });
   } catch (err) {
     res.status(500).json({ error: 'Failed to update document requirements' });
@@ -1125,31 +1371,48 @@ app.post('/api/services/:service_id/document-requirements', authenticateToken, r
 });
 
 // Service Inputs
-app.get('/api/service-inputs/:service_id', optionalAuthenticateToken, (req, res) => {
-  const inputs = db.prepare('SELECT * FROM service_inputs WHERE service_id = ?').all(req.params.service_id);
-  res.json(inputs);
-});
-
-app.post('/api/service-inputs', authenticateToken, requireRole(['admin']), (req, res) => {
-  const { service_id, input_label, input_type, required } = req.body;
-  const result = db.prepare('INSERT INTO service_inputs (service_id, input_label, input_type, required) VALUES (?, ?, ?, ?)').run(
-    service_id, input_label, input_type, required ? 1 : 0
-  );
-  res.json({ id: result.lastInsertRowid, message: 'Input field added successfully' });
-});
-
-app.delete('/api/service-inputs/:input_id', authenticateToken, requireRole(['admin']), (req: any, res) => {
+app.get('/api/service-inputs/:service_id', optionalAuthenticateToken, async (req, res) => {
   try {
-    const input = db.prepare('SELECT * FROM service_inputs WHERE input_id = ?').get(req.params.input_id) as any;
-    if (!input) {
+    const snapshot = await db.collection('service_inputs').where('service_id', '==', req.params.service_id).get();
+    const inputs = snapshot.docs.map(doc => ({ input_id: doc.id, ...doc.data() }));
+    res.json(inputs);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch service inputs' });
+  }
+});
+
+app.post('/api/service-inputs', authenticateToken, requireRole(['admin']), async (req, res) => {
+  const { service_id, input_label, input_type, required } = req.body;
+  try {
+    const result = await db.collection('service_inputs').add({
+      service_id,
+      input_label,
+      input_type,
+      required: !!required,
+      created_at: admin.firestore.FieldValue.serverTimestamp()
+    });
+    res.json({ id: result.id, message: 'Input field added successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to add input field' });
+  }
+});
+
+app.delete('/api/service-inputs/:input_id', authenticateToken, requireRole(['admin']), async (req: any, res) => {
+  try {
+    const inputRef = db.collection('service_inputs').doc(req.params.input_id);
+    const inputDoc = await inputRef.get();
+    if (!inputDoc.exists) {
       return res.status(404).json({ error: 'Input field not found' });
     }
     
-    db.prepare('DELETE FROM service_inputs WHERE input_id = ?').run(req.params.input_id);
+    await inputRef.delete();
     
-    db.prepare('INSERT INTO activity_logs (user_id, action, timestamp) VALUES (?, ?, CURRENT_TIMESTAMP)')
-      .run(req.user.id, `Admin deleted input field: ${input.input_label} for service_id: ${input.service_id}`);
-      
+    await db.collection('activity_logs').add({
+      user_id: req.user.id,
+      action: `Admin deleted input field: ${inputDoc.data()?.input_label} for service_id: ${inputDoc.data()?.service_id}`,
+      timestamp: admin.firestore.FieldValue.serverTimestamp()
+    });
+    
     res.json({ success: true, message: 'Input field deleted successfully' });
   } catch (err) {
     console.error('Error deleting input field:', err);
@@ -1158,107 +1421,219 @@ app.delete('/api/service-inputs/:input_id', authenticateToken, requireRole(['adm
 });
 
 // Service Links
-app.get('/api/service-links', authenticateToken, requireRole(['admin', 'staff']), (req, res) => {
-  const links = db.prepare('SELECT * FROM service_links').all();
-  res.json(links);
+app.get('/api/service-links', authenticateToken, requireRole(['admin', 'staff']), async (req, res) => {
+  try {
+    const snapshot = await db.collection('service_links').get();
+    const links = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    res.json(links);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch service links' });
+  }
 });
 
-app.put('/api/service-links/:id', authenticateToken, requireRole(['admin']), (req, res) => {
+app.put('/api/service-links/:id', authenticateToken, requireRole(['admin']), async (req, res) => {
   const { service_type, process_url, apply_url, is_active } = req.body;
-  db.prepare('UPDATE service_links SET service_type = ?, process_url = ?, apply_url = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(
-    service_type, process_url, apply_url, is_active, req.params.id
-  );
-  res.json({ message: 'Service link updated' });
+  try {
+    await db.collection('service_links').doc(req.params.id).update({
+      service_type,
+      process_url,
+      apply_url,
+      is_active: !!is_active,
+      updated_at: admin.firestore.FieldValue.serverTimestamp()
+    });
+    res.json({ message: 'Service link updated' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update service link' });
+  }
 });
 
-app.patch('/api/service-links/:id/status', authenticateToken, requireRole(['admin']), (req, res) => {
-  const link = db.prepare('SELECT is_active FROM service_links WHERE id = ?').get(req.params.id) as any;
-  if (!link) return res.status(404).json({ error: 'Link not found' });
-  const newStatus = link.is_active ? 0 : 1;
-  db.prepare('UPDATE service_links SET is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(newStatus, req.params.id);
-  res.json({ message: 'Link status toggled', is_active: newStatus });
+app.patch('/api/service-links/:id/status', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const linkRef = db.collection('service_links').doc(req.params.id);
+    const linkDoc = await linkRef.get();
+    if (!linkDoc.exists) return res.status(404).json({ error: 'Link not found' });
+    
+    const newStatus = !linkDoc.data()?.is_active;
+    await linkRef.update({ is_active: newStatus, updated_at: admin.firestore.FieldValue.serverTimestamp() });
+    res.json({ message: 'Link status toggled', is_active: newStatus });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to toggle link status' });
+  }
 });
 
 // Ledger
-app.get('/api/ledger', authenticateToken, requireRole(['admin', 'staff']), (req: any, res) => {
-  let query = 'SELECT l.*, u.name as staff_name FROM ledger l LEFT JOIN users u ON l.staff_id = u.id';
-  const params: any[] = [];
-  
-  if (req.user.role === 'staff') {
-    query += ' WHERE l.staff_id = ?';
-    params.push(req.user.id);
+app.get('/api/ledger', authenticateToken, requireRole(['admin', 'staff']), async (req: any, res) => {
+  try {
+    let query = db.collection('ledger');
+    
+    if (req.user.role === 'staff') {
+      query = query.where('staff_id', '==', req.user.id) as any;
+    }
+    
+    const snapshot = await query.orderBy('created_at', 'desc').get();
+    const usersSnapshot = await db.collection('users').get();
+    const usersMap = new Map();
+    usersSnapshot.docs.forEach(doc => usersMap.set(doc.id, doc.data()));
+
+    const ledger = snapshot.docs.map(doc => {
+      const data = doc.data();
+      const staff = usersMap.get(data.staff_id);
+      return {
+        id: doc.id,
+        ...data,
+        staff_name: staff?.name
+      };
+    });
+    res.json(ledger);
+  } catch (err) {
+    console.error('Ledger Error:', err);
+    res.status(500).json({ error: 'Failed to fetch ledger' });
   }
-  query += ' ORDER BY l.created_at DESC';
-  
-  const ledger = db.prepare(query).all(...params);
-  res.json(ledger);
 });
 
-app.post('/api/ledger', authenticateToken, requireRole(['admin', 'staff']), (req: any, res) => {
+app.post('/api/ledger', authenticateToken, requireRole(['admin', 'staff']), async (req: any, res) => {
   const { customer_name, service_name, amount, date } = req.body;
-  const result = db.prepare('INSERT INTO ledger (customer_name, service_name, amount, staff_id, date) VALUES (?, ?, ?, ?, ?)').run(
-    customer_name, service_name, amount, req.user.id, date || new Date().toISOString().split('T')[0]
-  );
-  res.json({ id: result.lastInsertRowid, message: 'Ledger entry added' });
+  try {
+    const result = await db.collection('ledger').add({
+      customer_name,
+      service_name,
+      amount: Number(amount),
+      staff_id: req.user.id,
+      date: date || new Date().toISOString().split('T')[0],
+      created_at: admin.firestore.FieldValue.serverTimestamp()
+    });
+    res.json({ id: result.id, message: 'Ledger entry added' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to add ledger entry' });
+  }
 });
 
 // Analytics
-app.get('/api/analytics', authenticateToken, requireRole(['admin']), (req, res) => {
-  const totalRevenue = db.prepare('SELECT SUM(amount) as total FROM ledger').get() as any;
-  const totalTransactions = db.prepare('SELECT COUNT(*) as count FROM ledger').get() as any;
-  const totalUsers = db.prepare('SELECT COUNT(*) as count FROM users WHERE role = \'user\'').get() as any;
-  const totalStaff = db.prepare('SELECT COUNT(*) as count FROM users WHERE role = \'staff\'').get() as any;
-  
-  const monthlyRevenue = db.prepare('SELECT strftime(\'%Y-%m\', date) as month, SUM(amount) as revenue FROM ledger GROUP BY month ORDER BY month DESC LIMIT 6').all();
-  const topServices = db.prepare('SELECT service_name, COUNT(*) as count FROM ledger GROUP BY service_name ORDER BY count DESC LIMIT 5').all();
+app.get('/api/analytics', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const ledgerSnapshot = await db.collection('ledger').get();
+    const usersSnapshot = await db.collection('users').get();
+    const appsSnapshot = await db.collection('applications').get();
+    const logsSnapshot = await db.collection('activity_logs').orderBy('timestamp', 'desc').limit(10).get();
 
-  // Application Analytics
-  const totalApplications = db.prepare('SELECT COUNT(*) as count FROM applications').get() as any;
-  const pendingApplications = db.prepare('SELECT COUNT(*) as count FROM applications WHERE status = \'Pending\'').get() as any;
-  const approvedApplications = db.prepare('SELECT COUNT(*) as count FROM applications WHERE status = \'Approved\'').get() as any;
-  const rejectedApplications = db.prepare('SELECT COUNT(*) as count FROM applications WHERE status = \'Rejected\'').get() as any;
-  const serviceApplications = db.prepare('SELECT service_type, COUNT(*) as count FROM applications GROUP BY service_type').all();
-  const staffPerformance = db.prepare('SELECT u.name, COUNT(a.id) as processed FROM applications a JOIN users u ON a.assigned_staff = u.id WHERE a.status != \'Pending\' GROUP BY u.id').all();
+    let totalRevenue = 0;
+    let totalTransactions = ledgerSnapshot.size;
+    ledgerSnapshot.forEach(doc => totalRevenue += (doc.data().amount || 0));
 
-  const todayRevenue = db.prepare('SELECT SUM(amount) as total FROM ledger WHERE date = date(\'now\')').get() as any;
-  const recentActivity = db.prepare('SELECT l.*, u.name as user_name, a.service_type FROM activity_logs l JOIN users u ON l.user_id = u.id LEFT JOIN applications a ON l.application_id = a.id ORDER BY l.timestamp DESC LIMIT 10').all();
+    const totalUsers = usersSnapshot.docs.filter(doc => doc.data().role === 'user').length;
+    const totalStaff = usersSnapshot.docs.filter(doc => doc.data().role === 'staff').length;
 
-  res.json({
-    totalRevenue: totalRevenue.total || 0,
-    todayRevenue: todayRevenue.total || 0,
-    totalTransactions: totalTransactions.count || 0,
-    totalUsers: totalUsers.count || 0,
-    totalStaff: totalStaff.count || 0,
-    monthlyRevenue,
-    topServices,
-    totalApplications: totalApplications.count || 0,
-    pendingApplications: pendingApplications.count || 0,
-    approvedApplications: approvedApplications.count || 0,
-    rejectedApplications: rejectedApplications.count || 0,
-    approvalRate: totalApplications.count > 0 ? Math.round((approvedApplications.count / totalApplications.count) * 100) : 0,
-    serviceApplications,
-    staffPerformance,
-    recentActivity
-  });
+    // Monthly Revenue
+    const monthlyMap = new Map();
+    ledgerSnapshot.forEach(doc => {
+      const data = doc.data();
+      const month = data.date?.substring(0, 7) || 'unknown';
+      monthlyMap.set(month, (monthlyMap.get(month) || 0) + (data.amount || 0));
+    });
+    const monthlyRevenue = Array.from(monthlyMap.entries())
+      .map(([month, revenue]) => ({ month, revenue }))
+      .sort((a, b) => b.month.localeCompare(a.month))
+      .slice(0, 6);
+
+    // Top Services
+    const serviceMap = new Map();
+    ledgerSnapshot.forEach(doc => {
+      const name = doc.data().service_name;
+      serviceMap.set(name, (serviceMap.get(name) || 0) + 1);
+    });
+    const topServices = Array.from(serviceMap.entries())
+      .map(([service_name, count]) => ({ service_name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    // Application Analytics
+    const totalApplications = appsSnapshot.size;
+    const pendingApplications = appsSnapshot.docs.filter(doc => doc.data().status === 'Pending').length;
+    const approvedApplications = appsSnapshot.docs.filter(doc => doc.data().status === 'Approved').length;
+    const rejectedApplications = appsSnapshot.docs.filter(doc => doc.data().status === 'Rejected').length;
+
+    const serviceAppsMap = new Map();
+    appsSnapshot.forEach(doc => {
+      const type = doc.data().service_type;
+      serviceAppsMap.set(type, (serviceAppsMap.get(type) || 0) + 1);
+    });
+    const serviceApplications = Array.from(serviceAppsMap.entries()).map(([service_type, count]) => ({ service_type, count }));
+
+    const staffPerfMap = new Map();
+    const usersMap = new Map();
+    usersSnapshot.docs.forEach(doc => usersMap.set(doc.id, doc.data()));
+
+    appsSnapshot.forEach(doc => {
+      const data = doc.data();
+      if (data.assigned_staff && data.status !== 'Pending') {
+        staffPerfMap.set(data.assigned_staff, (staffPerfMap.get(data.assigned_staff) || 0) + 1);
+      }
+    });
+    const staffPerformance = Array.from(staffPerfMap.entries()).map(([id, processed]) => ({
+      name: usersMap.get(id)?.name || 'Unknown',
+      processed
+    }));
+
+    const today = new Date().toISOString().split('T')[0];
+    let todayRevenue = 0;
+    ledgerSnapshot.forEach(doc => {
+      if (doc.data().date === today) todayRevenue += (doc.data().amount || 0);
+    });
+
+    const recentActivity = logsSnapshot.docs.map(doc => {
+      const data = doc.data();
+      const user = usersMap.get(data.user_id);
+      return {
+        id: doc.id,
+        ...data,
+        user_name: user?.name
+      };
+    });
+
+    res.json({
+      totalRevenue,
+      todayRevenue,
+      totalTransactions,
+      totalUsers,
+      totalStaff,
+      monthlyRevenue,
+      topServices,
+      totalApplications,
+      pendingApplications,
+      approvedApplications,
+      rejectedApplications,
+      approvalRate: totalApplications > 0 ? Math.round((approvedApplications / totalApplications) * 100) : 0,
+      serviceApplications,
+      staffPerformance,
+      recentActivity
+    });
+  } catch (err) {
+    console.error('Analytics Error:', err);
+    res.status(500).json({ error: 'Failed to fetch analytics' });
+  }
 });
 
 // File Uploads Setup
 // Secure Document Access API
-app.get('/api/admin/documents/:id', authenticateToken, requireRole(['admin', 'staff']), (req: any, res) => {
+app.get('/api/admin/documents/:id', authenticateToken, requireRole(['admin', 'staff']), async (req: any, res) => {
   try {
-    const doc = db.prepare('SELECT file_path, file_name FROM application_documents WHERE id = ?').get(req.params.id) as any;
-    if (!doc) {
+    const docSnapshot = await db.collection('application_documents').doc(req.params.id).get();
+    if (!docSnapshot.exists) {
       return res.status(404).send('Document not found');
     }
+    const docData = docSnapshot.data();
     
-    const absolutePath = path.join(__dirname, doc.file_path);
+    const absolutePath = path.join(__dirname, docData?.file_path);
     if (!fs.existsSync(absolutePath)) {
       return res.status(404).send('File not found on server');
     }
     
     // Log access
-    db.prepare('INSERT INTO activity_logs (user_id, action, timestamp) VALUES (?, ?, CURRENT_TIMESTAMP)')
-      .run(req.user.id, `Accessed document: ${doc.file_name}`);
+    await db.collection('activity_logs').add({
+      user_id: req.user.id,
+      action: `Accessed document: ${docData?.file_name}`,
+      timestamp: admin.firestore.FieldValue.serverTimestamp()
+    });
       
     res.sendFile(absolutePath);
   } catch (err) {
@@ -1268,138 +1643,192 @@ app.get('/api/admin/documents/:id', authenticateToken, requireRole(['admin', 'st
 });
 
 // Helper to generate Reference Number
-const generateReferenceNumber = () => {
+// Helper to generate Reference Number
+const generateReferenceNumber = async () => {
   const year = new Date().getFullYear();
-  const count = db.prepare('SELECT COUNT(*) as total FROM applications').get() as any;
-  const nextId = (count?.total || 0) + 1;
+  const snapshot = await db.collection('applications').count().get();
+  const nextId = snapshot.data().count + 1;
   return `APP-${year}-${String(nextId).padStart(5, '0')}`;
 };
 
 // Helper to get enriched application
-const getEnrichedApplication = (applicationId: number | bigint) => {
-  const application = db.prepare(`
-    SELECT a.*, u.name as user_name, u.email as user_email, u.phone as user_phone, 
-           s.name as staff_name, serv.service_name 
-    FROM applications a 
-    JOIN users u ON a.user_id = u.id 
-    LEFT JOIN users s ON a.assigned_staff = s.id 
-    LEFT JOIN services serv ON a.service_id = serv.id
-    WHERE a.id = ?
-  `).get(applicationId) as any;
+const getEnrichedApplication = async (applicationId: string) => {
+  const appDoc = await db.collection('applications').doc(applicationId).get();
+  if (!appDoc.exists) return null;
   
-  if (!application) return null;
+  const appData = appDoc.data();
+  const userDoc = await db.collection('users').doc(appData?.user_id).get();
+  const userData = userDoc.data();
   
-  const documents = db.prepare('SELECT * FROM application_documents WHERE application_id = ?').all(application.id);
-  const updates = db.prepare('SELECT au.*, u.name as updated_by_name FROM application_updates au JOIN users u ON au.updated_by = u.id WHERE application_id = ? ORDER BY au.updated_at DESC').all(application.id);
+  let staffData = null;
+  if (appData?.assigned_staff) {
+    const staffDoc = await db.collection('users').doc(appData.assigned_staff).get();
+    staffData = staffDoc.data();
+  }
+  
+  const serviceDoc = await db.collection('services').doc(appData?.service_id).get();
+  const serviceData = serviceDoc.data();
+  
+  const documentsSnapshot = await db.collection('application_documents').where('application_id', '==', applicationId).get();
+  const documents = documentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  
+  const updatesSnapshot = await db.collection('application_updates').where('application_id', '==', applicationId).orderBy('updated_at', 'desc').get();
+  const updates = updatesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
   let formData = {};
   try {
-    if (application.form_data && application.form_data !== 'undefined' && application.form_data !== 'null') {
-      formData = JSON.parse(application.form_data) || {};
+    if (appData?.form_data && appData.form_data !== 'undefined' && appData.form_data !== 'null') {
+      formData = typeof appData.form_data === 'string' ? JSON.parse(appData.form_data) : appData.form_data;
     }
   } catch (e) {
     console.error('Error parsing form_data:', e);
   }
 
   return {
-    ...application,
+    id: applicationId,
+    ...appData,
     form_data: formData,
+    user_name: userData?.name,
+    user_email: userData?.email,
+    user_phone: userData?.phone,
+    staff_name: staffData?.name,
+    service_name: serviceData?.service_name,
     documents,
     updates
   };
 };
 
 // Admin Dashboard Stats
-app.get('/api/admin/dashboard-stats', authenticateToken, requireRole(['admin']), (req, res) => {
+app.get('/api/admin/dashboard-stats', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
-    const totalUsers = db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'user' AND deleted_at IS NULL").get() as any;
-    const totalStaff = db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'staff' AND deleted_at IS NULL").get() as any;
-    const totalApplications = db.prepare("SELECT COUNT(*) as count FROM applications WHERE deleted_at IS NULL").get() as any;
-    const pendingApplications = db.prepare("SELECT COUNT(*) as count FROM applications WHERE status IN ('Submitted', 'Under Review', 'Processing', 'Documents Required') AND deleted_at IS NULL").get() as any;
-    const approvedApplications = db.prepare("SELECT COUNT(*) as count FROM applications WHERE status IN ('Approved', 'Completed') AND deleted_at IS NULL").get() as any;
-    const rejectedApplications = db.prepare("SELECT COUNT(*) as count FROM applications WHERE status = 'Rejected' AND deleted_at IS NULL").get() as any;
-    
-    // Revenue from ledger
-    const ledgerRevenue = db.prepare("SELECT SUM(amount) as total FROM ledger").get() as any;
-    
-    // Revenue from service payments (wallet + gateway)
-    const serviceRevenue = db.prepare("SELECT SUM(amount) as total FROM service_payments WHERE status = 'success'").get() as any;
+    const usersSnapshot = await db.collection('users').where('role', '==', 'user').get();
+    const staffSnapshot = await db.collection('users').where('role', '==', 'staff').get();
+    const appsSnapshot = await db.collection('applications').get();
+    const ledgerSnapshot = await db.collection('ledger').get();
+    const servicePaymentsSnapshot = await db.collection('service_payments').where('status', '==', 'success').get();
+    const logsSnapshot = await db.collection('activity_logs').orderBy('timestamp', 'desc').limit(10).get();
+    const notificationsSnapshot = await db.collection('notifications').orderBy('created_at', 'desc').limit(10).get();
 
-    const totalRevenue = (ledgerRevenue?.total || 0) + (serviceRevenue?.total || 0);
+    const totalUsers = usersSnapshot.size;
+    const totalStaff = staffSnapshot.size;
+    const totalApplications = appsSnapshot.size;
+    
+    const pendingStatuses = ['Submitted', 'Under Review', 'Processing', 'Documents Required'];
+    const approvedStatuses = ['Approved', 'Completed'];
+    
+    const pendingApplications = appsSnapshot.docs.filter(doc => pendingStatuses.includes(doc.data().status)).length;
+    const approvedApplications = appsSnapshot.docs.filter(doc => approvedStatuses.includes(doc.data().status)).length;
+    const rejectedApplications = appsSnapshot.docs.filter(doc => doc.data().status === 'Rejected').length;
+    
+    let ledgerRevenue = 0;
+    ledgerSnapshot.forEach(doc => ledgerRevenue += (doc.data().amount || 0));
+    
+    let serviceRevenue = 0;
+    servicePaymentsSnapshot.forEach(doc => serviceRevenue += (doc.data().amount || 0));
+
+    const totalRevenue = ledgerRevenue + serviceRevenue;
 
     // Applications by Status
-    const appsByStatus = db.prepare('SELECT status as name, COUNT(*) as value FROM applications WHERE deleted_at IS NULL GROUP BY status').all();
+    const statusMap = new Map();
+    appsSnapshot.forEach(doc => {
+      const status = doc.data().status;
+      statusMap.set(status, (statusMap.get(status) || 0) + 1);
+    });
+    const appsByStatus = Array.from(statusMap.entries()).map(([name, value]) => ({ name, value }));
 
     // Daily Applications (last 7 days)
-    const dailyApps = db.prepare(`
-      SELECT date(created_at) as date, COUNT(*) as count 
-      FROM applications 
-      WHERE created_at >= date('now', '-7 days') AND deleted_at IS NULL 
-      GROUP BY date(created_at) 
-      ORDER BY date(created_at) ASC
-    `).all();
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const dailyAppsMap = new Map();
+    appsSnapshot.forEach(doc => {
+      const createdAt = doc.data().created_at?.toDate();
+      if (createdAt && createdAt >= sevenDaysAgo) {
+        const date = createdAt.toISOString().split('T')[0];
+        dailyAppsMap.set(date, (dailyAppsMap.get(date) || 0) + 1);
+      }
+    });
+    const dailyApps = Array.from(dailyAppsMap.entries())
+      .map(([date, count]) => ({ date, count }))
+      .sort((a, b) => a.date.localeCompare(b.date));
 
     // Recent Applications
-    const recentApplications = db.prepare(`
-      SELECT a.id, a.reference_number, a.service_type as service_name, a.status, a.created_at, u.name as user_name
-      FROM applications a
-      LEFT JOIN users u ON a.user_id = u.id
-      WHERE a.deleted_at IS NULL
-      ORDER BY a.created_at DESC
-      LIMIT 5
-    `).all();
+    const usersMap = new Map();
+    const allUsersSnapshot = await db.collection('users').get();
+    allUsersSnapshot.docs.forEach(doc => usersMap.set(doc.id, doc.data()));
+
+    const recentApplications = appsSnapshot.docs
+      .sort((a, b) => (b.data().created_at?.toDate() || 0) - (a.data().created_at?.toDate() || 0))
+      .slice(0, 5)
+      .map(doc => {
+        const data = doc.data();
+        const user = usersMap.get(data.user_id);
+        return {
+          id: doc.id,
+          reference_number: data.reference_number,
+          service_name: data.service_type,
+          status: data.status,
+          created_at: data.created_at,
+          user_name: user?.name
+        };
+      });
 
     // Service Usage (Top 5)
-    const topServices = db.prepare(`
-      SELECT service_type as name, COUNT(*) as value 
-      FROM applications 
-      WHERE deleted_at IS NULL 
-      GROUP BY service_type 
-      ORDER BY value DESC 
-      LIMIT 5
-    `).all();
+    const serviceUsageMap = new Map();
+    appsSnapshot.forEach(doc => {
+      const type = doc.data().service_type;
+      serviceUsageMap.set(type, (serviceUsageMap.get(type) || 0) + 1);
+    });
+    const topServices = Array.from(serviceUsageMap.entries())
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 5);
 
     // Staff Performance
-    const staffPerformance = db.prepare(`
-      SELECT 
-        u.name as staff_name,
-        COUNT(a.id) as assigned,
-        SUM(CASE WHEN a.status IN ('Approved', 'Completed', 'Rejected') THEN 1 ELSE 0 END) as completed,
-        SUM(CASE WHEN a.status NOT IN ('Approved', 'Completed', 'Rejected') THEN 1 ELSE 0 END) as pending
-      FROM users u
-      LEFT JOIN applications a ON u.id = a.assigned_staff AND a.deleted_at IS NULL
-      WHERE u.role = 'staff' AND u.deleted_at IS NULL
-      GROUP BY u.id
-    `).all();
+    const staffPerfMap = new Map();
+    staffSnapshot.forEach(doc => {
+      staffPerfMap.set(doc.id, { staff_name: doc.data().name, assigned: 0, completed: 0, pending: 0 });
+    });
+    appsSnapshot.forEach(doc => {
+      const data = doc.data();
+      if (data.assigned_staff && staffPerfMap.has(data.assigned_staff)) {
+        const perf = staffPerfMap.get(data.assigned_staff);
+        perf.assigned += 1;
+        if (['Approved', 'Completed', 'Rejected'].includes(data.status)) {
+          perf.completed += 1;
+        } else {
+          perf.pending += 1;
+        }
+      }
+    });
+    const staffPerformance = Array.from(staffPerfMap.values());
 
     // Admin Activity Logs
-    const adminLogs = db.prepare(`
-      SELECT al.action, al.timestamp, u.name as admin_name
-      FROM activity_logs al
-      JOIN users u ON al.user_id = u.id
-      WHERE u.role = 'admin'
-      ORDER BY al.timestamp DESC
-      LIMIT 10
-    `).all();
+    const adminLogs = logsSnapshot.docs
+      .filter(doc => {
+        const user = usersMap.get(doc.data().user_id);
+        return user?.role === 'admin';
+      })
+      .map(doc => ({
+        ...doc.data(),
+        admin_name: usersMap.get(doc.data().user_id)?.name
+      }));
 
     // System Notifications
-    const systemNotifications = db.prepare(`
-      SELECT id, message, created_at, is_read
-      FROM notifications
-      ORDER BY created_at DESC
-      LIMIT 10
-    `).all();
+    const systemNotifications = notificationsSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
 
     res.json({
       overview: {
-        totalUsers: totalUsers.count,
-        totalStaff: totalStaff.count,
-        totalApplications: totalApplications.count,
-        pendingApplications: pendingApplications.count,
-        approvedApplications: approvedApplications.count,
-        rejectedApplications: rejectedApplications.count,
-        serviceRevenue: serviceRevenue?.total || 0,
-        totalRevenue: totalRevenue
+        totalUsers,
+        totalStaff,
+        totalApplications,
+        pendingApplications,
+        approvedApplications,
+        rejectedApplications,
+        serviceRevenue,
+        totalRevenue
       },
       appsByStatus,
       dailyApps,
@@ -1418,14 +1847,15 @@ app.get('/api/admin/dashboard-stats', authenticateToken, requireRole(['admin']),
 // Payments
 app.post('/api/payments/create-order', authenticateToken, async (req: any, res) => {
   const { service_id } = req.body;
-  const service = db.prepare('SELECT * FROM services WHERE id = ?').get(service_id) as any;
-  
-  if (!service) return res.status(404).json({ error: 'Service not found' });
-  if (!service.payment_required) return res.status(400).json({ error: 'Payment not required for this service' });
-
-  const amount = Math.round(service.service_price * 100); // in paise
-  
   try {
+    const serviceDoc = await db.collection('services').doc(service_id).get();
+    if (!serviceDoc.exists) return res.status(404).json({ error: 'Service not found' });
+    const service = serviceDoc.data();
+    
+    if (!service?.payment_required) return res.status(400).json({ error: 'Payment not required for this service' });
+
+    const amount = Math.round((service.service_price || 0) * 100); // in paise
+    
     const order = await razorpay.orders.create({
       amount,
       currency: 'INR',
@@ -1433,8 +1863,14 @@ app.post('/api/payments/create-order', authenticateToken, async (req: any, res) 
     });
     
     // Create a pending payment record
-    db.prepare('INSERT INTO service_payments (user_id, service_id, amount, razorpay_order_id, status) VALUES (?, ?, ?, ?, ?)')
-      .run(req.user.id, service_id, service.service_price, order.id, 'pending');
+    await db.collection('service_payments').add({
+      user_id: req.user.id,
+      service_id,
+      amount: service.service_price,
+      razorpay_order_id: order.id,
+      status: 'pending',
+      created_at: admin.firestore.FieldValue.serverTimestamp()
+    });
       
     res.json(order);
   } catch (err) {
@@ -1451,123 +1887,193 @@ app.post('/api/payments/verify', authenticateToken, async (req: any, res) => {
     .update(razorpay_order_id + "|" + razorpay_payment_id)
     .digest('hex');
 
-  if (generated_signature === razorpay_signature) {
-    db.prepare('UPDATE service_payments SET razorpay_payment_id = ?, razorpay_signature = ?, status = ?, payment_mode = ? WHERE razorpay_order_id = ?')
-      .run(razorpay_payment_id, razorpay_signature, 'success', 'gateway', razorpay_order_id);
-      
-    const payment = db.prepare('SELECT id FROM service_payments WHERE razorpay_order_id = ?').get(razorpay_order_id) as any;
-    res.json({ success: true, payment_id: payment?.id, message: 'Payment verified successfully' });
-  } else {
-    db.prepare('UPDATE service_payments SET status = ? WHERE razorpay_order_id = ?')
-      .run('failed', razorpay_order_id);
-    res.status(400).json({ error: 'Invalid payment signature' });
+  try {
+    const paymentsSnapshot = await db.collection('service_payments').where('razorpay_order_id', '==', razorpay_order_id).limit(1).get();
+    if (paymentsSnapshot.empty) return res.status(404).json({ error: 'Payment record not found' });
+    const paymentRef = paymentsSnapshot.docs[0].ref;
+
+    if (generated_signature === razorpay_signature) {
+      await paymentRef.update({
+        razorpay_payment_id,
+        razorpay_signature,
+        status: 'success',
+        payment_mode: 'gateway',
+        updated_at: admin.firestore.FieldValue.serverTimestamp()
+      });
+      res.json({ success: true, payment_id: paymentRef.id, message: 'Payment verified successfully' });
+    } else {
+      await paymentRef.update({
+        status: 'failed',
+        updated_at: admin.firestore.FieldValue.serverTimestamp()
+      });
+      res.status(400).json({ error: 'Invalid payment signature' });
+    }
+  } catch (err) {
+    console.error('Payment Verification Error:', err);
+    res.status(500).json({ error: 'Failed to verify payment' });
   }
 });
 
-app.post('/api/payments/wallet-pay', authenticateToken, (req: any, res) => {
+app.post('/api/payments/wallet-pay', authenticateToken, async (req: any, res) => {
   const { serviceId, service_id } = req.body;
   const sId = serviceId || service_id;
   const userId = req.user.id;
 
   try {
-    const service = db.prepare('SELECT * FROM services WHERE id = ?').get(sId) as any;
-    if (!service) {
-      return res.status(404).json({ error: 'Service not found' });
-    }
+    const serviceDoc = await db.collection('services').doc(sId).get();
+    if (!serviceDoc.exists) return res.status(404).json({ error: 'Service not found' });
+    const service = serviceDoc.data();
 
-    if (!service.payment_required) {
+    if (!service?.payment_required) {
       return res.status(400).json({ error: 'Payment not required for this service' });
     }
 
     const price = service.service_price || 0;
-    
-    const wallet = db.prepare('SELECT * FROM wallets WHERE user_id = ?').get(userId) as any;
-    if (!wallet || wallet.balance < price) {
-      return res.status(400).json({ error: 'Insufficient wallet balance' });
-    }
+    const walletRef = db.collection('wallets').doc(userId);
+    const transactionRef = db.collection('wallet_transactions').doc();
+    const paymentRef = db.collection('service_payments').doc();
 
-    let paymentId: number | bigint = 0;
-    db.transaction(() => {
-      // Deduct from wallet
-      db.prepare('UPDATE wallets SET balance = balance - ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?')
-        .run(price, userId);
-      
-      // Record wallet transaction
-      db.prepare('INSERT INTO wallet_transactions (user_id, type, amount, description, status) VALUES (?, ?, ?, ?, ?)')
-        .run(userId, 'debit', price, `Service Payment - ${service.service_name}`, 'success');
+    await db.runTransaction(async (transaction) => {
+      const walletDoc = await transaction.get(walletRef);
+      if (!walletDoc.exists || (walletDoc.data()?.balance || 0) < price) {
+        throw new Error('Insufficient wallet balance');
+      }
 
-      // Record service payment
-      const result = db.prepare(`
-        INSERT INTO service_payments (user_id, service_id, amount, status, payment_mode) 
-        VALUES (?, ?, ?, 'success', 'wallet')
-      `).run(userId, sId, price);
-      
-      paymentId = result.lastInsertRowid;
-    })();
+      transaction.update(walletRef, {
+        balance: admin.firestore.FieldValue.increment(-price),
+        updated_at: admin.firestore.FieldValue.serverTimestamp()
+      });
 
-    res.json({ success: true, payment_id: Number(paymentId), message: 'Payment successful via Wallet' });
-  } catch (err) {
+      transaction.set(transactionRef, {
+        user_id: userId,
+        type: 'debit',
+        amount: price,
+        description: `Service Payment - ${service.service_name}`,
+        status: 'success',
+        created_at: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      transaction.set(paymentRef, {
+        user_id: userId,
+        service_id: sId,
+        amount: price,
+        status: 'success',
+        payment_mode: 'wallet',
+        created_at: admin.firestore.FieldValue.serverTimestamp()
+      });
+    });
+
+    res.json({ success: true, payment_id: paymentRef.id, message: 'Payment successful via Wallet' });
+  } catch (err: any) {
     console.error('Wallet Payment Error:', err);
-    res.status(500).json({ error: 'Failed to process wallet payment' });
+    res.status(500).json({ error: err.message || 'Failed to process wallet payment' });
   }
 });
 
-app.get('/api/payments/status/:serviceId', authenticateToken, (req: any, res) => {
+app.get('/api/payments/status/:serviceId', authenticateToken, async (req: any, res) => {
   const { serviceId } = req.params;
-  // Check if user has a successful payment for this service that hasn't been used for an application yet
-  const payment = db.prepare(`
-    SELECT * FROM service_payments 
-    WHERE user_id = ? AND service_id = ? AND status = 'success'
-    AND id NOT IN (SELECT payment_id FROM applications WHERE payment_id IS NOT NULL)
-    ORDER BY created_at DESC LIMIT 1
-  `).get(req.user.id, serviceId) as any;
-  
-  res.json({ paid: !!payment, payment_id: payment ? payment.id : null });
+  try {
+    const paymentsSnapshot = await db.collection('service_payments')
+      .where('user_id', '==', req.user.id)
+      .where('service_id', '==', serviceId)
+      .where('status', '==', 'success')
+      .orderBy('created_at', 'desc')
+      .get();
+    
+    // Check if any successful payment hasn't been used for an application yet
+    const appsSnapshot = await db.collection('applications').where('user_id', '==', req.user.id).get();
+    const usedPaymentIds = new Set(appsSnapshot.docs.map(doc => doc.data().payment_id).filter(Boolean));
+    
+    const unusedPayment = paymentsSnapshot.docs.find(doc => !usedPaymentIds.has(doc.id));
+    
+    res.json({ paid: !!unusedPayment, payment_id: unusedPayment ? unusedPayment.id : null });
+  } catch (err) {
+    console.error('Payment Status Error:', err);
+    res.status(500).json({ error: 'Failed to fetch payment status' });
+  }
 });
 
-app.get('/api/admin/payments', authenticateToken, requireRole(['admin']), (req, res) => {
-  const payments = db.prepare(`
-    SELECT sp.*, u.name as user_name, u.email as user_email, s.service_name 
-    FROM service_payments sp
-    JOIN users u ON sp.user_id = u.id
-    JOIN services s ON sp.service_id = s.id
-    ORDER BY sp.created_at DESC
-  `).all();
-  res.json(payments);
+app.get('/api/admin/payments', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const paymentsSnapshot = await db.collection('service_payments').orderBy('created_at', 'desc').get();
+    const usersSnapshot = await db.collection('users').get();
+    const servicesSnapshot = await db.collection('services').get();
+    
+    const usersMap = new Map();
+    usersSnapshot.docs.forEach(doc => usersMap.set(doc.id, doc.data()));
+    
+    const servicesMap = new Map();
+    servicesSnapshot.docs.forEach(doc => servicesMap.set(doc.id, doc.data()));
+
+    const payments = paymentsSnapshot.docs.map(doc => {
+      const data = doc.data();
+      const user = usersMap.get(data.user_id);
+      const service = servicesMap.get(data.service_id);
+      return {
+        id: doc.id,
+        ...data,
+        user_name: user?.name,
+        user_email: user?.email,
+        service_name: service?.service_name
+      };
+    });
+    res.json(payments);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch payments' });
+  }
 });
 
-app.get('/api/admin/revenue', authenticateToken, requireRole(['admin']), (req, res) => {
-  const stats = db.prepare(`
-    SELECT 
-      SUM(amount) as total_revenue,
-      COUNT(*) as total_payments
-    FROM service_payments 
-    WHERE status = 'success'
-  `).get() as any;
-  
-  const byService = db.prepare(`
-    SELECT s.service_name, SUM(sp.amount) as revenue, COUNT(*) as count
-    FROM service_payments sp
-    JOIN services s ON sp.service_id = s.id
-    WHERE sp.status = 'success'
-    GROUP BY s.id
-  `).all();
-  
-  res.json({ ...stats, byService });
+app.get('/api/admin/revenue', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const paymentsSnapshot = await db.collection('service_payments').where('status', '==', 'success').get();
+    const servicesSnapshot = await db.collection('services').get();
+    
+    const servicesMap = new Map();
+    servicesSnapshot.docs.forEach(doc => servicesMap.set(doc.id, doc.data()));
+
+    let total_revenue = 0;
+    const total_payments = paymentsSnapshot.size;
+    
+    const serviceRevenueMap = new Map();
+    paymentsSnapshot.forEach(doc => {
+      const data = doc.data();
+      total_revenue += (data.amount || 0);
+      const serviceId = data.service_id;
+      const current = serviceRevenueMap.get(serviceId) || { revenue: 0, count: 0 };
+      current.revenue += (data.amount || 0);
+      current.count += 1;
+      serviceRevenueMap.set(serviceId, current);
+    });
+
+    const byService = Array.from(serviceRevenueMap.entries()).map(([id, stats]) => ({
+      service_name: servicesMap.get(id)?.service_name || 'Unknown',
+      ...stats
+    }));
+    
+    res.json({ total_revenue, total_payments, byService });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch revenue stats' });
+  }
 });
 
 // Applications
 app.post('/api/applications', authenticateToken, upload.array('documents', 20), async (req: any, res) => {
   try {
     const { service_type, form_data, payment_id } = req.body;
-    const reference_number = generateReferenceNumber();
+    const reference_number = await generateReferenceNumber();
     
     // Check for service
-    const service = db.prepare('SELECT id, service_name, fee, payment_required, service_price FROM services WHERE service_name = ? OR id = ?').get(service_type, service_type) as any;
+    const servicesSnapshot = await db.collection('services').where('service_name', '==', service_type).limit(1).get();
+    let serviceDoc = servicesSnapshot.docs[0];
+    if (!serviceDoc) {
+      const serviceById = await db.collection('services').doc(service_type).get();
+      if (serviceById.exists) serviceDoc = serviceById as any;
+    }
     
-    if (!service) {
+    if (!serviceDoc) {
       return res.status(404).json({ error: 'Service not found' });
     }
+    const service = { id: serviceDoc.id, ...serviceDoc.data() } as any;
 
     // Check payment requirement for users
     if (service.payment_required && req.user.role === 'user') {
@@ -1575,22 +2081,24 @@ app.post('/api/applications', authenticateToken, upload.array('documents', 20), 
         return res.status(400).json({ error: 'Payment is required for this service' });
       }
       
-      const payment = db.prepare('SELECT * FROM service_payments WHERE id = ? AND user_id = ? AND service_id = ? AND status = ?').get(payment_id, req.user.id, service.id, 'success') as any;
+      const paymentDoc = await db.collection('service_payments').doc(payment_id).get();
+      const paymentData = paymentDoc.data();
       
-      if (!payment) {
+      if (!paymentDoc.exists || paymentData?.user_id !== req.user.id || paymentData?.service_id !== service.id || paymentData?.status !== 'success') {
         return res.status(400).json({ error: 'Invalid or unsuccessful payment' });
       }
       
-      const existingApp = db.prepare('SELECT id FROM applications WHERE payment_id = ?').get(payment_id);
-      if (existingApp) {
+      const existingAppSnapshot = await db.collection('applications').where('payment_id', '==', payment_id).limit(1).get();
+      if (!existingAppSnapshot.empty) {
         return res.status(400).json({ error: 'This payment has already been used for an application' });
       }
     }
 
     // Check for service fee (wallet deduction for staff/admin or additional fee)
     if (service.fee > 0 && (req.user.role === 'staff' || req.user.role === 'admin')) {
-      const wallet = db.prepare('SELECT balance FROM wallets WHERE user_id = ?').get(req.user.id) as any;
-      if (!wallet || wallet.balance < service.fee) {
+      const walletDoc = await db.collection('wallets').doc(req.user.id).get();
+      const walletData = walletDoc.data();
+      if (!walletDoc.exists || (walletData?.balance || 0) < service.fee) {
         return res.status(400).json({ error: 'Insufficient wallet balance. Please add money to your wallet.' });
       }
     }
@@ -1601,14 +2109,17 @@ app.post('/api/applications', authenticateToken, upload.array('documents', 20), 
     // If staff/admin is applying for a customer
     if ((req.user.role === 'staff' || req.user.role === 'admin') && form_data) {
       try {
-        const parsedData = JSON.parse(form_data);
+        const parsedData = typeof form_data === 'string' ? JSON.parse(form_data) : form_data;
         const customerEmail = parsedData.customerEmail || parsedData.email;
         const customerPhone = parsedData.customerPhone || parsedData.mobile || parsedData.phone;
 
         if (customerEmail || customerPhone) {
-          const customer = db.prepare('SELECT id FROM users WHERE email = ? OR phone = ?').get(customerEmail, customerPhone) as any;
-          if (customer) {
-            userId = customer.id;
+          let customerSnapshot = await db.collection('users').where('email', '==', customerEmail).limit(1).get();
+          if (customerSnapshot.empty && customerPhone) {
+            customerSnapshot = await db.collection('users').where('phone', '==', customerPhone).limit(1).get();
+          }
+          if (!customerSnapshot.empty) {
+            userId = customerSnapshot.docs[0].id;
           }
         }
       } catch (e) {
@@ -1616,44 +2127,81 @@ app.post('/api/applications', authenticateToken, upload.array('documents', 20), 
       }
     }
 
-    db.transaction(() => {
-      const payment = payment_id ? db.prepare('SELECT payment_mode FROM service_payments WHERE id = ?').get(payment_id) as any : null;
-      const payment_mode = payment ? payment.payment_mode : 'none';
+    const paymentDoc = payment_id ? await db.collection('service_payments').doc(payment_id).get() : null;
+    const paymentData = paymentDoc?.data();
+    const payment_mode = paymentData ? paymentData.payment_mode : 'none';
 
-      const result = db.prepare('INSERT INTO applications (reference_number, user_id, service_type, service_id, form_data, status, payment_status, created_by, assigned_staff, payment_id, payment_mode) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
-        reference_number, userId, service.service_name, service.id, form_data, 'Submitted', (payment_id ? 'Paid' : 'Pending'), createdBy, (req.user.role === 'staff' ? req.user.id : null), payment_id || null, payment_mode
-      );
-      const applicationId = result.lastInsertRowid;
+    const appRef = db.collection('applications').doc();
+    const applicationId = appRef.id;
 
-      // Deduct from wallet if fee exists (for staff/admin)
-      if (service.fee > 0 && (req.user.role === 'staff' || req.user.role === 'admin')) {
-        db.prepare('UPDATE wallets SET balance = balance - ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?')
-          .run(service.fee, req.user.id);
-        
-        db.prepare('INSERT INTO wallet_transactions (user_id, type, amount, description, reference_id, status) VALUES (?, ?, ?, ?, ?, ?)')
-          .run(req.user.id, 'debit', service.fee, `Payment for service: ${service.service_name}`, applicationId, 'success');
-      }
+    const applicationData = {
+      reference_number,
+      user_id: userId,
+      service_type: service.service_name,
+      service_id: service.id,
+      form_data,
+      status: 'Submitted',
+      payment_status: (payment_id ? 'Paid' : 'Pending'),
+      created_by: createdBy,
+      assigned_staff: (req.user.role === 'staff' ? req.user.id : null),
+      payment_id: payment_id || null,
+      payment_mode,
+      created_at: admin.firestore.FieldValue.serverTimestamp(),
+      updated_at: admin.firestore.FieldValue.serverTimestamp()
+    };
 
-      const files = req.files as Express.Multer.File[];
-      if (files) {
-        const insertDoc = db.prepare('INSERT INTO application_documents (application_id, file_path, file_name, uploaded_by) VALUES (?, ?, ?, ?)');
-        files.forEach(f => {
-          insertDoc.run(applicationId, f.path, f.originalname, req.user.id);
+    await appRef.set(applicationData);
+
+    // Deduct from wallet if fee exists (for staff/admin)
+    if (service.fee > 0 && (req.user.role === 'staff' || req.user.role === 'admin')) {
+      const walletRef = db.collection('wallets').doc(req.user.id);
+      await walletRef.update({
+        balance: admin.firestore.FieldValue.increment(-service.fee),
+        updated_at: admin.firestore.FieldValue.serverTimestamp()
+      });
+      
+      await db.collection('wallet_transactions').add({
+        user_id: req.user.id,
+        type: 'debit',
+        amount: service.fee,
+        description: `Payment for service: ${service.service_name}`,
+        reference_id: applicationId,
+        status: 'success',
+        created_at: admin.firestore.FieldValue.serverTimestamp()
+      });
+    }
+
+    const files = req.files as Express.Multer.File[];
+    if (files) {
+      for (const f of files) {
+        await db.collection('application_documents').add({
+          application_id: applicationId,
+          file_path: f.path,
+          file_name: f.originalname,
+          uploaded_by: req.user.id,
+          created_at: admin.firestore.FieldValue.serverTimestamp()
         });
       }
+    }
 
-      // Initial update
-      db.prepare('INSERT INTO application_updates (application_id, status, comment, updated_by) VALUES (?, ?, ?, ?)').run(
-        applicationId, 'Submitted', 'Application submitted successfully.', req.user.id
-      );
+    // Initial update
+    await db.collection('application_updates').add({
+      application_id: applicationId,
+      status: 'Submitted',
+      comment: 'Application submitted successfully.',
+      updated_by: req.user.id,
+      updated_at: admin.firestore.FieldValue.serverTimestamp()
+    });
 
-      db.prepare('INSERT INTO activity_logs (user_id, action, application_id) VALUES (?, ?, ?)').run(
-        req.user.id, `Submitted new ${service.service_name} application (${reference_number})`, applicationId
-      );
+    await db.collection('activity_logs').add({
+      user_id: req.user.id,
+      action: `Submitted new ${service.service_name} application (${reference_number})`,
+      application_id: applicationId,
+      timestamp: admin.firestore.FieldValue.serverTimestamp()
+    });
 
-      const enrichedApp = getEnrichedApplication(applicationId);
-      res.json(enrichedApp);
-    })();
+    const enrichedApp = await getEnrichedApplication(applicationId);
+    res.json(enrichedApp);
   } catch (err: any) {
     console.error('Submission error:', err);
     res.status(400).json({ error: err.message || 'Failed to submit application' });
@@ -1665,383 +2213,483 @@ app.post('/api/applications/finalize', authenticateToken, async (req: any, res) 
   const userId = req.user.id;
 
   try {
-    const draft = db.prepare('SELECT * FROM application_drafts WHERE id = ? AND user_id = ?').get(draft_id, userId) as any;
-    if (!draft) {
+    const draftRef = db.collection('application_drafts').doc(draft_id);
+    const draftDoc = await draftRef.get();
+    if (!draftDoc.exists || draftDoc.data()?.user_id !== userId) {
       return res.status(404).json({ error: 'Draft not found' });
     }
+    const draft = draftDoc.data();
 
-    const service = db.prepare('SELECT * FROM services WHERE id = ?').get(draft.service_id) as any;
-    if (!service) {
+    const serviceDoc = await db.collection('services').doc(draft?.service_id).get();
+    if (!serviceDoc.exists) {
       return res.status(404).json({ error: 'Service not found' });
     }
+    const service = serviceDoc.data();
 
     // Verify payment
-    const payment = db.prepare('SELECT * FROM service_payments WHERE id = ? AND user_id = ? AND service_id = ? AND status = ?').get(payment_id, userId, draft.service_id, 'success') as any;
-    if (!payment) {
+    const paymentDoc = await db.collection('service_payments').doc(payment_id).get();
+    const payment = paymentDoc.data();
+    if (!paymentDoc.exists || payment?.user_id !== userId || payment?.service_id !== draft?.service_id || payment?.status !== 'success') {
       return res.status(400).json({ error: 'Invalid or unsuccessful payment' });
     }
 
-    const reference_number = generateReferenceNumber();
-    
-    let applicationId: number | bigint = 0;
-    db.transaction(() => {
+    const reference_number = await generateReferenceNumber();
+    const appRef = db.collection('applications').doc();
+    const applicationId = appRef.id;
+
+    await db.runTransaction(async (transaction) => {
       // 1. Create application
-      const result = db.prepare('INSERT INTO applications (reference_number, user_id, service_type, service_id, form_data, status, payment_status, created_by, payment_id, payment_mode) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
-        reference_number, userId, service.service_name, service.id, draft.form_data, 'Submitted', 'Paid', 'user', payment_id, payment.payment_mode
-      );
-      applicationId = result.lastInsertRowid;
+      transaction.set(appRef, {
+        reference_number,
+        user_id: userId,
+        service_type: service?.service_name,
+        service_id: draft?.service_id,
+        form_data: draft?.form_data,
+        status: 'Submitted',
+        payment_status: 'Paid',
+        created_by: 'user',
+        payment_id: payment_id,
+        payment_mode: payment?.payment_mode,
+        created_at: admin.firestore.FieldValue.serverTimestamp(),
+        updated_at: admin.firestore.FieldValue.serverTimestamp()
+      });
 
       // 2. Move documents from draft to application_documents
-      const draftDocs = JSON.parse(draft.documents || '[]');
+      const draftDocs = draft?.documents || [];
       draftDocs.forEach((doc: any) => {
-        db.prepare('INSERT INTO application_documents (application_id, document_type, file_name, file_path, uploaded_by) VALUES (?, ?, ?, ?, ?)').run(
-          applicationId, doc.type || 'Document', doc.originalname || 'Document', doc.path, userId
-        );
+        const docRef = db.collection('application_documents').doc();
+        transaction.set(docRef, {
+          application_id: applicationId,
+          document_type: doc.type || 'Document',
+          file_name: doc.originalname || 'Document',
+          file_path: doc.path,
+          uploaded_by: userId,
+          created_at: admin.firestore.FieldValue.serverTimestamp()
+        });
       });
 
       // 3. Delete draft
-      db.prepare('DELETE FROM application_drafts WHERE id = ?').run(draft_id);
+      transaction.delete(draftRef);
 
       // 4. Initial update
-      db.prepare('INSERT INTO application_updates (application_id, status, comment, updated_by) VALUES (?, ?, ?, ?)').run(
-        applicationId, 'Submitted', 'Application submitted successfully from draft.', userId
-      );
+      const updateRef = db.collection('application_updates').doc();
+      transaction.set(updateRef, {
+        application_id: applicationId,
+        status: 'Submitted',
+        comment: 'Application submitted successfully from draft.',
+        updated_by: userId,
+        updated_at: admin.firestore.FieldValue.serverTimestamp()
+      });
 
       // 5. Activity log
-      db.prepare('INSERT INTO activity_logs (user_id, action, application_id) VALUES (?, ?, ?)').run(
-        userId, `Finalized ${service.service_name} application (${reference_number})`, applicationId
-      );
-    })();
+      const logRef = db.collection('activity_logs').doc();
+      transaction.set(logRef, {
+        user_id: userId,
+        action: `Finalized ${service?.service_name} application (${reference_number})`,
+        application_id: applicationId,
+        timestamp: admin.firestore.FieldValue.serverTimestamp()
+      });
+    });
 
-    const enrichedApp = getEnrichedApplication(applicationId);
+    const enrichedApp = await getEnrichedApplication(applicationId);
     res.json(enrichedApp);
-  } catch (err) {
-    console.error('Finalization Error:', err);
-    res.status(500).json({ error: 'Failed to finalize application' });
+  } catch (err: any) {
+    console.error('Finalize error:', err);
+    res.status(500).json({ error: err.message || 'Failed to finalize application' });
   }
 });
 
-app.get('/api/applications', authenticateToken, (req: any, res) => {
-  const { service_id, user_name, mobile, reference_number, status, payment_status, start_date, end_date, search } = req.query;
-
-  let query = `
-    SELECT a.*, u.name as user_name, u.email as user_email, u.phone as user_phone, 
-           s.name as staff_name, s_orig.payment_required, s_orig.service_name
-    FROM applications a 
-    JOIN users u ON a.user_id = u.id 
-    LEFT JOIN users s ON a.assigned_staff = s.id 
-    LEFT JOIN services s_orig ON a.service_id = s_orig.id 
-    WHERE a.deleted_at IS NULL
-  `;
-  const params: any[] = [];
-  
-  if (req.user.role === 'user') {
-    query += ' AND a.user_id = ?';
-    params.push(req.user.id);
-  } else if (req.user.role === 'staff') {
-    // Staff can only see paid applications if service requires payment
-    query += ' AND (a.assigned_staff = ? OR a.assigned_staff IS NULL) AND (s_orig.payment_required = 0 OR a.payment_id IS NOT NULL)';
-    params.push(req.user.id);
-  } else if (req.user.role === 'admin') {
-    // Admin can only see paid applications if service requires payment
-    query += ' AND (s_orig.payment_required = 0 OR a.payment_id IS NOT NULL)';
-  }
-
-  if (service_id) {
-    query += ' AND a.service_id = ?';
-    params.push(service_id);
-  }
-  if (user_name) {
-    query += ' AND u.name LIKE ?';
-    params.push(`%${user_name}%`);
-  }
-  if (mobile) {
-    query += ' AND u.phone LIKE ?';
-    params.push(`%${mobile}%`);
-  }
-  if (reference_number) {
-    query += ' AND a.reference_number LIKE ?';
-    params.push(`%${reference_number}%`);
-  }
-  if (status) {
-    query += ' AND a.status = ?';
-    params.push(status);
-  }
-  if (payment_status) {
-    query += ' AND a.payment_status = ?';
-    params.push(payment_status);
-  }
-  if (start_date) {
-    query += ' AND a.created_at >= ?';
-    params.push(start_date);
-  }
-  if (end_date) {
-    query += ' AND a.created_at <= ?';
-    params.push(end_date);
-  }
-  if (search) {
-    query += ' AND (a.reference_number LIKE ? OR u.name LIKE ? OR u.phone LIKE ?)';
-    params.push(`%${search}%`, `%${search}%`, `%${search}%`);
-  }
-
-  query += ' ORDER BY a.created_at DESC';
-  
+app.get('/api/applications', authenticateToken, async (req: any, res) => {
   try {
-    const applications = db.prepare(query).all(...params);
+    let query = db.collection('applications').where('deleted_at', '==', null);
     
-    // Enrich with documents and updates
-    const enrichedApps = applications.map((app: any) => {
-      const documents = db.prepare('SELECT * FROM application_documents WHERE application_id = ?').all(app.id);
-      const updates = db.prepare('SELECT au.*, u.name as updated_by_name FROM application_updates au JOIN users u ON au.updated_by = u.id WHERE application_id = ? ORDER BY au.updated_at DESC').all(app.id);
-      
-      let formData = {};
-      try {
-        if (app.form_data && app.form_data !== 'undefined') {
-          formData = JSON.parse(app.form_data);
-        }
-      } catch (e) {
-        console.error('Error parsing form_data:', e);
-      }
-      
-      return {
-        ...app,
-        form_data: formData,
-        documents,
-        updates
-      };
-    });
+    if (req.user.role === 'user') {
+      query = query.where('user_id', '==', req.user.id);
+    }
     
-    res.json(enrichedApps);
+    const snapshot = await query.orderBy('created_at', 'desc').get();
+    const applications = await Promise.all(snapshot.docs.map(doc => getEnrichedApplication(doc.id)));
+    res.json(applications.filter(Boolean));
   } catch (err) {
-    console.error('Fetch Applications Error:', err);
+    console.error('Fetch applications error:', err);
     res.status(500).json({ error: 'Failed to fetch applications' });
   }
 });
 
-app.get('/api/applications/:id', authenticateToken, (req: any, res) => {
-  const application = db.prepare('SELECT a.*, u.name as user_name, u.email as user_email, s.name as staff_name FROM applications a JOIN users u ON a.user_id = u.id LEFT JOIN users s ON a.assigned_staff = s.id WHERE a.id = ?').get(req.params.id) as any;
-  
-  if (!application) return res.status(404).json({ error: 'Application not found' });
-  
-  // Check permission
-  if (req.user.role === 'user' && application.user_id !== req.user.id) {
-    return res.status(403).json({ error: 'Unauthorized' });
-  }
-  
-  const documents = db.prepare('SELECT * FROM application_documents WHERE application_id = ?').all(application.id);
-  const updates = db.prepare('SELECT au.*, u.name as updated_by_name FROM application_updates au JOIN users u ON au.updated_by = u.id WHERE application_id = ? ORDER BY au.updated_at DESC').all(application.id);
-
-  let formData = {};
+app.get('/api/applications/:id', authenticateToken, async (req: any, res) => {
   try {
-    if (application.form_data && application.form_data !== 'undefined') {
-      formData = JSON.parse(application.form_data);
+    const application = await getEnrichedApplication(req.params.id) as any;
+    if (!application) return res.status(404).json({ error: 'Application not found' });
+    
+    // Check permission
+    if (req.user.role === 'user' && application.user_id !== req.user.id) {
+      return res.status(403).json({ error: 'Unauthorized' });
     }
-  } catch (e) {
-    console.error('Error parsing form_data:', e);
+    
+    res.json(application);
+  } catch (err) {
+    console.error('Fetch application error:', err);
+    res.status(500).json({ error: 'Failed to fetch application' });
   }
-
-  res.json({
-    ...application,
-    form_data: formData,
-    documents,
-    updates
-  });
 });
 
-app.get('/api/applications/track/:ref', (req, res) => {
-  const ref = req.params.ref;
-  const application = db.prepare('SELECT a.*, s.name as staff_name FROM applications a LEFT JOIN users s ON a.assigned_staff = s.id WHERE a.reference_number = ? OR (SELECT phone FROM users WHERE id = a.user_id) = ?').get(ref, ref) as any;
-  
-  if (!application) return res.status(404).json({ error: 'Application not found' });
-  
-  const documents = db.prepare('SELECT * FROM application_documents WHERE application_id = ?').all(application.id);
-  const updates = db.prepare('SELECT au.*, u.name as updated_by_name FROM application_updates au JOIN users u ON au.updated_by = u.id WHERE application_id = ? ORDER BY au.updated_at ASC').all(application.id);
-
-  res.json({
-    ...application,
-    documents,
-    updates
-  });
+app.get('/api/applications/track/:ref', async (req, res) => {
+  try {
+    const ref = req.params.ref;
+    const snapshot = await db.collection('applications')
+      .where('reference_number', '==', ref)
+      .limit(1)
+      .get();
+    
+    let applicationDoc = snapshot.docs[0];
+    
+    if (!applicationDoc) {
+      // Try by phone number if ref is a phone number
+      const userSnapshot = await db.collection('users').where('phone', '==', ref).limit(1).get();
+      if (!userSnapshot.empty) {
+        const userId = userSnapshot.docs[0].id;
+        const appSnapshot = await db.collection('applications').where('user_id', '==', userId).orderBy('created_at', 'desc').limit(1).get();
+        if (!appSnapshot.empty) {
+          applicationDoc = appSnapshot.docs[0];
+        }
+      }
+    }
+    
+    if (!applicationDoc) return res.status(404).json({ error: 'Application not found' });
+    
+    const enrichedApp = await getEnrichedApplication(applicationDoc.id);
+    res.json(enrichedApp);
+  } catch (err) {
+    console.error('Track application error:', err);
+    res.status(500).json({ error: 'Failed to track application' });
+  }
 });
 
-app.patch('/api/applications/:id/assign', authenticateToken, requireRole(['admin']), (req: any, res) => {
+app.patch('/api/applications/:id/assign', authenticateToken, requireRole(['admin']), async (req: any, res) => {
   const { staff_id } = req.body;
   const applicationId = req.params.id;
 
   try {
-    db.prepare('UPDATE applications SET assigned_staff = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(
-      staff_id || null, applicationId
-    );
+    const appRef = db.collection('applications').doc(applicationId);
+    const appDoc = await appRef.get();
+    if (!appDoc.exists) return res.status(404).json({ error: 'Application not found' });
 
-    // Add to timeline
-    const staffName = staff_id ? (db.prepare('SELECT name FROM users WHERE id = ?').get(staff_id) as any)?.name : 'Unassigned';
-    db.prepare('INSERT INTO application_updates (application_id, status, comment, updated_by) VALUES (?, ?, ?, ?)').run(
-      applicationId, 
-      'Staff Assigned', 
-      `Application assigned to ${staffName || 'Unknown'}`, 
-      req.user.id
-    );
+    let staffName = 'Unassigned';
+    if (staff_id) {
+      const staffDoc = await db.collection('users').doc(staff_id).get();
+      staffName = staffDoc.data()?.name || 'Unknown Staff';
+    }
+
+    await db.runTransaction(async (transaction) => {
+      transaction.update(appRef, {
+        assigned_staff: staff_id || null,
+        updated_at: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      const updateRef = db.collection('application_updates').doc();
+      transaction.set(updateRef, {
+        application_id: applicationId,
+        status: 'Staff Assigned',
+        comment: `Application assigned to ${staffName}`,
+        updated_by: req.user.id,
+        updated_at: admin.firestore.FieldValue.serverTimestamp()
+      });
+    });
 
     res.json({ message: 'Staff assigned successfully' });
   } catch (err) {
-    console.error('Assign Staff Error:', err);
+    console.error('Assign staff error:', err);
     res.status(500).json({ error: 'Failed to assign staff' });
   }
 });
 
-app.patch('/api/applications/:id/status', authenticateToken, requireRole(['admin', 'staff']), upload.array('documents', 20), (req: any, res) => {
+app.patch('/api/applications/:id/status', authenticateToken, requireRole(['admin', 'staff']), upload.array('documents', 20), async (req: any, res) => {
   const { status, comment } = req.body;
   const applicationId = req.params.id;
 
-  db.prepare('UPDATE applications SET status = ?, assigned_staff = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(
-    status, req.user.id, applicationId
-  );
+  try {
+    const appRef = db.collection('applications').doc(applicationId);
+    const appDoc = await appRef.get();
+    if (!appDoc.exists) return res.status(404).json({ error: 'Application not found' });
+    const appData = appDoc.data();
 
-  // Add to timeline
-  db.prepare('INSERT INTO application_updates (application_id, status, comment, updated_by) VALUES (?, ?, ?, ?)').run(
-    applicationId, status, comment || `Status updated to ${status}`, req.user.id
-  );
+    await db.runTransaction(async (transaction) => {
+      transaction.update(appRef, {
+        status,
+        assigned_staff: req.user.id,
+        updated_at: admin.firestore.FieldValue.serverTimestamp()
+      });
 
-  // Handle new documents from staff/admin
-  const files = req.files as Express.Multer.File[];
-  if (files) {
-    const app = db.prepare('SELECT service_type, user_id FROM applications WHERE id = ?').get(applicationId) as any;
-    const insertDoc = db.prepare('INSERT INTO application_documents (application_id, file_path, file_name, uploaded_by) VALUES (?, ?, ?, ?)');
-    files.forEach(f => {
-      const filePath = `/uploads/${app.service_type}/${app.user_id}/${f.filename}`;
-      insertDoc.run(applicationId, filePath, f.originalname, req.user.id);
-    });
-  }
+      const updateRef = db.collection('application_updates').doc();
+      transaction.set(updateRef, {
+        application_id: applicationId,
+        status,
+        comment: comment || `Status updated to ${status}`,
+        updated_by: req.user.id,
+        updated_at: admin.firestore.FieldValue.serverTimestamp()
+      });
 
-  // Notify User
-  const appData = db.prepare('SELECT user_id, reference_number FROM applications WHERE id = ?').get(applicationId) as any;
-  db.prepare('INSERT INTO notifications (user_id, message) VALUES (?, ?)').run(
-    appData.user_id, `Your application ${appData.reference_number} status updated to ${status}.`
-  );
-
-  db.prepare('INSERT INTO activity_logs (user_id, action, application_id) VALUES (?, ?, ?)').run(
-    req.user.id, `Updated status to ${status} for ${appData.reference_number}`, applicationId
-  );
-
-  // Credit commission to staff if status is 'Completed'
-  if (status === 'Completed' && req.user.role === 'staff') {
-    // Check if commission already credited
-    const existingTx = db.prepare('SELECT id FROM wallet_transactions WHERE user_id = ? AND reference_id = ? AND type = ?').get(req.user.id, applicationId, 'credit');
-    
-    if (!existingTx) {
-      const app = db.prepare('SELECT service_type FROM applications WHERE id = ?').get(applicationId) as any;
-      const service = db.prepare('SELECT staff_commission FROM services WHERE service_name = ?').get(app.service_type) as any;
-      
-      if (service && service.staff_commission > 0) {
-        db.transaction(() => {
-          db.prepare('UPDATE wallets SET balance = balance + ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?')
-            .run(service.staff_commission, req.user.id);
-          
-          db.prepare('INSERT INTO wallet_transactions (user_id, type, amount, description, reference_id, status) VALUES (?, ?, ?, ?, ?, ?)')
-            .run(req.user.id, 'credit', service.staff_commission, `Commission for processing application: ${appData.reference_number}`, applicationId, 'success');
-        })();
+      // Handle new documents from staff/admin
+      const files = req.files as Express.Multer.File[];
+      if (files) {
+        files.forEach(f => {
+          const filePath = `/uploads/${appData?.service_type}/${appData?.user_id}/${f.filename}`;
+          const docRef = db.collection('application_documents').doc();
+          transaction.set(docRef, {
+            application_id: applicationId,
+            file_path: filePath,
+            file_name: f.originalname,
+            uploaded_by: req.user.id,
+            created_at: admin.firestore.FieldValue.serverTimestamp()
+          });
+        });
       }
-    }
-  }
 
-  res.json({ message: 'Status updated and user notified' });
+      // Notify User
+      const notifRef = db.collection('notifications').doc();
+      transaction.set(notifRef, {
+        user_id: appData?.user_id,
+        message: `Your application ${appData?.reference_number} status updated to ${status}.`,
+        is_read: false,
+        created_at: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      // Activity log
+      const logRef = db.collection('activity_logs').doc();
+      transaction.set(logRef, {
+        user_id: req.user.id,
+        action: `Updated status to ${status} for ${appData?.reference_number}`,
+        application_id: applicationId,
+        timestamp: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      // Credit commission to staff if status is 'Completed'
+      if (status === 'Completed' && req.user.role === 'staff') {
+        const txSnapshot = await db.collection('wallet_transactions')
+          .where('user_id', '==', req.user.id)
+          .where('reference_id', '==', applicationId)
+          .where('type', '==', 'credit')
+          .limit(1)
+          .get();
+        
+        if (txSnapshot.empty) {
+          const servicesSnapshot = await db.collection('services')
+            .where('service_name', '==', appData?.service_type)
+            .limit(1)
+            .get();
+          
+          const service = servicesSnapshot.docs[0]?.data();
+          if (service && service.staff_commission > 0) {
+            const walletRef = db.collection('wallets').doc(req.user.id);
+            const walletDoc = await transaction.get(walletRef);
+            const currentBalance = walletDoc.data()?.balance || 0;
+            
+            transaction.update(walletRef, {
+              balance: currentBalance + service.staff_commission,
+              updated_at: admin.firestore.FieldValue.serverTimestamp()
+            });
+            
+            const walletTxRef = db.collection('wallet_transactions').doc();
+            transaction.set(walletTxRef, {
+              user_id: req.user.id,
+              type: 'credit',
+              amount: service.staff_commission,
+              description: `Commission for processing application: ${appData?.reference_number}`,
+              reference_id: applicationId,
+              status: 'success',
+              created_at: admin.firestore.FieldValue.serverTimestamp()
+            });
+          }
+        }
+      }
+    });
+
+    res.json({ message: 'Status updated and user notified' });
+  } catch (err) {
+    console.error('Update status error:', err);
+    res.status(500).json({ error: 'Failed to update status' });
+  }
 });
 
 // Notifications
-app.get('/api/notifications', authenticateToken, (req: any, res) => {
-  const notifications = db.prepare('SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 20').all(req.user.id);
-  res.json(notifications);
+app.get('/api/notifications', authenticateToken, async (req: any, res) => {
+  try {
+    const snapshot = await db.collection('notifications')
+      .where('user_id', '==', req.user.id)
+      .orderBy('created_at', 'desc')
+      .limit(20)
+      .get();
+    const notifications = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    res.json(notifications);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch notifications' });
+  }
 });
 
-app.patch('/api/notifications/:id/read', authenticateToken, (req: any, res) => {
-  db.prepare('UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?').run(req.params.id, req.user.id);
-  res.json({ message: 'Notification marked as read' });
+app.patch('/api/notifications/:id/read', authenticateToken, async (req: any, res) => {
+  try {
+    await db.collection('notifications').doc(req.params.id).update({ is_read: true });
+    res.json({ message: 'Notification marked as read' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update notification' });
+  }
 });
 
 // Activity Logs
-app.get('/api/activity-logs', authenticateToken, requireRole(['admin']), (req, res) => {
-  const logs = db.prepare('SELECT l.*, u.name as user_name, a.service_type FROM activity_logs l JOIN users u ON l.user_id = u.id LEFT JOIN applications a ON l.application_id = a.id ORDER BY l.timestamp DESC LIMIT 50').all();
-  res.json(logs);
+app.get('/api/activity-logs', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const snapshot = await db.collection('activity_logs').orderBy('timestamp', 'desc').limit(50).get();
+    const usersSnapshot = await db.collection('users').get();
+    const usersMap = new Map();
+    usersSnapshot.docs.forEach(doc => usersMap.set(doc.id, doc.data()));
+
+    const logs = snapshot.docs.map(doc => {
+      const data = doc.data();
+      const user = usersMap.get(data.user_id);
+      return {
+        id: doc.id,
+        ...data,
+        user_name: user?.name
+      };
+    });
+    res.json(logs);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch activity logs' });
+  }
 });
 
 // Service Links
-app.get('/api/service-links', authenticateToken, requireRole(['admin', 'staff']), (req, res) => {
-  const links = db.prepare('SELECT * FROM service_links WHERE is_active = 1').all();
-  res.json(links);
+app.get('/api/service-links', authenticateToken, requireRole(['admin', 'staff']), async (req, res) => {
+  try {
+    const snapshot = await db.collection('service_links').where('is_active', '==', true).get();
+    const links = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    res.json(links);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch service links' });
+  }
 });
 
 // Support Tickets
-app.post('/api/support', authenticateToken, (req: any, res) => {
+app.post('/api/support', authenticateToken, async (req: any, res) => {
   const { subject, message } = req.body;
   if (!subject || !message) {
     return res.status(400).json({ error: 'Subject and message are required' });
   }
-  const result = db.prepare('INSERT INTO support_tickets (user_id, subject, message) VALUES (?, ?, ?)').run(
-    req.user.id, subject, message
-  );
-  res.json({ id: result.lastInsertRowid, message: 'Support ticket submitted successfully' });
-});
-
-app.get('/api/support', authenticateToken, (req: any, res) => {
-  let query = 'SELECT s.*, u.name as user_name, u.email as user_email FROM support_tickets s JOIN users u ON s.user_id = u.id';
-  const params: any[] = [];
-  
-  if (req.user.role === 'user') {
-    query += ' WHERE s.user_id = ?';
-    params.push(req.user.id);
+  try {
+    const result = await db.collection('support_tickets').add({
+      user_id: req.user.id,
+      subject,
+      message,
+      status: 'Open',
+      created_at: admin.firestore.FieldValue.serverTimestamp()
+    });
+    res.json({ id: result.id, message: 'Support ticket submitted successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to submit ticket' });
   }
-  query += ' ORDER BY s.created_at DESC';
-  
-  const tickets = db.prepare(query).all(...params);
-  res.json(tickets);
 });
 
-app.put('/api/support/:id/status', authenticateToken, requireRole(['admin', 'staff']), (req: any, res) => {
+app.get('/api/support', authenticateToken, async (req: any, res) => {
+  try {
+    let query: any = db.collection('support_tickets');
+    if (req.user.role === 'user') {
+      query = query.where('user_id', '==', req.user.id);
+    }
+    const snapshot = await query.orderBy('created_at', 'desc').get();
+    
+    const usersSnapshot = await db.collection('users').get();
+    const usersMap = new Map();
+    usersSnapshot.docs.forEach(doc => usersMap.set(doc.id, doc.data()));
+
+    const tickets = snapshot.docs.map(doc => {
+      const data = doc.data();
+      const user = usersMap.get(data.user_id);
+      return {
+        id: doc.id,
+        ...data,
+        user_name: user?.name,
+        user_email: user?.email
+      };
+    });
+    res.json(tickets);
+  } catch (err) {
+    console.error('Fetch Support Tickets Error:', err);
+    res.status(500).json({ error: 'Failed to fetch tickets' });
+  }
+});
+
+app.put('/api/support/:id/status', authenticateToken, requireRole(['admin', 'staff']), async (req: any, res) => {
   const { status } = req.body;
-  db.prepare('UPDATE support_tickets SET status = ? WHERE id = ?').run(status, req.params.id);
-  res.json({ message: 'Status updated' });
+  try {
+    await db.collection('support_tickets').doc(req.params.id).update({ status });
+    res.json({ message: 'Status updated' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update ticket status' });
+  }
 });
 
 // Recycle Bin Routes
-app.get('/api/recycle-bin', authenticateToken, requireRole(['admin']), (req, res) => {
-  const services = db.prepare("SELECT id, service_name as name, 'service' as type, deleted_at FROM services WHERE deleted_at IS NOT NULL").all();
-  const users = db.prepare("SELECT id, name, 'user' as type, deleted_at FROM users WHERE deleted_at IS NOT NULL").all();
-  const applications = db.prepare("SELECT id, reference_number as name, 'application' as type, deleted_at FROM applications WHERE deleted_at IS NOT NULL").all();
-  
-  res.json([...services, ...users, ...applications]);
+app.get('/api/recycle-bin', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const servicesSnapshot = await db.collection('services').where('deleted_at', '!=', null).get();
+    const usersSnapshot = await db.collection('users').where('deleted_at', '!=', null).get();
+    const applicationsSnapshot = await db.collection('applications').where('deleted_at', '!=', null).get();
+    
+    const services = servicesSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().service_name, type: 'service', deleted_at: doc.data().deleted_at }));
+    const users = usersSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name, type: 'user', deleted_at: doc.data().deleted_at }));
+    const applications = applicationsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().reference_number, type: 'application', deleted_at: doc.data().deleted_at }));
+    
+    res.json([...services, ...users, ...applications]);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch recycle bin items' });
+  }
 });
 
-app.post('/api/recycle-bin/restore', authenticateToken, requireRole(['admin']), (req, res) => {
+app.post('/api/recycle-bin/restore', authenticateToken, requireRole(['admin']), async (req, res) => {
   const { id, type } = req.body;
-  let table = '';
-  if (type === 'service') table = 'services';
-  else if (type === 'user') table = 'users';
-  else if (type === 'application') table = 'applications';
+  let collection = '';
+  if (type === 'service') collection = 'services';
+  else if (type === 'user') collection = 'users';
+  else if (type === 'application') collection = 'applications';
   
-  if (!table) return res.status(400).json({ error: 'Invalid type' });
+  if (!collection) return res.status(400).json({ error: 'Invalid type' });
   
-  db.prepare(`UPDATE ${table} SET deleted_at = NULL WHERE id = ?`).run(id);
-  res.json({ success: true, message: 'Item restored successfully' });
+  try {
+    await db.collection(collection).doc(id).update({ deleted_at: null });
+    res.json({ success: true, message: 'Item restored successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to restore item' });
+  }
 });
 
-app.delete('/api/recycle-bin/permanent/:type/:id', authenticateToken, requireRole(['admin']), (req, res) => {
+app.delete('/api/recycle-bin/permanent/:type/:id', authenticateToken, requireRole(['admin']), async (req, res) => {
   const { id, type } = req.params;
-  let table = '';
-  if (type === 'service') table = 'services';
-  else if (type === 'user') table = 'users';
-  else if (type === 'application') table = 'applications';
+  let collection = '';
+  if (type === 'service') collection = 'services';
+  else if (type === 'user') collection = 'users';
+  else if (type === 'application') collection = 'applications';
   
-  if (!table) return res.status(400).json({ error: 'Invalid type' });
+  if (!collection) return res.status(400).json({ error: 'Invalid type' });
   
-  db.prepare(`DELETE FROM ${table} WHERE id = ?`).run(id);
-  res.json({ success: true, message: 'Item permanently deleted' });
+  try {
+    await db.collection(collection).doc(id).delete();
+    res.json({ success: true, message: 'Item permanently deleted' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete item' });
+  }
 });
 
 // Portal Config Update
-app.put('/api/portal-config', authenticateToken, requireRole(['admin']), (req, res) => {
-  const configData = JSON.stringify(req.body);
-  db.prepare('UPDATE portal_config SET config_data = ? WHERE id = 1').run(configData);
-  res.json({ success: true, message: 'Configuration updated successfully' });
+app.put('/api/portal-config', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    await db.collection('portal_config').doc('1').update({
+      config_data: req.body,
+      updated_at: admin.firestore.FieldValue.serverTimestamp()
+    });
+    res.json({ success: true, message: 'Configuration updated successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update configuration' });
+  }
 });
 
 // Start Server
