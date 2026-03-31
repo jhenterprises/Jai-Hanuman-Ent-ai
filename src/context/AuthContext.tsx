@@ -16,6 +16,7 @@ interface User {
   name: string;
   email: string;
   phone?: string;
+  photoURL?: string;
   role: 'user' | 'staff' | 'admin';
 }
 
@@ -39,6 +40,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('Auth state changed:', firebaseUser);
       if (firebaseUser) {
         console.log('User is authenticated:', firebaseUser.uid);
+        
+        // Security: Only allow verified Google accounts if requested
+        if (firebaseUser.providerData.some(p => p.providerId === 'google.com') && !firebaseUser.emailVerified) {
+          console.log('Unverified Google account blocked in state listener');
+          await signOut(auth);
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+
         // Fetch user role from Firestore
         const userPath = `users/${firebaseUser.uid}`;
         console.log('Fetching user document:', userPath);
@@ -48,13 +59,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
           console.log('User document fetched:', userDoc.exists());
           if (userDoc.exists()) {
-            setUser(userDoc.data() as User);
+            const userData = userDoc.data() as User;
+            // Update photoURL if it changed or is missing
+            if (firebaseUser.photoURL && userData.photoURL !== firebaseUser.photoURL) {
+              await setDoc(doc(db, 'users', firebaseUser.uid), {
+                photoURL: firebaseUser.photoURL
+              }, { merge: true });
+              userData.photoURL = firebaseUser.photoURL;
+            }
+            setUser(userData);
           } else {
             // This case handles Google login where doc might not exist yet
             const newUser: User = {
               uid: firebaseUser.uid,
               name: firebaseUser.displayName || 'User',
               email: firebaseUser.email || '',
+              photoURL: firebaseUser.photoURL || undefined,
               role: 'user'
             };
             console.log('Creating new user document:', newUser);
@@ -82,8 +102,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loginWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
     try {
-      await signInWithPopup(auth, provider);
+      const result = await signInWithPopup(auth, provider);
+      if (result.user.providerData.some(p => p.providerId === 'google.com') && !result.user.emailVerified) {
+        await signOut(auth);
+        throw new Error('Your Google account email is not verified. Please verify it or use another account.');
+      }
     } catch (error) {
       console.error('Login failed:', error);
       throw error;

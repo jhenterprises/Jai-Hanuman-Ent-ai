@@ -33,24 +33,6 @@ import AdminWalletManagement from './pages/admin/AdminWalletManagement';
 import AdminPayments from './pages/admin/AdminPayments';
 import ServiceFormBuilder from './pages/admin/ServiceFormBuilder';
 
-const FirebaseDebug = () => {
-  const [debugInfo, setDebugInfo] = useState<string>('');
-
-  useEffect(() => {
-    setDebugInfo(JSON.stringify({
-      projectId: db.app.options.projectId,
-      databaseId: firebaseConfig.firestoreDatabaseId,
-      app: db.app.name
-    }, null, 2));
-  }, []);
-
-  return (
-    <div className="fixed bottom-0 left-0 bg-black text-white p-4 z-50 text-xs">
-      <pre>{debugInfo}</pre>
-    </div>
-  );
-};
-
 const ProtectedRoute = ({ children, roles }: { children: React.ReactNode, roles?: string[] }) => {
   const { user, loading } = useAuth();
   const location = useLocation();
@@ -89,7 +71,6 @@ export default function App() {
   return (
     <AuthProvider>
       <ConfigProvider>
-        <FirebaseDebug />
         <Router>
         <Routes>
           <Route element={<PublicLayout />}>

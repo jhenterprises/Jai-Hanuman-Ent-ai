@@ -14,10 +14,20 @@ const Register = () => {
 
   const handleGoogleLogin = async () => {
     try {
+      setError('');
       await loginWithGoogle();
       navigate('/app');
     } catch (err: any) {
-      setError('Google registration failed');
+      console.error('Google registration error:', err);
+      if (err.code === 'auth/popup-blocked') {
+        setError('Popup was blocked by your browser. Please allow popups for this site.');
+      } else if (err.code === 'auth/unauthorized-domain') {
+        setError('This domain is not authorized for Google login. Please add it to your Firebase Console.');
+      } else if (err.code === 'auth/operation-not-allowed') {
+        setError('Google login is not enabled in your Firebase Console.');
+      } else {
+        setError(err.message || 'Google registration failed');
+      }
     }
   };
 

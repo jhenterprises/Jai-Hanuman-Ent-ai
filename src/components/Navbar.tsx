@@ -36,8 +36,12 @@ const Navbar = () => {
               
               <div className="flex items-center gap-4 pl-4 border-l border-white/10">
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-blue-600/20 flex items-center justify-center text-blue-400">
-                    <User size={16} />
+                  <div className="w-8 h-8 rounded-full bg-blue-600/20 flex items-center justify-center text-blue-400 overflow-hidden">
+                    {user.photoURL ? (
+                      <img src={user.photoURL} alt={user.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    ) : (
+                      <User size={16} />
+                    )}
                   </div>
                   <span className="text-sm font-semibold text-white">{user.name}</span>
                 </div>
