@@ -36,11 +36,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      console.log('Auth state changed:', firebaseUser);
       if (firebaseUser) {
+        console.log('User is authenticated:', firebaseUser.uid);
         // Fetch user role from Firestore
         const userPath = `users/${firebaseUser.uid}`;
+        console.log('Fetching user document:', userPath);
         try {
+          console.log('Firestore instance project ID:', db.app.options.projectId);
+          console.log('Firestore database ID:', db.type); // This might not be the right way to check database ID
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+          console.log('User document fetched:', userDoc.exists());
           if (userDoc.exists()) {
             setUser(userDoc.data() as User);
           } else {
@@ -51,6 +57,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               email: firebaseUser.email || '',
               role: 'user'
             };
+            console.log('Creating new user document:', newUser);
             await setDoc(doc(db, 'users', firebaseUser.uid), {
               ...newUser,
               createdAt: serverTimestamp()
@@ -58,12 +65,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setUser(newUser);
           }
         } catch (error) {
+          console.error('Error fetching user document:', error);
           handleFirestoreError(error, OperationType.GET, userPath);
+        } finally {
+          setLoading(false);
         }
       } else {
+        console.log('User is not authenticated');
         setUser(null);
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     return () => unsubscribe();
@@ -82,9 +93,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loginWithEmail = async (email: string, password: string) => {
     try {
       await signInWithEmailAndPassword(auth, email, password);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Email login failed:', error);
-      throw error;
+      console.log('Error code:', error?.code);
+      if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
+        throw new Error('Invalid email or password. Please check your credentials and try again.');
+      } else if (error.code === 'auth/too-many-requests') {
+        throw new Error('Too many failed attempts. Please try again later.');
+      }
+      throw new Error('Login failed. Please check your credentials.');
     }
   };
 
@@ -112,9 +129,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       
       setUser(newUser);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Sign up failed:', error);
-      throw error;
+      if (error.code === 'auth/email-already-in-use') {
+        throw new Error('This email is already registered. Please log in.');
+      } else if (error.code === 'auth/weak-password') {
+        throw new Error('Password should be at least 6 characters.');
+      }
+      throw new Error('Sign up failed. Please try again.');
     }
   };
 

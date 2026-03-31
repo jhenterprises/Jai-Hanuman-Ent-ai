@@ -6,7 +6,6 @@
   "scripts": {
     "dev": "tsx server.ts",
     "build": "vite build",
-    "start": "node server.ts",
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit"
@@ -28,6 +27,7 @@
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
     "firebase": "^12.11.0",
+    "firebase-admin": "^13.7.0",
     "framer-motion": "^12.37.0",
     "html2canvas": "^1.4.1",
     "jsonwebtoken": "^9.0.3",

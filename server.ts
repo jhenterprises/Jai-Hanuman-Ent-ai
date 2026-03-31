@@ -43,6 +43,16 @@ if (!admin.apps.length) {
     const privateKey = process.env.FIREBASE_PRIVATE_KEY;
     const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
     const projectId = process.env.FIREBASE_PROJECT_ID || firebaseConfig.projectId;
+    
+    console.log('--- FIREBASE ADMIN DEBUG ---');
+    console.log('Project ID:', projectId);
+    console.log('Client Email provided:', !!clientEmail);
+    console.log('Private Key provided:', !!privateKey);
+    if (privateKey) {
+        console.log('Private Key length:', privateKey.length);
+        console.log('Private Key starts with:', privateKey.substring(0, 30));
+    }
+    console.log('----------------------------');
 
     if (privateKey && clientEmail) {
       try {
@@ -82,13 +92,8 @@ if (!admin.apps.length) {
 }
 
 // Initialize Firestore instance
-let firestoreDatabaseId = process.env.FIREBASE_DATABASE_ID || firebaseConfig.firestoreDatabaseId;
-
-// Validate database ID format (must be lowercase alphanumeric and hyphens, or '(default)')
-if (firestoreDatabaseId !== '(default)' && !/^[a-z]([a-z0-9-]{0,61}[a-z0-9])?$/.test(firestoreDatabaseId)) {
-  console.warn(`Invalid FIREBASE_DATABASE_ID provided: "${firestoreDatabaseId}". Falling back to config: "${firebaseConfig.firestoreDatabaseId}"`);
-  firestoreDatabaseId = firebaseConfig.firestoreDatabaseId;
-}
+let firestoreDatabaseId = firebaseConfig.firestoreDatabaseId || '(default)';
+console.log(`Firestore initialized with database: ${firestoreDatabaseId}`);
 
 if (admin.apps.length > 0) {
   try {
@@ -967,7 +972,6 @@ app.get('/api/application-drafts', authenticateToken, async (req: any, res) => {
   try {
     const snapshot = await db.collection('application_drafts')
       .where('user_id', '==', req.user.id)
-      .orderBy('created_at', 'desc')
       .get();
     
     const servicesSnapshot = await db.collection('services').get();
@@ -982,6 +986,10 @@ app.get('/api/application-drafts', authenticateToken, async (req: any, res) => {
         ...data,
         service_name: service?.service_name
       };
+    }).sort((a: any, b: any) => {
+      const dateA = a.created_at?.toDate ? a.created_at.toDate() : new Date(a.created_at || 0);
+      const dateB = b.created_at?.toDate ? b.created_at.toDate() : new Date(b.created_at || 0);
+      return dateB.getTime() - dateA.getTime();
     });
     res.json(drafts);
   } catch (err) {
@@ -2307,9 +2315,14 @@ app.get('/api/applications', authenticateToken, async (req: any, res) => {
       query = query.where('user_id', '==', req.user.id);
     }
     
-    const snapshot = await query.orderBy('created_at', 'desc').get();
+    const snapshot = await query.get();
     const applications = await Promise.all(snapshot.docs.map(doc => getEnrichedApplication(doc.id)));
-    res.json(applications.filter(Boolean));
+    const sortedApps = applications.filter(Boolean).sort((a: any, b: any) => {
+      const dateA = a.created_at?.toDate ? a.created_at.toDate() : new Date(a.created_at || 0);
+      const dateB = b.created_at?.toDate ? b.created_at.toDate() : new Date(b.created_at || 0);
+      return dateB.getTime() - dateA.getTime();
+    });
+    res.json(sortedApps);
   } catch (err) {
     console.error('Fetch applications error:', err);
     res.status(500).json({ error: 'Failed to fetch applications' });
@@ -2516,10 +2529,14 @@ app.get('/api/notifications', authenticateToken, async (req: any, res) => {
   try {
     const snapshot = await db.collection('notifications')
       .where('user_id', '==', req.user.id)
-      .orderBy('created_at', 'desc')
-      .limit(20)
       .get();
-    const notifications = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const notifications = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+      .sort((a: any, b: any) => {
+        const dateA = a.created_at?.toDate ? a.created_at.toDate() : new Date(a.created_at || 0);
+        const dateB = b.created_at?.toDate ? b.created_at.toDate() : new Date(b.created_at || 0);
+        return dateB.getTime() - dateA.getTime();
+      })
+      .slice(0, 20);
     res.json(notifications);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch notifications' });
@@ -2713,3 +2730,5 @@ async function startServer() {
 }
 
 startServer();
+
+export default app;

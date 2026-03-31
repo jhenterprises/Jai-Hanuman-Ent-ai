@@ -28,7 +28,15 @@ api.interceptors.request.use(async (config) => {
 });
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Check if the response is actually JSON
+    const contentType = response.headers['content-type'];
+    if (contentType && contentType.includes('text/html')) {
+      console.error('Received HTML instead of JSON:', response.data);
+      return Promise.reject(new Error('Invalid API response: Expected JSON, received HTML.'));
+    }
+    return response;
+  },
   (error) => {
     if (error.response && error.response.status === 401) {
       localStorage.removeItem('token');
