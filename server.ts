@@ -403,26 +403,55 @@ app.put('/api/portal-config', authenticateToken, requireRole(['admin']), async (
 app.post('/api/admin/reset-passwords', async (req, res) => {
   try {
     const usersToReset = [
-      { email: 'admin@jh.com', password: 'admin123' },
-      { email: 'staff@jh.com', password: 'staff123' },
-      { email: 'user@jh.com', password: 'user123' },
-      { email: 'pavan.tr16@gmail.com', password: 'admin123' }
+      { email: 'admin@jh.com', password: 'admin123', role: 'admin', name: 'Admin User' },
+      { email: 'staff@jh.com', password: 'staff123', role: 'staff', name: 'Staff Member' },
+      { email: 'user@jh.com', password: 'user123', role: 'user', name: 'Test User' },
+      { email: 'pavan.tr16@gmail.com', password: 'admin123', role: 'admin', name: 'Pavan' }
     ];
 
     const results = [];
     for (const u of usersToReset) {
       try {
-        const userRecord = await admin.auth().getUserByEmail(u.email);
-        await admin.auth().updateUser(userRecord.uid, {
-          password: u.password
-        });
-        results.push({ email: u.email, status: 'reset' });
-      } catch (err: any) {
-        if (err.code === 'auth/user-not-found') {
-          results.push({ email: u.email, status: 'not_found' });
-        } else {
-          results.push({ email: u.email, status: 'error', message: err.message });
+        let userRecord;
+        try {
+          userRecord = await admin.auth().getUserByEmail(u.email);
+          await admin.auth().updateUser(userRecord.uid, {
+            password: u.password
+          });
+          results.push({ email: u.email, status: 'reset' });
+        } catch (err: any) {
+          if (err.code === 'auth/user-not-found') {
+            // Create the user if they don't exist
+            userRecord = await admin.auth().createUser({
+              email: u.email,
+              password: u.password,
+              displayName: u.name,
+            });
+            results.push({ email: u.email, status: 'created' });
+          } else {
+            throw err;
+          }
         }
+
+        // Ensure the user exists in Firestore as well
+        if (userRecord) {
+          const userRef = db.collection('users').doc(userRecord.uid);
+          const userDoc = await userRef.get();
+          if (!userDoc.exists) {
+            await userRef.set({
+              name: u.name,
+              email: u.email,
+              role: u.role,
+              created_at: admin.firestore.FieldValue.serverTimestamp()
+            });
+          } else {
+            await userRef.update({
+              role: u.role
+            });
+          }
+        }
+      } catch (err: any) {
+        results.push({ email: u.email, status: 'error', message: err.message });
       }
     }
     res.json({ results });
