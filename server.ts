@@ -1707,7 +1707,7 @@ const getEnrichedApplication = async (applicationId: string) => {
 };
 
 // Admin Dashboard Stats
-app.get('/api/admin/dashboard-stats', authenticateToken, requireRole(['admin']), async (req, res) => {
+app.get('/api/admin/dashboard-overview', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
     const usersSnapshot = await db.collection('users').where('role', '==', 'user').get();
     const staffSnapshot = await db.collection('users').where('role', '==', 'staff').get();
@@ -2525,7 +2525,7 @@ app.patch('/api/applications/:id/status', authenticateToken, requireRole(['admin
 });
 
 // Notifications
-app.get('/api/notifications', authenticateToken, async (req: any, res) => {
+app.get('/api/user-alerts', authenticateToken, async (req: any, res) => {
   try {
     const snapshot = await db.collection('notifications')
       .where('user_id', '==', req.user.id)
@@ -2543,7 +2543,7 @@ app.get('/api/notifications', authenticateToken, async (req: any, res) => {
   }
 });
 
-app.patch('/api/notifications/:id/read', authenticateToken, async (req: any, res) => {
+app.patch('/api/user-alerts/:id/read', authenticateToken, async (req: any, res) => {
   try {
     await db.collection('notifications').doc(req.params.id).update({ is_read: true });
     res.json({ message: 'Notification marked as read' });

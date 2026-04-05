@@ -57,7 +57,7 @@ const DashboardLayout = () => {
   const fetchNotifications = async () => {
     if (!auth.currentUser) return;
     try {
-      const res = await api.get('/notifications');
+      const res = await api.get('/user-alerts');
       setNotifications(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error('Error fetching notifications:', err);
@@ -67,7 +67,7 @@ const DashboardLayout = () => {
 
   const markAsRead = async (id: number) => {
     try {
-      await api.patch(`/notifications/${id}/read`);
+      await api.patch(`/user-alerts/${id}/read`);
       fetchNotifications();
     } catch (err) {
       console.error('Error marking notification as read:', err);
