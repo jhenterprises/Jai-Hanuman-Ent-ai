@@ -682,11 +682,14 @@ const ApplyService = () => {
         });
       });
 
+      // Use the actual service name from serviceDetails to avoid 404 on backend
+      const serviceName = serviceDetails?.service_name || serviceType || 'general';
+
       // If payment is required and not yet paid, save as draft and show payment step
       if (serviceDetails?.payment_required && serviceDetails?.service_price > 0 && !paymentStatus.paid && user?.role === 'user') {
         const data = new FormData();
         data.append('service_id', serviceDetails.service_id.toString());
-        data.append('service_type', serviceType || 'general');
+        data.append('service_type', serviceName);
         data.append('form_data', JSON.stringify(filteredFormData));
         if (draftId) {
           data.append('draft_id', draftId.toString());
@@ -711,7 +714,7 @@ const ApplyService = () => {
 
       // Direct submission for free services or staff/admin
       const data = new FormData();
-      data.append('service_type', serviceType || 'general');
+      data.append('service_type', serviceName);
       data.append('form_data', JSON.stringify(filteredFormData));
       if (paymentStatus.payment_id) {
         data.append('payment_id', paymentStatus.payment_id.toString());

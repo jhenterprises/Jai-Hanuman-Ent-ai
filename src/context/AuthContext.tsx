@@ -39,6 +39,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       console.log('Auth state changed:', firebaseUser);
       if (firebaseUser) {
+        setLoading(true);
         console.log('User is authenticated:', firebaseUser.uid);
         
         // Security: Only allow verified Google accounts if requested

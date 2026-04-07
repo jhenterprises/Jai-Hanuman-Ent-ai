@@ -143,7 +143,7 @@ const Dashboard = () => {
                     <h3 className="text-lg font-bold text-white mb-1">{draft.service_name}</h3>
                     <p className="text-xs text-slate-500 mb-6">Saved on {safeFormat(draft.created_at, 'dd MMM yyyy')}</p>
                     <Link
-                      to={`/app/user/apply/${draft.service_type.toLowerCase()}?draftId=${draft.id}`}
+                      to={`/app/user/apply/${draft.service_type.toLowerCase().replace(/\s+/g, '-')}?draftId=${draft.id}`}
                       className="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-orange-500/20"
                     >
                       Resume Application <ArrowRight size={14} />

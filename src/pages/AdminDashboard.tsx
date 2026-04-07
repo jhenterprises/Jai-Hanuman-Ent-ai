@@ -9,7 +9,7 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.get('/admin/stats')
+    api.get('/admin/dashboard-overview')
       .then(res => setStats(res.data))
       .finally(() => setLoading(false));
   }, []);
