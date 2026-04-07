@@ -200,8 +200,8 @@ seedUsers();
 // Seed Service Links
 const seedServiceLinks = async () => {
   try {
-    const snapshot = await db.collection('service_links').count().get();
-    if (snapshot.data().count === 0) {
+    const snapshot = await db.collection('service_links').limit(1).get();
+    if (snapshot.empty) {
       const initialLinks = [
         ['aadhaar', 'https://myaadhaar.uidai.gov.in', 'https://resident.uidai.gov.in'],
         ['pan', 'https://www.incometax.gov.in', 'https://www.onlineservices.nsdl.com'],
@@ -308,8 +308,8 @@ seedPortalConfig();
 // Seed Services
 const seedServices = async () => {
   try {
-    const snapshot = await db.collection('services').count().get();
-    if (snapshot.data().count === 0) {
+    const snapshot = await db.collection('services').limit(1).get();
+    if (snapshot.empty) {
       const initialServices = [
         { service_name: 'Aadhaar Card', description: 'Aadhaar related services including update and download', service_url: 'https://myaadhaar.uidai.gov.in', icon: 'fa-fingerprint', application_type: 'external' },
         { service_name: 'PAN Card', description: 'New PAN card application and corrections', service_url: 'https://www.onlineservices.nsdl.com', icon: 'fa-id-card', application_type: 'external' },
