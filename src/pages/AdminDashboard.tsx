@@ -14,18 +14,20 @@ const AdminDashboard = () => {
       .finally(() => setLoading(false));
   }, []);
 
-  const chartData = [
-    { name: 'Mon', apps: 45, rev: 1200 },
-    { name: 'Tue', apps: 52, rev: 1500 },
-    { name: 'Wed', apps: 38, rev: 900 },
-    { name: 'Thu', apps: 65, rev: 2100 },
-    { name: 'Fri', apps: 48, rev: 1400 },
-    { name: 'Sat', apps: 24, rev: 600 },
-    { name: 'Sun', apps: 18, rev: 400 },
-  ];
+  const chartData = stats.dailyApps && stats.dailyApps.length > 0 
+    ? stats.dailyApps.map((d: any) => ({ name: d.date.split('-').slice(1).join('/'), apps: d.count, rev: 0 }))
+    : [
+        { name: 'Mon', apps: 0, rev: 0 },
+        { name: 'Tue', apps: 0, rev: 0 },
+        { name: 'Wed', apps: 0, rev: 0 },
+        { name: 'Thu', apps: 0, rev: 0 },
+        { name: 'Fri', apps: 0, rev: 0 },
+        { name: 'Sat', apps: 0, rev: 0 },
+        { name: 'Sun', apps: 0, rev: 0 },
+      ];
 
   if (loading) return <div className="h-screen flex items-center justify-center">Loading Analytics...</div>;
-  if (!stats) return <div className="h-screen flex items-center justify-center text-red-500">Failed to load analytics. Please try again later.</div>;
+  if (!stats || !stats.overview) return <div className="h-screen flex items-center justify-center text-red-500">Failed to load analytics. Please try again later.</div>;
 
   return (
     <div className="space-y-10">
@@ -37,10 +39,10 @@ const AdminDashboard = () => {
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {[
-          { label: 'Total Citizens', value: stats.totalUsers.count, icon: Users, color: 'blue' },
-          { label: 'Applications', value: stats.totalApplications.count, icon: FileText, color: 'amber' },
-          { label: 'Pending Tasks', value: stats.pendingApps.count, icon: Activity, color: 'emerald' },
-          { label: 'Total Revenue', value: `₹${stats.revenue.total || 0}`, icon: DollarSign, color: 'purple' },
+          { label: 'Total Citizens', value: stats.overview.totalUsers, icon: Users, color: 'blue' },
+          { label: 'Applications', value: stats.overview.totalApplications, icon: FileText, color: 'amber' },
+          { label: 'Pending Tasks', value: stats.overview.pendingApplications, icon: Activity, color: 'emerald' },
+          { label: 'Total Revenue', value: `₹${stats.overview.totalRevenue || 0}`, icon: DollarSign, color: 'purple' },
         ].map((s, i) => (
           <motion.div 
             key={i}

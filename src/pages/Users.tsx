@@ -10,7 +10,7 @@ const UsersPage = () => {
   const [search, setSearch] = useState('');
   const [showAdd, setShowAdd] = useState(false);
   const [newUser, setNewUser] = useState({ name: '', email: '', phone: '', password: '', role: 'user' });
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [editRole, setEditRole] = useState('');
   
   // Confirm Dialog State
@@ -43,7 +43,7 @@ const UsersPage = () => {
     fetchUsers();
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = (id: string) => {
     setConfirmDialog({
       isOpen: true,
       title: 'Delete User',
@@ -65,7 +65,7 @@ const UsersPage = () => {
     });
   };
 
-  const handleEditRole = async (id: number) => {
+  const handleEditRole = async (id: string) => {
     try {
       await api.put(`/users/${id}/role`, { role: editRole });
       setEditingId(null);

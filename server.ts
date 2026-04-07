@@ -133,25 +133,69 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-// SQLite Database Setup (REMOVED)
-/*
-const dbDir = path.join(__dirname, 'data');
-...
-*/
+// Seed initial data
+const seedUsers = async () => {
+  try {
+    const snapshot = await db.collection('users').limit(1).get();
+    if (snapshot.empty) {
+      console.log('No users found in Firestore. Seeding default users...');
+      const defaultUsers = [
+        {
+          name: 'Admin User',
+          email: 'admin@jh.com',
+          password: 'AdminPassword123!',
+          phone: '+919999999999',
+          role: 'admin'
+        },
+        {
+          name: 'Staff User',
+          email: 'staff@jh.com',
+          password: 'StaffPassword123!',
+          phone: '+918888888888',
+          role: 'staff'
+        }
+      ];
 
-// Initialize Database Tables (REMOVED - Using Firestore)
-/*
-db.exec(`
-...
-*/
+      for (const u of defaultUsers) {
+        try {
+          let userRecord;
+          try {
+            userRecord = await admin.auth().getUserByEmail(u.email);
+            console.log(`User ${u.email} already exists in Firebase Auth.`);
+          } catch (authErr: any) {
+            if (authErr.code === 'auth/user-not-found') {
+              userRecord = await admin.auth().createUser({
+                email: u.email,
+                password: u.password,
+                displayName: u.name,
+                phoneNumber: u.phone
+              });
+              console.log(`Created new user in Firebase Auth: ${u.email}`);
+            } else {
+              throw authErr;
+            }
+          }
 
-// Seed initial data (REMOVED - Using SeedFirebase component)
-/*
-const seedUsers = () => {
-...
-}
+          if (userRecord) {
+            await db.collection('users').doc(userRecord.uid).set({
+              name: u.name,
+              email: u.email,
+              phone: u.phone,
+              role: u.role,
+              created_at: admin.firestore.FieldValue.serverTimestamp()
+            });
+            console.log(`Added user to Firestore: ${u.email} with role ${u.role}`);
+          }
+        } catch (err) {
+          console.error(`Error seeding user ${u.email}:`, err);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Error in seedUsers:', err);
+  }
+};
 seedUsers();
-*/
 
 // Seed Service Links
 const seedServiceLinks = async () => {

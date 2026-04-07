@@ -15,12 +15,12 @@ const StaffManagement = () => {
     setStaff(res.data);
   };
 
-  const handleResetPassword = async (id: number) => {
+  const handleResetPassword = async (id: string) => {
     // Implementation for password reset
     alert('Temporary password generated successfully.');
   };
 
-  const handleSetPassword = async (id: number) => {
+  const handleSetPassword = async (id: string) => {
     // Implementation for setting password
     alert('Set new password functionality would go here.');
   };

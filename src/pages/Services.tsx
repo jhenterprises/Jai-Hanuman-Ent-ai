@@ -62,7 +62,7 @@ const Services = () => {
     }
   };
 
-  const fetchServiceInputs = async (serviceId: number) => {
+  const fetchServiceInputs = async (serviceId: string) => {
     try {
       const res = await api.get(`/service-inputs/${serviceId}`);
       setServiceInputs(res.data);
@@ -86,7 +86,7 @@ const Services = () => {
     }
   };
 
-  const handleDeleteInput = (inputId: number) => {
+  const handleDeleteInput = (inputId: string) => {
     setConfirmDialog({
       isOpen: true,
       title: 'Delete Input Field',
@@ -156,7 +156,7 @@ const Services = () => {
     fetchServiceInputs(service.service_id);
   };
 
-  const handleDelete = (id: string | number) => {
+  const handleDelete = (id: string) => {
     setConfirmDialog({
       isOpen: true,
       title: 'Delete Service',
@@ -178,7 +178,7 @@ const Services = () => {
     });
   };
 
-  const toggleVisibility = async (id: string | number) => {
+  const toggleVisibility = async (id: string) => {
     try {
       await api.patch(`/services/${id}/visibility`);
       fetchServices();
@@ -187,7 +187,7 @@ const Services = () => {
     }
   };
 
-  const toggleStatus = async (id: string | number) => {
+  const toggleStatus = async (id: string) => {
     try {
       await api.patch(`/services/${id}/status`);
       fetchServices();
