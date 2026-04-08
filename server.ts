@@ -508,6 +508,19 @@ const optionalAuthenticateToken = async (req: any, res: any, next: any) => {
 
 // --- API Routes ---
 
+app.get('/api/health', async (req, res) => {
+  try {
+    const snapshot = await db.collection('services').get();
+    res.json({ 
+      status: 'ok', 
+      services_count: snapshot.size,
+      db_initialized: !!_dbInstance
+    });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
 // Portal Config
 app.get('/api/portal-config', async (req, res) => {
   try {
@@ -1302,26 +1315,26 @@ app.get('/api/services/:name', optionalAuthenticateToken, async (req, res) => {
 
 app.get('/api/services', optionalAuthenticateToken, async (req: any, res) => {
   try {
-    let query = db.collection('services');
+    const snapshot = await db.collection('services').get();
+    let services = snapshot.docs.map(doc => ({ service_id: doc.id, ...doc.data() }));
     
     if (!req.user || req.user.role === 'user' || req.user.role === 'guest') {
       // Users and guests should only see active and visible services
-      const snapshot = await query.where('is_active', '==', true).where('is_visible', '==', true).get();
-      const services = snapshot.docs.map(doc => {
-        const data = doc.data();
-        const { service_url, fee, staff_commission, ...rest } = data; // Hide sensitive fields
-        return { service_id: doc.id, ...rest };
+      // Filter in memory to avoid composite index requirements and handle potential type mismatches (1 vs true)
+      services = services.filter((s: any) => 
+        (s.is_active === true || s.is_active === 1) && 
+        (s.is_visible === true || s.is_visible === 1)
+      ).map((s: any) => {
+        const { service_url, fee, staff_commission, ...rest } = s; // Hide sensitive fields
+        return rest;
       });
       return res.json(services);
     } else if (req.user.role === 'staff') {
       // Staff can see all active services
-      const snapshot = await query.where('is_active', '==', true).get();
-      const services = snapshot.docs.map(doc => ({ service_id: doc.id, ...doc.data() }));
+      services = services.filter((s: any) => (s.is_active === true || s.is_active === 1));
       return res.json(services);
     } else {
       // Admin can see all
-      const snapshot = await query.get();
-      const services = snapshot.docs.map(doc => ({ service_id: doc.id, ...doc.data() }));
       return res.json(services);
     }
   } catch (err: any) {
@@ -1353,21 +1366,22 @@ app.post('/api/services', authenticateToken, requireRole(['admin']), async (req,
     const result = await db.collection('services').add({
       service_name,
       description,
-      is_active: active_status ?? true,
-      is_visible: visible_status ?? true,
+      is_active: active_status === 1 || active_status === true,
+      is_visible: visible_status === 1 || visible_status === true,
       application_type: type || 'internal',
       service_url: url || '',
       icon: icon || '',
       application_id: application_id || '',
-      service_price: service_price || 0,
+      service_price: Number(service_price) || 0,
       payment_required: !!payment_required,
-      fee: fee || 0,
-      staff_commission: staff_commission || 0,
+      fee: Number(fee) || 0,
+      staff_commission: Number(staff_commission) || 0,
       created_at: admin.firestore.FieldValue.serverTimestamp(),
       updated_at: admin.firestore.FieldValue.serverTimestamp()
     });
     res.json({ id: result.id, message: 'Service added' });
   } catch (err) {
+    console.error('Add Service Error:', err);
     res.status(500).json({ error: 'Failed to add service' });
   }
 });
@@ -1378,20 +1392,21 @@ app.put('/api/services/:id', authenticateToken, requireRole(['admin']), async (r
     await db.collection('services').doc(req.params.id).update({
       service_name,
       description,
-      is_active: active_status,
-      is_visible: visible_status,
-      application_type: type,
-      service_url: url,
-      icon,
+      is_active: active_status === 1 || active_status === true,
+      is_visible: visible_status === 1 || visible_status === true,
+      application_type: type || 'internal',
+      service_url: url || '',
+      icon: icon || '',
       application_id: application_id || '',
-      service_price: service_price || 0,
+      service_price: Number(service_price) || 0,
       payment_required: !!payment_required,
-      fee: fee || 0,
-      staff_commission: staff_commission || 0,
+      fee: Number(fee) || 0,
+      staff_commission: Number(staff_commission) || 0,
       updated_at: admin.firestore.FieldValue.serverTimestamp()
     });
     res.json({ message: 'Service updated' });
   } catch (err) {
+    console.error('Update Service Error:', err);
     res.status(500).json({ error: 'Failed to update service' });
   }
 });
@@ -2900,11 +2915,18 @@ async function startServer() {
     });
   }
 
+  if (process.env.VERCEL) {
+    console.log('Running in Vercel environment, skipping app.listen()');
+    return;
+  }
+
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
 }
 
-startServer();
+if (!process.env.VERCEL) {
+  startServer();
+}
 
 export default app;

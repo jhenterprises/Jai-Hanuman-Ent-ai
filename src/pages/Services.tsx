@@ -9,9 +9,18 @@ import ModernButton from '../components/ModernButton';
 
 import { useConfig } from '../context/ConfigContext';
 
+const FALLBACK_SERVICES = [
+  { service_id: 'aadhaar', service_name: 'Aadhaar Card', description: 'Aadhaar related services including update and download', icon: 'fa-fingerprint', is_active: true, is_visible: true, service_price: 0 },
+  { service_id: 'pan', service_name: 'PAN Card', description: 'New PAN card application and corrections', icon: 'fa-id-card', is_active: true, is_visible: true, service_price: 0 },
+  { service_id: 'voter', service_name: 'Voter ID', description: 'Voter registration and ID card services', icon: 'fa-id-badge', is_active: true, is_visible: true, service_price: 0 },
+  { service_id: 'passport', service_name: 'Passport', description: 'Passport application and renewal services', icon: 'fa-globe', is_active: true, is_visible: true, service_price: 0 }
+];
+
 const Services = () => {
   const { config } = useConfig();
   const [services, setServices] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const { user } = useAuth();
   const [showForm, setShowForm] = useState(false);
@@ -53,12 +62,17 @@ const Services = () => {
   }, []);
 
   const fetchServices = async () => {
+    setLoading(true);
+    setError(null);
     try {
       const res = await api.get('/services');
       setServices(res.data);
     } catch (err) {
       console.error('Error fetching services:', err);
-      alert('Services temporarily unavailable. Please contact admin.');
+      setError('Services temporarily unavailable. Showing default services.');
+      setServices(FALLBACK_SERVICES);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -447,9 +461,21 @@ const Services = () => {
         </div>
       )}
 
-      <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-${config.grid_columns || 4} gap-6`}>
-        {filtered.length > 0 ? (
-          filtered.map(service => (
+      {error && (
+        <div className="bg-orange-500/10 border border-orange-500/20 rounded-2xl p-4 flex items-center gap-3 text-orange-400 mb-6">
+          <LucideIcons.AlertCircle size={20} />
+          <p className="text-sm font-medium">{error}</p>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="flex items-center justify-center py-20">
+          <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+        </div>
+      ) : (
+        <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-${config.grid_columns || 4} gap-6`}>
+          {filtered.length > 0 ? (
+            filtered.map(service => (
             <div key={service.service_id} className="group bg-slate-800/60 backdrop-blur-xl rounded-3xl p-6 border border-slate-700/50 shadow-lg hover:border-blue-500/50 transition-all hover:-translate-y-1 relative flex flex-col">
               {isAdmin && (
                 <div className="absolute top-4 right-4 flex gap-2 opacity-100 transition-opacity">
@@ -528,6 +554,7 @@ const Services = () => {
           </div>
         )}
       </div>
+      )}
 
       <ConfirmDialog
         isOpen={confirmDialog.isOpen}

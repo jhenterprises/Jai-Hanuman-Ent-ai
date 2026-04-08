@@ -6,13 +6,25 @@ import api from '../services/api';
 import { useConfig } from '../context/ConfigContext';
 import ModernButton from '../components/ModernButton';
 
+const FALLBACK_SERVICES = [
+  { service_id: 'aadhaar', service_name: 'Aadhaar Card', description: 'Aadhaar related services including update and download', icon: 'fa-fingerprint', is_active: true, is_visible: true, service_price: 0 },
+  { service_id: 'pan', service_name: 'PAN Card', description: 'New PAN card application and corrections', icon: 'fa-id-card', is_active: true, is_visible: true, service_price: 0 },
+  { service_id: 'voter', service_name: 'Voter ID', description: 'Voter registration and ID card services', icon: 'fa-id-badge', is_active: true, is_visible: true, service_price: 0 },
+  { service_id: 'passport', service_name: 'Passport', description: 'Passport application and renewal services', icon: 'fa-globe', is_active: true, is_visible: true, service_price: 0 }
+];
+
 const Home = () => {
   const { config } = useConfig();
   const [services, setServices] = useState<any[]>([]);
   const navigate = useNavigate();
 
   useEffect(() => {
-    api.get('/services').then(res => setServices(res.data));
+    api.get('/services')
+      .then(res => setServices(res.data))
+      .catch(err => {
+        console.error('Error fetching services for home:', err);
+        setServices(FALLBACK_SERVICES);
+      });
   }, []);
 
   const getServiceKey = (name: string) => {
