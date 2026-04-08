@@ -140,16 +140,7 @@ if (admin.apps.length > 0) {
 }
 
 // --- Health Check ---
-app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    firebase: {
-      initialized: admin.apps.length > 0,
-      firestore: _dbInstance !== null,
-      projectId: admin.apps.length > 0 ? admin.app().options.projectId : null
-    }
-  });
-});
+// (Consolidated health check is below in API Routes)
 // Note: In some environments, you might need to use a specific database ID
 // but for now we'll stick to the default or assume the project ID handles it.
 // If a specific database is needed, it's usually configured in the project settings.
@@ -216,13 +207,19 @@ const requireRole = (roles: string[]) => {
   };
 };
 
+const checkFirestore = (req: any, res: any, next: any) => {
+  if (!admin.apps.length || !_dbInstance) {
+    console.error(`Firestore not initialized for ${req.method} ${req.path}`);
+    return res.status(503).json({ 
+      error: 'Database connection not established. Please check your Firebase environment variables in Vercel.',
+      details: 'Firebase Admin initialization failed or is pending.'
+    });
+  }
+  next();
+};
+
 // Middleware
 app.use(express.json());
-
-// Health Check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok' });
-});
 
 // Debug endpoint to check database state
 app.get('/api/debug/db-stats', authenticateToken, requireRole(['admin']), async (req, res) => {
@@ -510,11 +507,32 @@ const optionalAuthenticateToken = async (req: any, res: any, next: any) => {
 
 app.get('/api/health', async (req, res) => {
   try {
-    const snapshot = await db.collection('services').get();
+    const dbStatus = !!_dbInstance;
+    let servicesCount = 0;
+    let dbError = null;
+    
+    if (dbStatus) {
+      try {
+        // Use _dbInstance directly to avoid proxy throw if it's somehow null here
+        const snapshot = await _dbInstance!.collection('services').limit(1).get();
+        servicesCount = snapshot.size;
+      } catch (dbErr: any) {
+        console.error('Health check DB error:', dbErr);
+        dbError = dbErr.message;
+      }
+    }
+
     res.json({ 
-      status: 'ok', 
-      services_count: snapshot.size,
-      db_initialized: !!_dbInstance
+      status: dbStatus && !dbError ? 'ok' : 'degraded', 
+      db_initialized: dbStatus,
+      firebase_initialized: admin.apps.length > 0,
+      services_count: servicesCount,
+      db_error: dbError,
+      environment: {
+        node_env: process.env.NODE_ENV,
+        vercel: !!process.env.VERCEL,
+        project_id: admin.apps.length > 0 ? admin.app().options.projectId : null
+      }
     });
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err.message });
@@ -536,7 +554,7 @@ app.get('/api/portal-config', async (req, res) => {
   }
 });
 
-app.put('/api/portal-config', authenticateToken, requireRole(['admin']), async (req, res) => {
+app.put('/api/portal-config', authenticateToken, requireRole(['admin']), checkFirestore, async (req, res) => {
   try {
     await db.collection('portal_config').doc('main').set({
       ...req.body,
@@ -545,7 +563,11 @@ app.put('/api/portal-config', authenticateToken, requireRole(['admin']), async (
     res.json({ message: 'Configuration updated successfully' });
   } catch (err: any) {
     console.error('Portal Config Update Error:', err);
-    res.status(500).json({ error: 'Failed to update configuration' });
+    res.status(500).json({ 
+      error: 'Failed to update configuration',
+      message: err.message,
+      code: err.code
+    });
   }
 });
 
@@ -1360,7 +1382,7 @@ app.post('/api/services/:id/log-access', authenticateToken, requireRole(['staff'
   }
 });
 
-app.post('/api/services', authenticateToken, requireRole(['admin']), async (req, res) => {
+app.post('/api/services', authenticateToken, requireRole(['admin']), checkFirestore, async (req, res) => {
   const { service_name, description, active_status, visible_status, type, url, icon, application_id, service_price, payment_required, fee, staff_commission } = req.body;
   try {
     const result = await db.collection('services').add({
@@ -1386,10 +1408,10 @@ app.post('/api/services', authenticateToken, requireRole(['admin']), async (req,
   }
 });
 
-app.put('/api/services/:id', authenticateToken, requireRole(['admin']), async (req, res) => {
+app.put('/api/services/:id', authenticateToken, requireRole(['admin']), checkFirestore, async (req, res) => {
   const { service_name, description, active_status, visible_status, type, url, icon, application_id, service_price, payment_required, fee, staff_commission } = req.body;
   try {
-    await db.collection('services').doc(req.params.id).update({
+    await db.collection('services').doc(req.params.id).set({
       service_name,
       description,
       is_active: active_status === 1 || active_status === true,
@@ -1403,11 +1425,14 @@ app.put('/api/services/:id', authenticateToken, requireRole(['admin']), async (r
       fee: Number(fee) || 0,
       staff_commission: Number(staff_commission) || 0,
       updated_at: admin.firestore.FieldValue.serverTimestamp()
-    });
+    }, { merge: true });
     res.json({ message: 'Service updated' });
-  } catch (err) {
+  } catch (err: any) {
     console.error('Update Service Error:', err);
-    res.status(500).json({ error: 'Failed to update service' });
+    res.status(500).json({ 
+      error: 'Failed to update service',
+      message: err.message
+    });
   }
 });
 
@@ -1439,7 +1464,7 @@ app.patch('/api/services/:id/visibility', authenticateToken, requireRole(['admin
   }
 });
 
-app.delete('/api/services/:id', authenticateToken, requireRole(['admin']), async (req: any, res) => {
+app.delete('/api/services/:id', authenticateToken, requireRole(['admin']), checkFirestore, async (req: any, res) => {
   try {
     const serviceRef = db.collection('services').doc(req.params.id);
     const serviceDoc = await serviceRef.get();
@@ -2884,19 +2909,6 @@ app.delete('/api/recycle-bin/permanent/:type/:id', authenticateToken, requireRol
     res.json({ success: true, message: 'Item permanently deleted' });
   } catch (err) {
     res.status(500).json({ error: 'Failed to delete item' });
-  }
-});
-
-// Portal Config Update
-app.put('/api/portal-config', authenticateToken, requireRole(['admin']), async (req, res) => {
-  try {
-    await db.collection('portal_config').doc('1').update({
-      config_data: req.body,
-      updated_at: admin.firestore.FieldValue.serverTimestamp()
-    });
-    res.json({ success: true, message: 'Configuration updated successfully' });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to update configuration' });
   }
 });
 

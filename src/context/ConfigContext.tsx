@@ -20,15 +20,19 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setConfig(res.data || {});
       setError(null);
     } catch (err: any) {
-      console.error('Error fetching config, using default:', err);
-      // Set a default config to avoid blocking the app
-      setConfig({ 
-        portal_name: 'My App',
-        theme_color: '#3b82f6',
-        secondary_color: '#64748b',
-        header_bg_color: '#1e293b'
-      });
-      setError(null);
+      console.error('Error fetching config:', err);
+      if (err.response?.status === 503) {
+        setError(err.response.data.error || 'Database connection not established.');
+      } else {
+        // For other errors, use defaults to keep the app running
+        setConfig({ 
+          portal_name: 'JH Digital Seva Kendra',
+          theme_color: '#3b82f6',
+          secondary_color: '#64748b',
+          header_bg_color: '#1e293b'
+        });
+        setError(null);
+      }
     } finally {
       setLoading(false);
     }

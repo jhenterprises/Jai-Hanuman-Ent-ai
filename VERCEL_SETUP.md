@@ -15,20 +15,19 @@ Go to your Vercel Project Settings > Environment Variables and add the following
 | `VITE_API_URL` | (Optional) URL of your backend API | `/api` (default) |
 
 ### Important: Firebase Private Key
-When pasting the `FIREBASE_PRIVATE_KEY`, make sure it includes the `\n` characters if you are pasting it as a single line, or ensure Vercel handles the multi-line string correctly. The application is designed to handle both literal `\n` and actual newlines.
+When pasting the `FIREBASE_PRIVATE_KEY` into Vercel:
+1. **Copy the entire value** from the JSON file (the part between the quotes).
+2. It should look like `-----BEGIN PRIVATE KEY-----\nMII... \n-----END PRIVATE KEY-----\n`.
+3. **DO NOT** wrap it in extra quotes in the Vercel dashboard.
+4. If you are using the Vercel CLI, use `vercel env add FIREBASE_PRIVATE_KEY`.
+5. The application is designed to automatically handle literal `\n` characters and convert them to actual newlines.
 
-## 2. Deployment Configuration
-
-The project includes a `vercel.json` file that configures:
-- **API Routes**: All `/api/*` requests are routed to the Express server.
-- **Static Assets**: The React frontend is served from the `dist` directory.
-
-## 3. Troubleshooting "Services temporarily unavailable"
-
-If you still see this message:
-1. **Check Vercel Logs**: Look for "CRITICAL: Firestore 'db' is not initialized" or other Firebase errors.
-2. **Verify Firebase Credentials**: Ensure the Service Account has "Cloud Datastore User" or "Firebase Admin" permissions.
-3. **Database ID**: If you are using a named Firestore database (not `(default)`), ensure `FIREBASE_DATABASE_ID` is set or correctly picked up from `firebase-applet-config.json`.
+### Troubleshooting "Failed to update configuration"
+If you see this error:
+1. Visit `https://your-app.vercel.app/api/health`.
+2. Check if `firebase.firestore` is `true`.
+3. If it is `false`, your environment variables are likely incorrect or missing.
+4. Check the Vercel Function logs for "CRITICAL ERROR: Firebase Service Account initialization failed".
 
 ## 4. Local Development vs Production
 

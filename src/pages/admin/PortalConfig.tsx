@@ -29,9 +29,11 @@ const PortalConfig = () => {
       await api.put('/portal-config', config);
       await refreshConfig();
       alert('Configuration updated successfully');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error updating portal config:', err);
-      alert('Failed to update configuration');
+      const errorMessage = err.response?.data?.error || err.response?.data?.message || 'Failed to update configuration';
+      const details = err.response?.data?.details ? `\n\nDetails: ${err.response.data.details}` : '';
+      alert(`${errorMessage}${details}`);
     }
   };
 
