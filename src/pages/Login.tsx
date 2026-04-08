@@ -10,6 +10,7 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const { loginWithGoogle, loginWithEmail } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -17,7 +18,9 @@ const Login = () => {
   const isLoggedOut = new URLSearchParams(location.search).get('loggedOut') === 'true';
 
   const handleGoogleLogin = async () => {
+    if (loading) return;
     try {
+      setLoading(true);
       setError('');
       await loginWithGoogle();
       const from = location.state?.from?.pathname || '/app';
@@ -26,25 +29,37 @@ const Login = () => {
       console.error('Google login error:', err);
       if (err.code === 'auth/popup-blocked') {
         setError('Popup was blocked by your browser. Please allow popups for this site.');
+      } else if (err.code === 'auth/cancelled-popup-request') {
+        setError('A login popup was already open. Please complete that one or wait a moment.');
+      } else if (err.code === 'auth/popup-closed-by-user') {
+        setError('Login popup was closed before completion. Please try again.');
       } else if (err.code === 'auth/unauthorized-domain') {
         setError('This domain is not authorized for Google login. Please add it to your Firebase Console.');
       } else if (err.code === 'auth/operation-not-allowed') {
         setError('Google login is not enabled in your Firebase Console.');
+      } else if (err.message && err.message.includes('Pending promise was never set')) {
+        setError('A login attempt is already in progress. Please wait or refresh the page.');
       } else {
         setError(err.message || 'Google login failed');
       }
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     setError('');
+    setLoading(true);
     try {
       await loginWithEmail(email, password);
       const from = location.state?.from?.pathname || '/app';
       navigate(from, { replace: true });
     } catch (err: any) {
       setError(err.message || 'Login failed. Please check your credentials.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -127,9 +142,10 @@ const Login = () => {
 
           <button 
             type="submit"
-            className="w-full py-4 blue-gradient text-white font-black rounded-2xl shadow-xl shadow-blue-600/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+            disabled={loading}
+            className={`w-full py-4 blue-gradient text-white font-black rounded-2xl shadow-xl shadow-blue-600/20 hover:scale-[1.02] active:scale-[0.98] transition-all ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
           >
-            Sign In
+            {loading ? 'Signing In...' : 'Sign In'}
           </button>
 
           <div className="relative py-4">
@@ -144,10 +160,11 @@ const Login = () => {
           <button 
             type="button"
             onClick={handleGoogleLogin}
-            className="w-full py-4 bg-white text-slate-900 font-black rounded-2xl shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3"
+            disabled={loading}
+            className={`w-full py-4 bg-white text-slate-900 font-black rounded-2xl shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
           >
             <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-6 h-6" />
-            Sign in with Google
+            {loading ? 'Connecting...' : 'Sign in with Google'}
           </button>
         </form>
 

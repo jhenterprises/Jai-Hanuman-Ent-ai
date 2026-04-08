@@ -11,8 +11,15 @@ const StaffManagement = () => {
   }, []);
 
   const fetchStaff = async () => {
-    const res = await api.get('/users?role=staff');
-    setStaff(res.data);
+    try {
+      console.log('Fetching staff from API...');
+      const res = await api.get('/users?role=staff');
+      console.log('Staff fetched successfully:', res.data);
+      setStaff(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      console.error('Error fetching staff:', err);
+      setStaff([]);
+    }
   };
 
   const handleResetPassword = async (id: string) => {
@@ -55,11 +62,18 @@ const StaffManagement = () => {
             </tr>
           </thead>
           <tbody>
-            {filtered.map(s => (
-              <tr key={s.id} className="border-b border-slate-700/30 hover:bg-slate-700/20 transition-colors">
-                <td className="p-4 text-slate-200">{s.name}</td>
-                <td className="p-4 text-slate-400">{s.email}</td>
-                <td className="p-4 text-slate-400">{s.role}</td>
+            {filtered.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="p-8 text-center text-slate-500">
+                  No staff members found.
+                </td>
+              </tr>
+            ) : (
+              filtered.map(s => (
+                <tr key={s.id} className="border-b border-slate-700/30 hover:bg-slate-700/20 transition-colors">
+                <td className="p-4 text-slate-200">{s.name || 'Unknown Staff'}</td>
+                <td className="p-4 text-slate-400">{s.email || 'No Email'}</td>
+                <td className="p-4 text-slate-400">{s.role || 'staff'}</td>
                 <td className="p-4 text-slate-400">Active</td>
                 <td className="p-4 flex gap-2">
                   <button onClick={() => handleResetPassword(s.id)} className="text-blue-400 hover:text-blue-300 flex items-center gap-1 text-sm">
@@ -70,8 +84,9 @@ const StaffManagement = () => {
                   </button>
                 </td>
               </tr>
-            ))}
-          </tbody>
+            ))
+          )}
+        </tbody>
         </table>
       </div>
     </div>

@@ -48,11 +48,10 @@ if (!admin.apps.length) {
     console.log('Project ID:', projectId);
     console.log('Client Email provided:', !!clientEmail);
     console.log('Private Key provided:', !!privateKey);
-    if (privateKey) {
-        console.log('Private Key length:', privateKey.length);
-        console.log('Private Key starts with:', privateKey.substring(0, 30));
+    
+    if (privateKey && !privateKey.includes('BEGIN PRIVATE KEY')) {
+      console.error('CRITICAL ERROR: FIREBASE_PRIVATE_KEY does not appear to be a valid private key. It should start with "-----BEGIN PRIVATE KEY-----".');
     }
-    console.log('----------------------------');
 
     if (privateKey && clientEmail) {
       try {
@@ -77,9 +76,9 @@ if (!admin.apps.length) {
         console.error('Please ensure you copied the ENTIRE private_key string from the JSON file, including "-----BEGIN PRIVATE KEY-----" and "-----END PRIVATE KEY-----".');
         console.error('Error details:', certErr instanceof Error ? certErr.message : certErr);
         console.error('================================================================\n');
-        // Do not fallback to applicationDefault because it will cause PERMISSION_DENIED errors
       }
     } else {
+      console.warn('Firebase Admin: No service account credentials found. Falling back to applicationDefault.');
       admin.initializeApp({
         credential: admin.credential.applicationDefault(),
         projectId
@@ -93,12 +92,48 @@ if (!admin.apps.length) {
 
 // Initialize Firestore instance
 let firestoreDatabaseId = firebaseConfig.firestoreDatabaseId || '(default)';
+
+// Sanity check for database ID (it should not be a Measurement ID starting with G-)
+if (firestoreDatabaseId.startsWith('G-')) {
+  console.warn(`WARNING: FIREBASE_DATABASE_ID "${firestoreDatabaseId}" looks like a Measurement ID. Reverting to config value.`);
+  firestoreDatabaseId = '(default)';
+}
+
 console.log(`Firestore initialized with database: ${firestoreDatabaseId}`);
 
 if (admin.apps.length > 0) {
   try {
     _dbInstance = getFirestore(admin.app(), firestoreDatabaseId);
-    console.log(`Firestore initialized with database: ${firestoreDatabaseId}`);
+    console.log('Firestore instance obtained successfully');
+    
+    // Test the connection immediately to catch NOT_FOUND errors early
+    (async () => {
+      try {
+        await _dbInstance!.collection('health_check').limit(1).get();
+        console.log('Firestore connection verified successfully');
+      } catch (err: any) {
+        if (err.code === 5 || (err.message && err.message.includes('NOT_FOUND'))) {
+          console.error(`\n================================================================`);
+          console.error(`CRITICAL ERROR: Firestore database "${firestoreDatabaseId}" not found.`);
+          console.error(`This usually means the database ID in your config is incorrect or hasn't been created.`);
+          
+          if (firestoreDatabaseId !== '(default)') {
+            console.warn(`Attempting fallback to (default) database...`);
+            try {
+              const fallbackDb = getFirestore(admin.app(), '(default)');
+              await fallbackDb.collection('health_check').limit(1).get();
+              _dbInstance = fallbackDb;
+              console.log('Successfully fell back to (default) database');
+            } catch (fallbackErr) {
+              console.error('Fallback to (default) database also failed.');
+            }
+          }
+          console.error(`================================================================\n`);
+        } else {
+          console.error('Firestore connection test failed with non-404 error:', err);
+        }
+      }
+    })();
   } catch (e) {
     console.error('Failed to get Firestore instance:', e);
   }
@@ -125,6 +160,62 @@ const razorpay = new Razorpay({
   key_secret: process.env.RAZORPAY_KEY_SECRET || 'dummy_secret'
 });
 
+// Auth Middleware
+const authenticateToken = async (req: any, res: any, next: any) => {
+  const authHeader = req.headers['authorization'];
+  const token = (authHeader && authHeader.split(' ')[1]) || req.query.token;
+  if (!token) return res.status(401).json({ error: 'Access denied' });
+
+  try {
+    const decodedToken = await admin.auth().verifyIdToken(token);
+    const userDoc = await db.collection('users').doc(decodedToken.uid).get();
+    const userData = userDoc.data();
+    
+    // Safety check: ensure primary admin emails always get admin role
+    let role = userData?.role || 'user';
+    const adminEmails = ['pancardjhc2018@gmail.com', 'pavan.tr16@gmail.com'];
+    const userEmail = (decodedToken.email || '').toLowerCase().trim();
+    
+    if (userEmail && adminEmails.includes(userEmail)) {
+      role = 'admin';
+    }
+    
+    console.log(`[Auth Debug] Email: ${userEmail}, DB Role: ${userData?.role}, Assigned Role: ${role}`);
+    
+    req.user = {
+      ...userData,
+      id: decodedToken.uid,
+      uid: decodedToken.uid,
+      email: decodedToken.email,
+      role: role
+    };
+    next();
+  } catch (err: any) {
+    if (err.code !== 'auth/argument-error' && err.code !== 'auth/id-token-expired') {
+      console.error('Auth Error:', err);
+    }
+    return res.status(401).json({ error: 'Invalid token' });
+  }
+};
+
+const requireRole = (roles: string[]) => {
+  return (req: any, res: any, next: any) => {
+    const adminEmails = ['pancardjhc2018@gmail.com', 'pavan.tr16@gmail.com'];
+    const userEmail = (req.user?.email || '').toLowerCase().trim();
+    
+    // If user is one of the primary admins, they pass any role check
+    if (userEmail && adminEmails.includes(userEmail)) {
+      return next();
+    }
+
+    if (!roles.includes(req.user.role)) {
+      console.log(`[403 Forbidden] Path: ${req.path}, Required: ${roles}, User: ${userEmail}, Role: ${req.user.role}`);
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    next();
+  };
+};
+
 // Middleware
 app.use(express.json());
 
@@ -133,62 +224,98 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
+// Debug endpoint to check database state
+app.get('/api/debug/db-stats', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const collections = ['users', 'applications', 'services', 'ledger', 'notifications'];
+    const stats: any = {};
+    
+    for (const col of collections) {
+      const snapshot = await db.collection(col).get();
+      stats[col] = snapshot.size;
+    }
+    
+    res.json(stats);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch debug stats' });
+  }
+});
+
 // Seed initial data
 const seedUsers = async () => {
+  console.log('Starting seedUsers...');
   try {
-    const snapshot = await db.collection('users').limit(1).get();
-    if (snapshot.empty) {
-      console.log('No users found in Firestore. Seeding default users...');
-      const defaultUsers = [
-        {
-          name: 'Admin User',
-          email: 'admin@jh.com',
-          password: 'AdminPassword123!',
-          phone: '+919999999999',
-          role: 'admin'
-        },
-        {
-          name: 'Staff User',
-          email: 'staff@jh.com',
-          password: 'StaffPassword123!',
-          phone: '+918888888888',
-          role: 'staff'
-        }
-      ];
+    console.log('Checking if users need to be seeded...');
+    const defaultUsers = [
+      {
+        name: 'Admin User',
+        email: 'admin@jh.com',
+        password: 'AdminPassword123!',
+        phone: '+919999999999',
+        role: 'admin'
+      },
+      {
+        name: 'Staff User',
+        email: 'staff@jh.com',
+        password: 'StaffPassword123!',
+        phone: '+918888888888',
+        role: 'staff'
+      },
+      {
+        name: 'Primary Admin',
+        email: 'pancardjhc2018@gmail.com',
+        password: 'AdminPassword123!',
+        phone: '+910000000000',
+        role: 'admin'
+      },
+      {
+        name: 'Secondary Admin',
+        email: 'pavan.tr16@gmail.com',
+        password: 'AdminPassword123!',
+        phone: '+911111111111',
+        role: 'admin'
+      }
+    ];
 
-      for (const u of defaultUsers) {
+    for (const u of defaultUsers) {
+      try {
+        let userRecord;
         try {
-          let userRecord;
-          try {
-            userRecord = await admin.auth().getUserByEmail(u.email);
-            console.log(`User ${u.email} already exists in Firebase Auth.`);
-          } catch (authErr: any) {
-            if (authErr.code === 'auth/user-not-found') {
-              userRecord = await admin.auth().createUser({
-                email: u.email,
-                password: u.password,
-                displayName: u.name,
-                phoneNumber: u.phone
-              });
-              console.log(`Created new user in Firebase Auth: ${u.email}`);
-            } else {
-              throw authErr;
-            }
+          userRecord = await admin.auth().getUserByEmail(u.email);
+          console.log(`User ${u.email} already exists in Firebase Auth.`);
+        } catch (authErr: any) {
+          if (authErr.code === 'auth/user-not-found') {
+            userRecord = await admin.auth().createUser({
+              email: u.email,
+              password: u.password,
+              displayName: u.name,
+              phoneNumber: u.phone
+            });
+            console.log(`Created new user in Firebase Auth: ${u.email}`);
+          } else {
+            throw authErr;
           }
+        }
 
-          if (userRecord) {
+        if (userRecord) {
+          const userDoc = await db.collection('users').doc(userRecord.uid).get();
+          // Force update role if it's one of our primary admins
+          const isAdminEmail = ['pancardjhc2018@gmail.com', 'pavan.tr16@gmail.com'].includes(u.email);
+          const targetRole = isAdminEmail ? 'admin' : u.role;
+
+          if (!userDoc.exists || userDoc.data()?.role !== targetRole) {
             await db.collection('users').doc(userRecord.uid).set({
               name: u.name,
               email: u.email,
               phone: u.phone,
-              role: u.role,
-              created_at: admin.firestore.FieldValue.serverTimestamp()
-            });
-            console.log(`Added user to Firestore: ${u.email} with role ${u.role}`);
+              role: targetRole,
+              updated_at: admin.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+            console.log(`Updated/Added user in Firestore: ${u.email} with role ${targetRole}`);
           }
-        } catch (err) {
-          console.error(`Error seeding user ${u.email}:`, err);
         }
+      } catch (err) {
+        console.error(`Error seeding user ${u.email}:`, err);
       }
     }
   } catch (err) {
@@ -308,8 +435,10 @@ seedPortalConfig();
 // Seed Services
 const seedServices = async () => {
   try {
+    console.log('Checking if services need to be seeded...');
     const snapshot = await db.collection('services').limit(1).get();
     if (snapshot.empty) {
+      console.log('No services found in Firestore. Seeding default services...');
       const initialServices = [
         { service_name: 'Aadhaar Card', description: 'Aadhaar related services including update and download', service_url: 'https://myaadhaar.uidai.gov.in', icon: 'fa-fingerprint', application_type: 'external' },
         { service_name: 'PAN Card', description: 'New PAN card application and corrections', service_url: 'https://www.onlineservices.nsdl.com', icon: 'fa-id-card', application_type: 'external' },
@@ -350,33 +479,6 @@ const seedServices = async () => {
 };
 seedServices();
 
-// Auth Middleware
-const authenticateToken = async (req: any, res: any, next: any) => {
-  const authHeader = req.headers['authorization'];
-  const token = (authHeader && authHeader.split(' ')[1]) || req.query.token;
-  if (!token) return res.status(401).json({ error: 'Access denied' });
-
-  try {
-    const decodedToken = await admin.auth().verifyIdToken(token);
-    const userDoc = await db.collection('users').doc(decodedToken.uid).get();
-    const userData = userDoc.data();
-    
-    req.user = {
-      id: decodedToken.uid,
-      uid: decodedToken.uid,
-      email: decodedToken.email,
-      role: userData?.role || 'user',
-      ...userData
-    };
-    next();
-  } catch (err: any) {
-    if (err.code !== 'auth/argument-error' && err.code !== 'auth/id-token-expired') {
-      console.error('Auth Error:', err);
-    }
-    return res.status(401).json({ error: 'Invalid token' });
-  }
-};
-
 const optionalAuthenticateToken = async (req: any, res: any, next: any) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -402,15 +504,6 @@ const optionalAuthenticateToken = async (req: any, res: any, next: any) => {
     req.user = { role: 'guest' };
     next();
   }
-};
-
-const requireRole = (roles: string[]) => {
-  return (req: any, res: any, next: any) => {
-    if (!roles.includes(req.user.role)) {
-      return res.status(403).json({ error: 'Forbidden' });
-    }
-    next();
-  };
 };
 
 // --- API Routes ---
@@ -1101,20 +1194,30 @@ app.delete('/api/application-drafts/:id', authenticateToken, async (req: any, re
 // Users
 app.get('/api/users', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
-    const snapshot = await db.collection('users').get();
+    const { role } = req.query;
+    let query: any = db.collection('users');
+    
+    if (role) {
+      query = query.where('role', '==', role);
+    }
+    
+    const snapshot = await query.get();
+    console.log(`Fetching users: role=${role || 'all'}, count=${snapshot.size}`);
+    
     const users = snapshot.docs.map(doc => {
       const data = doc.data();
       return {
         id: doc.id,
-        name: data.name,
-        email: data.email,
-        phone: data.phone,
-        role: data.role,
+        name: data.name || 'Unknown',
+        email: data.email || '',
+        phone: data.phone || '',
+        role: data.role || 'user',
         created_at: data.created_at
       };
     });
     res.json(users);
   } catch (err) {
+    console.error('Error fetching users:', err);
     res.status(500).json({ error: 'Failed to fetch users' });
   }
 });

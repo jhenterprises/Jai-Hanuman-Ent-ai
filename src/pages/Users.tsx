@@ -30,9 +30,20 @@ const UsersPage = () => {
     fetchUsers();
   }, []);
 
+  useEffect(() => {
+    console.log('Current users state:', users);
+  }, [users]);
+
   const fetchUsers = async () => {
-    const res = await api.get('/users');
-    setUsers(res.data);
+    try {
+      console.log('Fetching users from API...');
+      const res = await api.get('/users');
+      console.log('Users fetched successfully:', res.data);
+      setUsers(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      console.error('Error fetching users:', err);
+      setUsers([]);
+    }
   };
 
   const handleAdd = async (e: React.FormEvent) => {
@@ -168,13 +179,20 @@ const UsersPage = () => {
               </tr>
             </thead>
             <tbody>
-              {filtered.map(item => (
-                <tr key={item.id} className="border-b border-slate-700/30 hover:bg-slate-700/20 transition-colors">
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="p-8 text-center text-slate-500">
+                    No users or staff found.
+                  </td>
+                </tr>
+              ) : (
+                filtered.map(item => (
+                  <tr key={item.id} className="border-b border-slate-700/30 hover:bg-slate-700/20 transition-colors">
                   <td className="p-4 text-slate-200 font-medium flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-sm font-bold">
-                      {item.name.charAt(0).toUpperCase()}
+                      {(item.name || 'U').charAt(0).toUpperCase()}
                     </div>
-                    {item.name}
+                    {item.name || 'Unknown User'}
                   </td>
                   <td className="p-4 text-slate-400">{item.email}</td>
                   <td className="p-4 text-slate-400">{item.phone}</td>
@@ -231,8 +249,9 @@ const UsersPage = () => {
                     )}
                   </td>
                 </tr>
-              ))}
-            </tbody>
+              ))
+            )}
+          </tbody>
           </table>
         </div>
       </div>

@@ -61,6 +61,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.log('User document fetched:', userDoc.exists());
           if (userDoc.exists()) {
             const userData = userDoc.data() as User;
+            // Force admin role for primary emails
+            const adminEmails = ['pancardjhc2018@gmail.com', 'pavan.tr16@gmail.com'];
+            if (firebaseUser.email && adminEmails.includes(firebaseUser.email)) {
+              userData.role = 'admin';
+            }
+            
             // Update photoURL if it changed or is missing
             if (firebaseUser.photoURL && userData.photoURL !== firebaseUser.photoURL) {
               await setDoc(doc(db, 'users', firebaseUser.uid), {
@@ -71,12 +77,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setUser(userData);
           } else {
             // This case handles Google login where doc might not exist yet
+            const adminEmails = ['pancardjhc2018@gmail.com', 'pavan.tr16@gmail.com'];
             const newUser: User = {
               uid: firebaseUser.uid,
               name: firebaseUser.displayName || 'User',
               email: firebaseUser.email || '',
               photoURL: firebaseUser.photoURL || undefined,
-              role: 'user'
+              role: (firebaseUser.email && adminEmails.includes(firebaseUser.email)) ? 'admin' : 'user'
             };
             console.log('Creating new user document:', newUser);
             await setDoc(doc(db, 'users', firebaseUser.uid), {
