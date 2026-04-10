@@ -38,6 +38,8 @@ const db = new Proxy({} as admin.firestore.Firestore, {
   }
 });
 
+export const adminDb = db;
+
 if (!admin.apps.length) {
   try {
     const privateKey = process.env.FIREBASE_PRIVATE_KEY;

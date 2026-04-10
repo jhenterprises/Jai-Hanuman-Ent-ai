@@ -1,7 +1,5 @@
-import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getFirestore, getDocFromServer, doc } from 'firebase/firestore';
-import firebaseConfig from '../../firebase-applet-config.json';
+import { auth, db } from '../config/firebase';
+import { getDocFromServer, doc } from 'firebase/firestore';
 
 export enum OperationType {
   CREATE = 'create',
@@ -54,20 +52,7 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   throw new Error(JSON.stringify(errInfo));
 }
 
-const app = initializeApp(firebaseConfig);
-
-console.log('--------------------------------------------------');
-console.log('FIREBASE DEBUG LOGS');
-console.log('Project ID:', firebaseConfig.projectId);
-console.log('Firestore Database ID:', firebaseConfig.firestoreDatabaseId || '(default)');
-console.log('--------------------------------------------------');
-
-// Use getFirestore without databaseId if it's (default)
-export const db = firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== '(default)'
-  ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
-  : getFirestore(app);
-
-export const auth = getAuth(app);
+export { auth, db };
 
 // Test connection
 async function testConnection() {

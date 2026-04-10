@@ -25,6 +25,30 @@
         "createdAt": { "type": "string", "format": "date-time", "description": "Submission timestamp" }
       },
       "required": ["userId", "serviceType", "status"]
+    },
+    "services": {
+      "title": "Service",
+      "description": "Available digital services",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Service name" },
+        "description": { "type": "string", "description": "Service description" },
+        "category": { "type": "string", "description": "Service category" },
+        "price": { "type": "number", "description": "Service fee" },
+        "isActive": { "type": "boolean", "description": "Whether service is available" }
+      },
+      "required": ["name", "price", "isActive"]
+    },
+    "wallets": {
+      "title": "Wallet",
+      "description": "User wallet balance and transactions",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "UID of the wallet owner" },
+        "balance": { "type": "number", "description": "Current balance" },
+        "transactions": { "type": "array", "description": "List of transactions" }
+      },
+      "required": ["userId", "balance"]
     }
   },
   "firestore": {
@@ -35,6 +59,14 @@
     "/applications/{applicationId}": {
       "schema": "applications",
       "description": "Service application documents"
+    },
+    "/services/{serviceId}": {
+      "schema": "services",
+      "description": "Service definition documents"
+    },
+    "/wallets/{walletId}": {
+      "schema": "wallets",
+      "description": "User wallet documents"
     }
   }
 }
