@@ -1,71 +1,7 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // ===============================================================
-    // Helper Functions
-    // ===============================================================
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-    
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
-    }
-    
-    function isAdmin() {
-      return isAuthenticated() && 
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-         request.auth.token.email == "pancardjhc2018@gmail.com");
-    }
-
-    // ===============================================================
-    // Rules
-    // ===============================================================
-
-    match /users/{userId} {
-      allow read: if isOwner(userId) || isAdmin();
-      allow create: if isAuthenticated() && request.auth.uid == userId && (request.resource.data.role == 'user' || isAdmin());
-      allow update: if (isOwner(userId) && request.resource.data.role == resource.data.role) || isAdmin();
-    }
-
-    match /applications/{applicationId} {
-      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update: if isAdmin();
-    }
-
-    match /services/{serviceId} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    match /portal_config/{configId} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-    
-    match /service_links/{linkId} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    match /wallets/{walletId} {
-      allow read: if isAuthenticated() && (resource.data.user_id == request.auth.uid || isAdmin());
-      allow write: if isAdmin();
-    }
-    
-    match /ledger/{ledgerId} {
-      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow write: if isAdmin();
-    }
-
-    match /notifications/{notificationId} {
-      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if isAdmin();
-      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
-    }
-
-    match /test/{document=**} {
+    match /{document=**} {
       allow read, write: if true;
     }
   }

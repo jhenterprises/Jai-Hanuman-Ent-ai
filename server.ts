@@ -439,7 +439,7 @@ const seedPortalConfig = async () => {
     return;
   }
   try {
-    const snapshot = await db.collection('portal_config').doc('main').get();
+    const snapshot = await db.collection('settings').doc('portal').get();
     if (!snapshot.exists) {
       const defaultConfig = {
         portal_name: 'JH Digital Seva Kendra',
@@ -474,7 +474,7 @@ const seedPortalConfig = async () => {
         enable_captcha: false,
         enable_otp: false
       };
-      await db.collection('portal_config').doc('main').set({
+      await db.collection('settings').doc('portal').set({
         ...defaultConfig,
         updated_at: admin.firestore.FieldValue.serverTimestamp()
       });
@@ -604,7 +604,7 @@ app.get('/api/health', async (req, res) => {
 // Portal Config
 app.get('/api/portal-config', async (req, res) => {
   try {
-    const configDoc = await db.collection('portal_config').doc('main').get();
+    const configDoc = await db.collection('settings').doc('portal').get();
     if (configDoc.exists) {
       res.json(configDoc.data());
     } else {
@@ -618,7 +618,7 @@ app.get('/api/portal-config', async (req, res) => {
 
 app.put('/api/portal-config', authenticateToken, requireRole(['admin']), checkFirestore, async (req, res) => {
   try {
-    await db.collection('portal_config').doc('main').set({
+    await db.collection('settings').doc('portal').set({
       ...req.body,
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     }, { merge: true });

@@ -1,15 +1,19 @@
 import React, { useState } from 'react';
 import { useConfig } from '../context/ConfigContext';
+import { useAuth } from '../context/AuthContext';
 import { motion } from 'framer-motion';
-import { Settings, Palette, Layout, Type, Image as ImageIcon, Globe, Save, Loader2, CheckCircle2 } from 'lucide-react';
-import api from '../services/api';
+import { Settings, Palette, Layout, Type, Image as ImageIcon, Globe, Save, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 const PortalConfig = () => {
   const { config, refreshConfig } = useConfig();
+  const { user } = useAuth();
   const [formData, setFormData] = useState(config);
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('general');
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
@@ -23,15 +27,21 @@ const PortalConfig = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) {
+      setError('You must be logged in to save configuration.');
+      return;
+    }
+    
     setIsSaving(true);
+    setError(null);
     try {
-      await api.put('/portal-config', formData);
+      await setDoc(doc(db, 'settings', 'portal'), formData, { merge: true });
       await refreshConfig();
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error updating config:', err);
-      alert('Failed to update configuration');
+      setError(err.message || 'Failed to update configuration');
     } finally {
       setIsSaving(false);
     }
@@ -62,6 +72,13 @@ const PortalConfig = () => {
           {saveSuccess ? 'Settings Saved!' : 'Save Changes'}
         </button>
       </header>
+
+      {error && (
+        <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-center gap-3 text-red-400 text-sm">
+          <AlertCircle size={18} />
+          {error}
+        </div>
+      )}
 
       <div className="flex flex-col lg:flex-row gap-8">
         {/* Sidebar Tabs */}

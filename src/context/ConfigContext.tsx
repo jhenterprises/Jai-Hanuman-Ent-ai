@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import api from '../services/api';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 interface ConfigContextType {
   config: any;
@@ -16,23 +17,31 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const fetchConfig = async () => {
     try {
-      const res = await api.get('/portal-config');
-      setConfig(res.data || {});
-      setError(null);
-    } catch (err: any) {
-      console.error('Error fetching config:', err);
-      if (err.response?.status === 503) {
-        setError(err.response.data.error || 'Database connection not established.');
+      const docRef = doc(db, 'settings', 'portal');
+      const docSnap = await getDoc(docRef);
+      
+      if (docSnap.exists()) {
+        setConfig(docSnap.data());
       } else {
-        // For other errors, use defaults to keep the app running
+        // Default config if not found
         setConfig({ 
           portal_name: 'JH Digital Seva Kendra',
           theme_color: '#3b82f6',
           secondary_color: '#64748b',
           header_bg_color: '#1e293b'
         });
-        setError(null);
       }
+      setError(null);
+    } catch (err: any) {
+      console.error('Error fetching config:', err);
+      // For other errors, use defaults to keep the app running
+      setConfig({ 
+        portal_name: 'JH Digital Seva Kendra',
+        theme_color: '#3b82f6',
+        secondary_color: '#64748b',
+        header_bg_color: '#1e293b'
+      });
+      setError(null);
     } finally {
       setLoading(false);
     }

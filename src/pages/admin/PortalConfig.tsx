@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import api from '../../services/api';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '../../lib/firebase';
 import { Save } from 'lucide-react';
 import { useConfig } from '../../context/ConfigContext';
+import { useAuth } from '../../context/AuthContext';
 
 const PortalConfig = () => {
   const { refreshConfig } = useConfig();
+  const { user } = useAuth();
   const [config, setConfig] = useState<any>({});
   const [loading, setLoading] = useState(true);
 
@@ -14,8 +17,12 @@ const PortalConfig = () => {
 
   const fetchConfig = async () => {
     try {
-      const res = await api.get('/portal-config');
-      setConfig(res.data);
+      const { getDoc } = await import('firebase/firestore');
+      const docRef = doc(db, 'settings', 'portal');
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        setConfig(docSnap.data());
+      }
       setLoading(false);
     } catch (err) {
       console.error('Error fetching portal config:', err);
@@ -25,15 +32,18 @@ const PortalConfig = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) {
+      alert('You must be logged in to save configuration.');
+      return;
+    }
+    
     try {
-      await api.put('/portal-config', config);
+      await setDoc(doc(db, 'settings', 'portal'), config, { merge: true });
       await refreshConfig();
       alert('Configuration updated successfully');
     } catch (err: any) {
       console.error('Error updating portal config:', err);
-      const errorMessage = err.response?.data?.error || err.response?.data?.message || 'Failed to update configuration';
-      const details = err.response?.data?.details ? `\n\nDetails: ${err.response.data.details}` : '';
-      alert(`${errorMessage}${details}`);
+      alert(err.message || 'Failed to update configuration');
     }
   };
 

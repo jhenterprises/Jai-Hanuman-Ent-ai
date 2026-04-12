@@ -62,7 +62,7 @@
       "schema": "services",
       "description": "Available services"
     },
-    "/portal_config/main": {
+    "/settings/portal": {
       "schema": "portal_config",
       "description": "Main portal configuration"
     }

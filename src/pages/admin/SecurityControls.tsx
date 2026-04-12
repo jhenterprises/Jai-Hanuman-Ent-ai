@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import api from '../../services/api';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '../../lib/firebase';
 import { Shield, Save, Lock, Eye, EyeOff, AlertTriangle } from 'lucide-react';
 import { useConfig } from '../../context/ConfigContext';
+import { useAuth } from '../../context/AuthContext';
 
 const SecurityControls = () => {
   const { refreshConfig } = useConfig();
+  const { user } = useAuth();
   const [config, setConfig] = useState<any>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -15,8 +18,12 @@ const SecurityControls = () => {
 
   const fetchConfig = async () => {
     try {
-      const res = await api.get('/portal-config');
-      setConfig(res.data);
+      const { getDoc } = await import('firebase/firestore');
+      const docRef = doc(db, 'settings', 'portal');
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        setConfig(docSnap.data());
+      }
       setLoading(false);
     } catch (err) {
       console.error('Error fetching security config:', err);
@@ -26,14 +33,19 @@ const SecurityControls = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) {
+      alert('You must be logged in to save configuration.');
+      return;
+    }
+    
     setSaving(true);
     try {
-      await api.put('/portal-config', config);
+      await setDoc(doc(db, 'settings', 'portal'), config, { merge: true });
       await refreshConfig();
       alert('Security settings updated successfully');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error updating security config:', err);
-      alert('Failed to update security settings');
+      alert(err.message || 'Failed to update security settings');
     } finally {
       setSaving(false);
     }
