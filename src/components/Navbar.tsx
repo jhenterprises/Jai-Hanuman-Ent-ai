@@ -30,9 +30,9 @@ const Navbar = () => {
           <Link to="/" className="text-sm font-medium text-slate-300 hover:text-accent transition-colors">Home</Link>
           {user ? (
             <>
-              {user.role === 'user' && <Link to="/dashboard" className="text-sm font-medium text-slate-300 hover:text-accent transition-colors">My Applications</Link>}
-              {user.role === 'staff' && <Link to="/staff" className="text-sm font-medium text-slate-300 hover:text-accent transition-colors">Staff Portal</Link>}
-              {user.role === 'admin' && <Link to="/admin" className="text-sm font-medium text-slate-300 hover:text-accent transition-colors">Admin Panel</Link>}
+              {user.role === 'user' && <Link to="/app/user/dashboard" className="text-sm font-medium text-slate-300 hover:text-accent transition-colors">My Applications</Link>}
+              {user.role === 'staff' && <Link to="/app/staff/dashboard" className="text-sm font-medium text-slate-300 hover:text-accent transition-colors">Staff Portal</Link>}
+              {user.role === 'admin' && <Link to="/app/admin-dashboard" className="text-sm font-medium text-slate-300 hover:text-accent transition-colors">Admin Panel</Link>}
               
               <div className="flex items-center gap-4 pl-4 border-l border-white/10">
                 <div className="flex items-center gap-2">

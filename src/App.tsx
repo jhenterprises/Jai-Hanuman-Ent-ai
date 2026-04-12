@@ -86,6 +86,11 @@ export default function App() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           
+          {/* Aliases for common routes */}
+          <Route path="/dashboard" element={<Navigate to="/app" replace />} />
+          <Route path="/admin" element={<Navigate to="/app/admin-dashboard" replace />} />
+          <Route path="/settings" element={<Navigate to="/app/settings" replace />} />
+          
           <Route path="/app" element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
             <Route index element={<DefaultRedirect />} />
             <Route path="dashboard" element={<ProtectedRoute roles={['admin', 'staff']}><Dashboard /></ProtectedRoute>} />
