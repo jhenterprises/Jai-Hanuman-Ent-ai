@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import { createServer as createViteServer } from 'vite';
-import admin from 'firebase-admin';
+import admin, { adminDb as db, adminAuth } from './api/firebaseAdmin.ts';
 import { getFirestore } from 'firebase-admin/firestore';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -23,74 +23,34 @@ const app = express();
 const PORT = 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-key-jai-hanuman';
 
+// Admin Configuration
+const ADMIN_EMAILS = ['pancardjhc2018@gmail.com', 'pavan.tr16@gmail.com'];
+
+// Helper to format phone number for Firebase Auth (E.164)
+const formatPhoneNumber = (phone: any) => {
+  if (!phone || typeof phone !== 'string' || phone.trim() === '') return undefined;
+  let cleaned = phone.replace(/[^\d+]/g, '');
+  if (!cleaned) return undefined;
+  
+  // If it already has +, check if it's valid E.164
+  if (cleaned.startsWith('+')) {
+    return /^\+\d{7,15}$/.test(cleaned) ? cleaned : undefined;
+  }
+  
+  // If it's 10 digits, assume India (+91)
+  if (cleaned.length === 10) return `+91${cleaned}`;
+  
+  // If it's 12 digits and starts with 91, assume India without +
+  if (cleaned.length === 12 && cleaned.startsWith('91')) return `+${cleaned}`;
+
+  // Fallback: if it's between 7 and 15 digits, try adding +
+  if (cleaned.length >= 7 && cleaned.length <= 15) return `+${cleaned}`;
+
+  return undefined;
+};
+
 // Firebase Admin Setup
-let _dbInstance: admin.firestore.Firestore | null = null;
-
-// The 'db' variable will be a proxy that delegates to _dbInstance
-// This ensures that 'db' is never undefined, and provides clear errors if accessed before initialization
-const db = new Proxy({} as admin.firestore.Firestore, {
-  get(target, prop) {
-    if (!_dbInstance) {
-      throw new Error(`CRITICAL: Firestore 'db' is not initialized. Firebase Admin initialization likely failed. Check server logs.`);
-    }
-    const value = (_dbInstance as any)[prop];
-    return typeof value === 'function' ? value.bind(_dbInstance) : value;
-  }
-});
-
-export const adminDb = db;
-
-if (!admin.apps.length) {
-  try {
-    const privateKey = process.env.FIREBASE_PRIVATE_KEY;
-    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-    const projectId = process.env.FIREBASE_PROJECT_ID || firebaseConfig.projectId;
-    
-    console.log('--- FIREBASE ADMIN DEBUG ---');
-    console.log('Project ID:', projectId);
-    console.log('Client Email provided:', !!clientEmail);
-    console.log('Private Key provided:', !!privateKey);
-    
-    if (privateKey && !privateKey.includes('BEGIN PRIVATE KEY')) {
-      console.error('CRITICAL ERROR: FIREBASE_PRIVATE_KEY does not appear to be a valid private key. It should start with "-----BEGIN PRIVATE KEY-----".');
-    }
-
-    if (privateKey && clientEmail) {
-      try {
-        const formattedKey = privateKey
-          .replace(/\\n/g, '\n')
-          .replace(/^"(.*)"$/, '$1')
-          .replace(/^'(.*)'$/, '$1')
-          .trim();
-
-        admin.initializeApp({
-          credential: admin.credential.cert({
-            projectId,
-            clientEmail,
-            privateKey: formattedKey,
-          })
-        });
-        console.log('Firebase Admin initialized with service account');
-      } catch (certErr) {
-        console.error('\n================================================================');
-        console.error('CRITICAL ERROR: Firebase Service Account initialization failed.');
-        console.error('The FIREBASE_PRIVATE_KEY or FIREBASE_CLIENT_EMAIL is invalid.');
-        console.error('Please ensure you copied the ENTIRE private_key string from the JSON file, including "-----BEGIN PRIVATE KEY-----" and "-----END PRIVATE KEY-----".');
-        console.error('Error details:', certErr instanceof Error ? certErr.message : certErr);
-        console.error('================================================================\n');
-      }
-    } else {
-      console.warn('Firebase Admin: No service account credentials found. Falling back to applicationDefault.');
-      admin.initializeApp({
-        credential: admin.credential.applicationDefault(),
-        projectId
-      });
-      console.log('Firebase Admin initialized with applicationDefault');
-    }
-  } catch (err) {
-    console.error('Firebase Admin initialization failed:', err);
-  }
-}
+// The 'db' and 'admin' are imported from ./api/firebaseAdmin.ts
 
 // Initialize Firestore instance
 let firestoreDatabaseId = firebaseConfig.firestoreDatabaseId || '(default)';
@@ -105,14 +65,17 @@ console.log(`Firestore initialized with database: ${firestoreDatabaseId}`);
 
 if (admin.apps.length > 0) {
   try {
-    _dbInstance = getFirestore(admin.app(), firestoreDatabaseId);
-    console.log('Firestore instance obtained successfully');
-    
     // Test the connection immediately to catch NOT_FOUND errors early
     (async () => {
       try {
-        await _dbInstance!.collection('health_check').limit(1).get();
+        await db.collection('health_check').limit(1).get();
         console.log('Firestore connection verified successfully');
+        
+        // Run seeding after verification
+        await seedUsers();
+        await seedServiceLinks();
+        await seedServices();
+        await seedPortalConfig();
       } catch (err: any) {
         if (err.code === 5 || (err.message && err.message.includes('NOT_FOUND'))) {
           console.error(`\n================================================================`);
@@ -124,7 +87,7 @@ if (admin.apps.length > 0) {
             try {
               const fallbackDb = getFirestore(admin.app(), '(default)');
               await fallbackDb.collection('health_check').limit(1).get();
-              _dbInstance = fallbackDb;
+              // Fallback handled in firebaseAdmin.ts
               console.log('Successfully fell back to (default) database');
             } catch (fallbackErr) {
               console.error('Fallback to (default) database also failed.');
@@ -160,44 +123,66 @@ const authenticateToken = async (req: any, res: any, next: any) => {
   if (!token) return res.status(401).json({ error: 'Access denied' });
 
   try {
-    const decodedToken = await admin.auth().verifyIdToken(token);
-    const userDoc = await db.collection('users').doc(decodedToken.uid).get();
-    const userData = userDoc.data();
+    let decodedToken: any;
     
-    // Safety check: ensure primary admin emails always get admin role
-    let role = userData?.role || 'user';
-    const adminEmails = ['pancardjhc2018@gmail.com', 'pavan.tr16@gmail.com'];
-    const userEmail = (decodedToken.email || '').toLowerCase().trim();
-    
-    if (userEmail && adminEmails.includes(userEmail)) {
-      role = 'admin';
+    // Try Firebase ID Token first
+    try {
+      decodedToken = await admin.auth().verifyIdToken(token);
+      const userDoc = await db.collection('users').doc(decodedToken.uid).get();
+      const userData = userDoc.data();
+      
+      let role = userData?.role || 'user';
+      const userEmail = (decodedToken.email || '').toLowerCase().trim();
+      
+      if (userEmail && ADMIN_EMAILS.includes(userEmail)) {
+        role = 'admin';
+      }
+      
+      req.user = {
+        ...userData,
+        id: decodedToken.uid,
+        uid: decodedToken.uid,
+        email: decodedToken.email,
+        role: role
+      };
+      return next();
+    } catch (firebaseErr: any) {
+      // If not a Firebase token, try custom JWT
+      try {
+        decodedToken = jwt.verify(token, JWT_SECRET);
+        const userDoc = await db.collection('users').doc(decodedToken.id).get();
+        const userData = userDoc.data();
+        
+        let role = userData?.role || decodedToken.role || 'user';
+        const userEmail = (userData?.email || decodedToken.email || '').toLowerCase().trim();
+        
+        if (userEmail && ADMIN_EMAILS.includes(userEmail)) {
+          role = 'admin';
+        }
+        
+        req.user = {
+          ...userData,
+          id: decodedToken.id,
+          role: role
+        };
+        return next();
+      } catch (jwtErr) {
+        console.error('Token verification failed (both Firebase and JWT)');
+        return res.status(401).json({ error: 'Invalid token' });
+      }
     }
-    
-    console.log(`[Auth Debug] Email: ${userEmail}, DB Role: ${userData?.role}, Assigned Role: ${role}`);
-    
-    req.user = {
-      ...userData,
-      id: decodedToken.uid,
-      uid: decodedToken.uid,
-      email: decodedToken.email,
-      role: role
-    };
-    next();
   } catch (err: any) {
-    if (err.code !== 'auth/argument-error' && err.code !== 'auth/id-token-expired') {
-      console.error('Auth Error:', err);
-    }
+    console.error('Auth Middleware Error:', err);
     return res.status(401).json({ error: 'Invalid token' });
   }
 };
 
 const requireRole = (roles: string[]) => {
   return (req: any, res: any, next: any) => {
-    const adminEmails = ['pancardjhc2018@gmail.com', 'pavan.tr16@gmail.com'];
     const userEmail = (req.user?.email || '').toLowerCase().trim();
     
     // If user is one of the primary admins, they pass any role check
-    if (userEmail && adminEmails.includes(userEmail)) {
+    if (userEmail && ADMIN_EMAILS.includes(userEmail)) {
       return next();
     }
 
@@ -210,7 +195,7 @@ const requireRole = (roles: string[]) => {
 };
 
 const checkFirestore = (req: any, res: any, next: any) => {
-  if (!admin.apps.length || !_dbInstance) {
+  if (!admin.apps.length) {
     console.error(`Firestore not initialized for ${req.method} ${req.path}`);
     return res.status(503).json({ 
       error: 'Database connection not established. Please check your Firebase environment variables in Vercel.',
@@ -242,6 +227,10 @@ app.get('/api/debug/db-stats', authenticateToken, requireRole(['admin']), async 
 
 // Seed initial data
 const seedUsers = async () => {
+  if (!db) {
+    console.warn('Skipping users seeding: Firestore not initialized');
+    return;
+  }
   console.log('Starting seedUsers...');
   try {
     console.log('Checking if users need to be seeded...');
@@ -262,19 +251,71 @@ const seedUsers = async () => {
       },
       {
         name: 'Primary Admin',
-        email: 'pancardjhc2018@gmail.com',
+        email: ADMIN_EMAILS[0],
         password: 'AdminPassword123!',
         phone: '+910000000000',
         role: 'admin'
       },
       {
         name: 'Secondary Admin',
-        email: 'pavan.tr16@gmail.com',
+        email: ADMIN_EMAILS[1],
         password: 'AdminPassword123!',
         phone: '+911111111111',
         role: 'admin'
       }
     ];
+
+    // Sync existing Firestore users to Firebase Auth if they don't exist there
+    console.log('Syncing Firestore users to Firebase Auth...');
+    const allUsersSnapshot = await db.collection('users').get();
+    for (const doc of allUsersSnapshot.docs) {
+      const userData = doc.data();
+      if (userData.email && userData.password) {
+        try {
+          await admin.auth().getUserByEmail(userData.email);
+        } catch (authErr: any) {
+          if (authErr.code === 'auth/user-not-found') {
+            try {
+              // Use the same UID as in Firestore if possible, but Firestore IDs are usually random strings
+              // while Auth UIDs are also strings. We can't easily change Auth UID after creation.
+              // If we create a new Auth user, it will have a NEW UID.
+              // This is a problem because Firestore docs are keyed by UID for Auth users.
+              
+              // If the Firestore doc ID is NOT a valid Auth UID (e.g. it was generated by .add()),
+              // we should probably create the Auth user and then update the Firestore doc ID.
+              
+              const authOptions: any = {
+                email: userData.email,
+                password: 'ChangeMe123!', // We can't recover the original password from bcrypt
+                displayName: userData.name,
+              };
+              
+              const formattedPhone = formatPhoneNumber(userData.phone);
+              if (formattedPhone) {
+                authOptions.phoneNumber = formattedPhone;
+              }
+
+              const newUser = await admin.auth().createUser(authOptions);
+              
+              console.log(`Synced user ${userData.email} to Firebase Auth. Temporary password: ChangeMe123!`);
+              
+              // If the current doc ID is not the new UID, we need to migrate the data
+              if (doc.id !== newUser.uid) {
+                await db.collection('users').doc(newUser.uid).set({
+                  ...userData,
+                  phone: userData.phone, // Ensure phone is preserved in Firestore
+                  synced_from_id: doc.id
+                });
+                await db.collection('users').doc(doc.id).delete();
+                console.log(`Migrated Firestore document for ${userData.email} to new UID ${newUser.uid}`);
+              }
+            } catch (createErr) {
+              console.error(`Failed to sync user ${userData.email}:`, createErr);
+            }
+          }
+        }
+      }
+    }
 
     for (const u of defaultUsers) {
       try {
@@ -284,12 +325,18 @@ const seedUsers = async () => {
           console.log(`User ${u.email} already exists in Firebase Auth.`);
         } catch (authErr: any) {
           if (authErr.code === 'auth/user-not-found') {
-            userRecord = await admin.auth().createUser({
+            const authOptions: any = {
               email: u.email,
               password: u.password,
               displayName: u.name,
-              phoneNumber: u.phone
-            });
+            };
+            
+            const formattedPhone = formatPhoneNumber(u.phone);
+            if (formattedPhone) {
+              authOptions.phoneNumber = formattedPhone;
+            }
+
+            userRecord = await admin.auth().createUser(authOptions);
             console.log(`Created new user in Firebase Auth: ${u.email}`);
           } else {
             throw authErr;
@@ -299,7 +346,7 @@ const seedUsers = async () => {
         if (userRecord) {
           const userDoc = await db.collection('users').doc(userRecord.uid).get();
           // Force update role if it's one of our primary admins
-          const isAdminEmail = ['pancardjhc2018@gmail.com', 'pavan.tr16@gmail.com'].includes(u.email);
+          const isAdminEmail = ADMIN_EMAILS.includes(u.email);
           const targetRole = isAdminEmail ? 'admin' : u.role;
 
           if (!userDoc.exists || userDoc.data()?.role !== targetRole) {
@@ -321,10 +368,14 @@ const seedUsers = async () => {
     console.error('Error in seedUsers:', err);
   }
 };
-seedUsers();
+// seedUsers();
 
 // Seed Service Links
 const seedServiceLinks = async () => {
+  if (!db) {
+    console.warn('Skipping service links seeding: Firestore not initialized');
+    return;
+  }
   try {
     const snapshot = await db.collection('service_links').limit(1).get();
     if (snapshot.empty) {
@@ -379,10 +430,14 @@ const seedServiceLinks = async () => {
     console.error('Error seeding service links:', err);
   }
 };
-seedServiceLinks();
+// seedServiceLinks();
 
 // Seed Portal Config
 const seedPortalConfig = async () => {
+  if (!db) {
+    console.warn('Skipping portal config seeding: Firestore not initialized');
+    return;
+  }
   try {
     const snapshot = await db.collection('portal_config').doc('main').get();
     if (!snapshot.exists) {
@@ -429,10 +484,14 @@ const seedPortalConfig = async () => {
     console.error('Error seeding portal config:', err);
   }
 };
-seedPortalConfig();
+// seedPortalConfig();
 
 // Seed Services
 const seedServices = async () => {
+  if (!db) {
+    console.warn('Skipping services seeding: Firestore not initialized');
+    return;
+  }
   try {
     console.log('Checking if services need to be seeded...');
     const snapshot = await db.collection('services').limit(1).get();
@@ -465,6 +524,7 @@ const seedServices = async () => {
           payment_required: false,
           fee: 0,
           staff_commission: 0,
+          visit_count: 0,
           created_at: admin.firestore.FieldValue.serverTimestamp(),
           updated_at: admin.firestore.FieldValue.serverTimestamp()
         }, { merge: true });
@@ -476,7 +536,7 @@ const seedServices = async () => {
     console.error('Error seeding services:', err);
   }
 };
-seedServices();
+// seedServices();
 
 const optionalAuthenticateToken = async (req: any, res: any, next: any) => {
   const authHeader = req.headers['authorization'];
@@ -509,14 +569,14 @@ const optionalAuthenticateToken = async (req: any, res: any, next: any) => {
 
 app.get('/api/health', async (req, res) => {
   try {
-    const dbStatus = !!_dbInstance;
+    const dbStatus = !!db;
     let servicesCount = 0;
     let dbError = null;
     
     if (dbStatus) {
       try {
-        // Use _dbInstance directly to avoid proxy throw if it's somehow null here
-        const snapshot = await _dbInstance!.collection('services').limit(1).get();
+        // Use db directly
+        const snapshot = await db.collection('services').limit(1).get();
         servicesCount = snapshot.size;
       } catch (dbErr: any) {
         console.error('Health check DB error:', dbErr);
@@ -580,7 +640,8 @@ app.post('/api/admin/reset-passwords', async (req, res) => {
       { email: 'admin@jh.com', password: 'admin123', role: 'admin', name: 'Admin User' },
       { email: 'staff@jh.com', password: 'staff123', role: 'staff', name: 'Staff Member' },
       { email: 'user@jh.com', password: 'user123', role: 'user', name: 'Test User' },
-      { email: 'pavan.tr16@gmail.com', password: 'admin123', role: 'admin', name: 'Pavan' }
+      { email: 'pavan.tr16@gmail.com', password: 'admin123', role: 'admin', name: 'Pavan' },
+      { email: 'pancardjhc2018@gmail.com', password: 'admin123', role: 'admin', name: 'Admin' }
     ];
 
     const results = [];
@@ -658,9 +719,13 @@ app.post('/api/auth/login', async (req, res) => {
     const token = jwt.sign({ id: userDoc.id, role: user.role, name: user.name }, JWT_SECRET, { expiresIn: '24h' });
     console.log('Login successful:', email);
     res.json({ token, user: { id: userDoc.id, name: user.name, email: user.email, role: user.role } });
-  } catch (err) {
+  } catch (err: any) {
     console.error('Login error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ 
+      error: 'Internal server error',
+      message: err.message,
+      code: err.code
+    });
   }
 });
 
@@ -674,16 +739,54 @@ app.post('/api/auth/register', async (req, res) => {
       return res.status(400).json({ error: 'Email already exists' });
     }
 
+    // Create user in Firebase Auth
+    let userRecord;
+    try {
+      try {
+        userRecord = await admin.auth().getUserByEmail(normalizedEmail);
+        return res.status(400).json({ error: 'Email already exists in authentication system' });
+      } catch (getErr: any) {
+        if (getErr.code !== 'auth/user-not-found') throw getErr;
+      }
+
+      const authOptions: any = {
+        email: normalizedEmail,
+        password: password,
+        displayName: name,
+      };
+      
+      const formattedPhone = formatPhoneNumber(phone);
+      if (formattedPhone) {
+        authOptions.phoneNumber = formattedPhone;
+        // Check if phone number already exists in Auth
+        try {
+          await admin.auth().getUserByPhoneNumber(formattedPhone);
+          return res.status(400).json({ error: 'Phone number already exists in authentication system' });
+        } catch (phoneErr: any) {
+          if (phoneErr.code !== 'auth/user-not-found') throw phoneErr;
+        }
+      }
+
+      userRecord = await admin.auth().createUser(authOptions);
+    } catch (authErr: any) {
+      console.error('Firebase Auth registration error:', authErr);
+      if (authErr.code === 'auth/phone-number-already-exists') {
+        return res.status(400).json({ error: 'Phone number is already associated with another account' });
+      }
+      return res.status(400).json({ error: authErr.message || 'Error creating authentication account' });
+    }
+
+    const userId = userRecord.uid;
     const hashedPassword = bcrypt.hashSync(password, 10);
-    const userRef = await db.collection('users').add({
+    
+    await db.collection('users').doc(userId).set({
       name,
       email: normalizedEmail,
       phone,
-      password: hashedPassword,
+      password: hashedPassword, // Keep for legacy/custom login support
       role: 'user',
       created_at: admin.firestore.FieldValue.serverTimestamp()
     });
-    const userId = userRef.id;
     
     // Create wallet for new user
     await db.collection('wallets').doc(userId).set({
@@ -702,7 +805,11 @@ app.post('/api/auth/register', async (req, res) => {
     });
   } catch (err: any) {
     console.error('Registration error:', err);
-    res.status(500).json({ error: 'Database error' });
+    res.status(500).json({ 
+      error: 'Database error',
+      message: err.message,
+      code: err.code
+    });
   }
 });
 
@@ -767,9 +874,13 @@ app.post('/api/auth/reset-password', async (req, res) => {
     });
 
     res.json({ message: 'Password has been reset successfully' });
-  } catch (err) {
+  } catch (err: any) {
     console.error('Reset password error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ 
+      error: 'Internal server error',
+      message: err.message,
+      code: err.code
+    });
   }
 });
 
@@ -1093,9 +1204,13 @@ app.get('/api/admin/wallet/analytics', authenticateToken, requireRole(['admin'])
 
 // --- Application Drafts Endpoints ---
 
-const uploadDir = path.join(__dirname, 'uploads');
+const uploadDir = process.env.VERCEL ? path.join('/tmp', 'uploads') : path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir);
+  try {
+    fs.mkdirSync(uploadDir, { recursive: true });
+  } catch (err) {
+    console.error('Failed to create upload directory:', err);
+  }
 }
 
 const storage = multer.diskStorage({
@@ -1232,7 +1347,7 @@ app.delete('/api/application-drafts/:id', authenticateToken, async (req: any, re
 app.get('/api/users', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
     const { role } = req.query;
-    let query: any = db.collection('users');
+    let query: any = db.collection('users').where('deleted_at', '==', null);
     
     if (role) {
       query = query.where('role', '==', role);
@@ -1262,12 +1377,35 @@ app.get('/api/users', authenticateToken, requireRole(['admin']), async (req, res
 app.post('/api/users', authenticateToken, requireRole(['admin']), async (req, res) => {
   const { name, email, phone, password, role } = req.body;
   try {
-    const userRecord = await admin.auth().createUser({
-      email,
-      password,
-      displayName: name,
-      phoneNumber: phone
-    });
+    let userRecord;
+    try {
+      userRecord = await admin.auth().getUserByEmail(email);
+      console.log('User already exists in Firebase Auth, updating Firestore record.');
+    } catch (getErr: any) {
+      if (getErr.code === 'auth/user-not-found') {
+        const authOptions: any = {
+          email,
+          password,
+          displayName: name,
+        };
+        
+        const formattedPhone = formatPhoneNumber(phone);
+        if (formattedPhone) {
+          authOptions.phoneNumber = formattedPhone;
+          // Check if phone number already exists in Auth
+          try {
+            await admin.auth().getUserByPhoneNumber(formattedPhone);
+            return res.status(400).json({ error: 'Phone number already exists in authentication system' });
+          } catch (phoneErr: any) {
+            if (phoneErr.code !== 'auth/user-not-found') throw phoneErr;
+          }
+        }
+
+        userRecord = await admin.auth().createUser(authOptions);
+      } else {
+        throw getErr;
+      }
+    }
 
     await db.collection('users').doc(userRecord.uid).set({
       name,
@@ -1280,6 +1418,9 @@ app.post('/api/users', authenticateToken, requireRole(['admin']), async (req, re
     res.json({ id: userRecord.uid, message: 'User created successfully' });
   } catch (err: any) {
     console.error('Create User Error:', err);
+    if (err.code === 'auth/phone-number-already-exists') {
+      return res.status(400).json({ error: 'Phone number is already associated with another account' });
+    }
     res.status(400).json({ error: err.message || 'Error creating user' });
   }
 });
@@ -1340,7 +1481,9 @@ app.get('/api/services/:name', optionalAuthenticateToken, async (req, res) => {
 app.get('/api/services', optionalAuthenticateToken, async (req: any, res) => {
   try {
     const snapshot = await db.collection('services').get();
-    let services = snapshot.docs.map(doc => ({ service_id: doc.id, ...doc.data() }));
+    let services = snapshot.docs
+      .map(doc => ({ service_id: doc.id, ...doc.data() }))
+      .filter((s: any) => !s.deleted_at);
     
     if (!req.user || req.user.role === 'user' || req.user.role === 'guest') {
       // Users and guests should only see active and visible services
@@ -1372,15 +1515,39 @@ app.post('/api/services/:id/log-access', authenticateToken, requireRole(['staff'
   const { action } = req.body;
   
   try {
+    // Log the access
     await db.collection('service_logs').add({
       staff_id: req.user.id,
       service_id: id,
       action: action || 'Opened Service URL',
       timestamp: admin.firestore.FieldValue.serverTimestamp()
     });
+
+    // Increment visit count
+    await db.collection('services').doc(id).update({
+      visit_count: admin.firestore.FieldValue.increment(1)
+    }).catch(err => {
+      // If document doesn't exist or field missing, we can ignore or handle
+      console.error('Error incrementing visit count:', err);
+    });
+
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Failed to log access' });
+  }
+});
+
+// Public endpoint to increment visit count (for users)
+app.post('/api/services/:id/visit', async (req, res) => {
+  const { id } = req.params;
+  try {
+    await db.collection('services').doc(id).update({
+      visit_count: admin.firestore.FieldValue.increment(1)
+    });
+    res.json({ success: true });
+  } catch (err) {
+    // If it fails (e.g. doc doesn't exist), just return success anyway to not break UI
+    res.json({ success: false });
   }
 });
 
@@ -1400,6 +1567,7 @@ app.post('/api/services', authenticateToken, requireRole(['admin']), checkFirest
       payment_required: !!payment_required,
       fee: Number(fee) || 0,
       staff_commission: Number(staff_commission) || 0,
+      visit_count: 0,
       created_at: admin.firestore.FieldValue.serverTimestamp(),
       updated_at: admin.firestore.FieldValue.serverTimestamp()
     });
@@ -1690,7 +1858,7 @@ app.patch('/api/service-links/:id/status', authenticateToken, requireRole(['admi
 // Ledger
 app.get('/api/ledger', authenticateToken, requireRole(['admin', 'staff']), async (req: any, res) => {
   try {
-    let query = db.collection('ledger');
+    let query = db.collection('ledger').where('deleted_at', '==', null);
     
     if (req.user.role === 'staff') {
       query = query.where('staff_id', '==', req.user.id) as any;
@@ -1718,14 +1886,21 @@ app.get('/api/ledger', authenticateToken, requireRole(['admin', 'staff']), async
 });
 
 app.post('/api/ledger', authenticateToken, requireRole(['admin', 'staff']), async (req: any, res) => {
-  const { customer_name, service_name, amount, date } = req.body;
+  const { customer_name, service_name, principle_amount, profit_amount, date } = req.body;
   try {
+    const pAmount = Number(principle_amount) || 0;
+    const prAmount = Number(profit_amount) || 0;
+    const totalAmount = pAmount + prAmount;
+
     const result = await db.collection('ledger').add({
       customer_name,
       service_name,
-      amount: Number(amount),
+      principle_amount: pAmount,
+      profit_amount: prAmount,
+      amount: totalAmount,
       staff_id: req.user.id,
       date: date || new Date().toISOString().split('T')[0],
+      deleted_at: null,
       created_at: admin.firestore.FieldValue.serverTimestamp()
     });
     res.json({ id: result.id, message: 'Ledger entry added' });
@@ -1734,17 +1909,33 @@ app.post('/api/ledger', authenticateToken, requireRole(['admin', 'staff']), asyn
   }
 });
 
+app.delete('/api/ledger/:id', authenticateToken, requireRole(['admin']), async (req: any, res) => {
+  try {
+    await db.collection('ledger').doc(req.params.id).update({ 
+      deleted_at: admin.firestore.FieldValue.serverTimestamp() 
+    });
+    res.json({ message: 'Ledger entry moved to Recycle Bin' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete ledger entry' });
+  }
+});
+
 // Analytics
 app.get('/api/analytics', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
-    const ledgerSnapshot = await db.collection('ledger').get();
+    const ledgerSnapshot = await db.collection('ledger').where('deleted_at', '==', null).get();
     const usersSnapshot = await db.collection('users').get();
     const appsSnapshot = await db.collection('applications').get();
     const logsSnapshot = await db.collection('activity_logs').orderBy('timestamp', 'desc').limit(10).get();
 
     let totalRevenue = 0;
+    let totalProfit = 0;
     let totalTransactions = ledgerSnapshot.size;
-    ledgerSnapshot.forEach(doc => totalRevenue += (doc.data().amount || 0));
+    ledgerSnapshot.forEach(doc => {
+      const data = doc.data();
+      totalRevenue += (data.amount || 0);
+      totalProfit += (data.profit_amount || 0);
+    });
 
     const totalUsers = usersSnapshot.docs.filter(doc => doc.data().role === 'user').length;
     const totalStaff = usersSnapshot.docs.filter(doc => doc.data().role === 'staff').length;
@@ -1818,6 +2009,7 @@ app.get('/api/analytics', authenticateToken, requireRole(['admin']), async (req,
 
     res.json({
       totalRevenue,
+      totalProfit,
       todayRevenue,
       totalTransactions,
       totalUsers,
@@ -1927,10 +2119,10 @@ const getEnrichedApplication = async (applicationId: string) => {
 // Admin Dashboard Stats
 app.get('/api/admin/dashboard-overview', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
-    const usersSnapshot = await db.collection('users').where('role', '==', 'user').get();
-    const staffSnapshot = await db.collection('users').where('role', '==', 'staff').get();
-    const appsSnapshot = await db.collection('applications').get();
-    const ledgerSnapshot = await db.collection('ledger').get();
+    const usersSnapshot = await db.collection('users').where('role', '==', 'user').where('deleted_at', '==', null).get();
+    const staffSnapshot = await db.collection('users').where('role', '==', 'staff').where('deleted_at', '==', null).get();
+    const appsSnapshot = await db.collection('applications').where('deleted_at', '==', null).get();
+    const ledgerSnapshot = await db.collection('ledger').where('deleted_at', '==', null).get();
     const servicePaymentsSnapshot = await db.collection('service_payments').where('status', '==', 'success').get();
     const logsSnapshot = await db.collection('activity_logs').orderBy('timestamp', 'desc').limit(10).get();
     const notificationsSnapshot = await db.collection('notifications').orderBy('created_at', 'desc').limit(10).get();
@@ -1947,12 +2139,18 @@ app.get('/api/admin/dashboard-overview', authenticateToken, requireRole(['admin'
     const rejectedApplications = appsSnapshot.docs.filter(doc => doc.data().status === 'Rejected').length;
     
     let ledgerRevenue = 0;
-    ledgerSnapshot.forEach(doc => ledgerRevenue += (doc.data().amount || 0));
+    let ledgerProfit = 0;
+    ledgerSnapshot.forEach(doc => {
+      const data = doc.data();
+      ledgerRevenue += (data.amount || 0);
+      ledgerProfit += (data.profit_amount || 0);
+    });
     
     let serviceRevenue = 0;
     servicePaymentsSnapshot.forEach(doc => serviceRevenue += (doc.data().amount || 0));
 
     const totalRevenue = ledgerRevenue + serviceRevenue;
+    const totalProfit = ledgerProfit; // Assuming service payments don't have a separate profit field yet
 
     // Applications by Status
     const statusMap = new Map();
@@ -2054,7 +2252,8 @@ app.get('/api/admin/dashboard-overview', authenticateToken, requireRole(['admin'
         approvedApplications,
         rejectedApplications,
         serviceRevenue,
-        totalRevenue
+        totalRevenue,
+        totalProfit
       },
       appsByStatus,
       dailyApps,
@@ -2564,6 +2763,27 @@ app.get('/api/applications/:id', authenticateToken, async (req: any, res) => {
   }
 });
 
+app.delete('/api/applications/:id', authenticateToken, requireRole(['admin']), async (req: any, res) => {
+  try {
+    const appRef = db.collection('applications').doc(req.params.id);
+    const appDoc = await appRef.get();
+    if (!appDoc.exists) return res.status(404).json({ error: 'Application not found' });
+
+    await appRef.update({ deleted_at: admin.firestore.FieldValue.serverTimestamp() });
+    
+    await db.collection('activity_logs').add({
+      user_id: req.user.id,
+      action: `Moved application to Recycle Bin: ${appDoc.data()?.reference_number}`,
+      timestamp: admin.firestore.FieldValue.serverTimestamp()
+    });
+    
+    res.json({ message: 'Application moved to Recycle Bin' });
+  } catch (err) {
+    console.error('Delete application error:', err);
+    res.status(500).json({ error: 'Failed to delete application' });
+  }
+});
+
 app.get('/api/applications/track/:ref', async (req, res) => {
   try {
     const ref = req.params.ref;
@@ -2869,12 +3089,14 @@ app.get('/api/recycle-bin', authenticateToken, requireRole(['admin']), async (re
     const servicesSnapshot = await db.collection('services').where('deleted_at', '!=', null).get();
     const usersSnapshot = await db.collection('users').where('deleted_at', '!=', null).get();
     const applicationsSnapshot = await db.collection('applications').where('deleted_at', '!=', null).get();
+    const ledgerSnapshot = await db.collection('ledger').where('deleted_at', '!=', null).get();
     
     const services = servicesSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().service_name, type: 'service', deleted_at: doc.data().deleted_at }));
     const users = usersSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name, type: 'user', deleted_at: doc.data().deleted_at }));
     const applications = applicationsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().reference_number, type: 'application', deleted_at: doc.data().deleted_at }));
+    const ledger = ledgerSnapshot.docs.map(doc => ({ id: doc.id, name: `${doc.data().customer_name} - ${doc.data().service_name}`, type: 'ledger', deleted_at: doc.data().deleted_at }));
     
-    res.json([...services, ...users, ...applications]);
+    res.json([...services, ...users, ...applications, ...ledger]);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch recycle bin items' });
   }
@@ -2886,6 +3108,7 @@ app.post('/api/recycle-bin/restore', authenticateToken, requireRole(['admin']), 
   if (type === 'service') collection = 'services';
   else if (type === 'user') collection = 'users';
   else if (type === 'application') collection = 'applications';
+  else if (type === 'ledger') collection = 'ledger';
   
   if (!collection) return res.status(400).json({ error: 'Invalid type' });
   
@@ -2903,6 +3126,7 @@ app.delete('/api/recycle-bin/permanent/:type/:id', authenticateToken, requireRol
   if (type === 'service') collection = 'services';
   else if (type === 'user') collection = 'users';
   else if (type === 'application') collection = 'applications';
+  else if (type === 'ledger') collection = 'ledger';
   
   if (!collection) return res.status(400).json({ error: 'Invalid type' });
   
@@ -2912,6 +3136,21 @@ app.delete('/api/recycle-bin/permanent/:type/:id', authenticateToken, requireRol
   } catch (err) {
     res.status(500).json({ error: 'Failed to delete item' });
   }
+});
+
+// Global Error Handler to ensure JSON responses
+app.use((err: any, req: any, res: any, next: any) => {
+  console.error('Global Error Handler:', err);
+  
+  // If headers already sent, delegate to default Express handler
+  if (res.headersSent) {
+    return next(err);
+  }
+
+  res.status(err.status || 500).json({
+    error: err.message || 'Internal Server Error',
+    code: err.code || 'INTERNAL_ERROR'
+  });
 });
 
 // Start Server
@@ -2925,6 +3164,10 @@ async function startServer() {
   } else {
     app.use(express.static(path.join(__dirname, 'dist')));
     app.get('*', (req, res) => {
+      // If it's an API request that wasn't handled, return 404 JSON
+      if (req.path.startsWith('/api/')) {
+        return res.status(404).json({ error: 'API route not found' });
+      }
       res.sendFile(path.join(__dirname, 'dist', 'index.html'));
     });
   }

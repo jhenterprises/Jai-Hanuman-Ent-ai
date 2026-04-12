@@ -1,14 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import { Plus, Download, Search, Filter } from 'lucide-react';
+import { Plus, Download, Search, Filter, Trash2 } from 'lucide-react';
 
 const Ledger = () => {
   const [ledger, setLedger] = useState<any[]>([]);
   const [search, setSearch] = useState('');
   const [dateFilter, setDateFilter] = useState('');
   const [showAdd, setShowAdd] = useState(false);
-  const [newEntry, setNewEntry] = useState({ customer_name: '', service_name: '', amount: '', date: '' });
+  const [newEntry, setNewEntry] = useState({ 
+    customer_name: '', 
+    service_name: '', 
+    principle_amount: '', 
+    profit_amount: '', 
+    date: new Date().toISOString().split('T')[0] 
+  });
   const { user } = useAuth();
 
   useEffect(() => {
@@ -24,8 +30,25 @@ const Ledger = () => {
     e.preventDefault();
     await api.post('/ledger', newEntry);
     setShowAdd(false);
-    setNewEntry({ customer_name: '', service_name: '', amount: '', date: '' });
+    setNewEntry({ 
+      customer_name: '', 
+      service_name: '', 
+      principle_amount: '', 
+      profit_amount: '', 
+      date: new Date().toISOString().split('T')[0] 
+    });
     fetchLedger();
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this entry?')) return;
+    try {
+      await api.delete(`/ledger/${id}`);
+      fetchLedger();
+    } catch (err) {
+      console.error('Delete error:', err);
+      alert('Failed to delete entry');
+    }
   };
 
   const filtered = ledger.filter(l => 
@@ -33,7 +56,8 @@ const Ledger = () => {
     (dateFilter ? l.date.startsWith(dateFilter) : true)
   );
 
-  const total = filtered.reduce((sum, item) => sum + item.amount, 0);
+  const totalRevenue = filtered.reduce((sum, item) => sum + (item.amount || 0), 0);
+  const totalProfit = filtered.reduce((sum, item) => sum + (item.profit_amount || 0), 0);
 
   return (
     <div className="space-y-6">
@@ -81,8 +105,13 @@ const Ledger = () => {
               className="px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200"
             />
             <input 
-              type="number" placeholder="Amount (₹)" required
-              value={newEntry.amount} onChange={e => setNewEntry({...newEntry, amount: e.target.value})}
+              type="number" placeholder="Principle Amount (₹)" required
+              value={newEntry.principle_amount} onChange={e => setNewEntry({...newEntry, principle_amount: e.target.value})}
+              className="px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200"
+            />
+            <input 
+              type="number" placeholder="Profit Amount (₹)" required
+              value={newEntry.profit_amount} onChange={e => setNewEntry({...newEntry, profit_amount: e.target.value})}
               className="px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200"
             />
             <input 
@@ -106,8 +135,11 @@ const Ledger = () => {
                 <th className="p-4 text-slate-300 font-semibold">Date</th>
                 <th className="p-4 text-slate-300 font-semibold">Customer</th>
                 <th className="p-4 text-slate-300 font-semibold">Service</th>
-                <th className="p-4 text-slate-300 font-semibold">Amount</th>
+                <th className="p-4 text-slate-300 font-semibold">Principle</th>
+                <th className="p-4 text-slate-300 font-semibold">Profit</th>
+                <th className="p-4 text-slate-300 font-semibold">Total</th>
                 {user?.role === 'admin' && <th className="p-4 text-slate-300 font-semibold">Staff</th>}
+                {user?.role === 'admin' && <th className="p-4 text-slate-300 font-semibold text-right">Actions</th>}
               </tr>
             </thead>
             <tbody>
@@ -116,13 +148,29 @@ const Ledger = () => {
                   <td className="p-4 text-slate-400">{item.date}</td>
                   <td className="p-4 text-slate-200 font-medium">{item.customer_name}</td>
                   <td className="p-4 text-slate-400">{item.service_name}</td>
-                  <td className="p-4 text-green-400 font-medium">₹{item.amount}</td>
+                  <td className="p-4 text-slate-400">₹{item.principle_amount || 0}</td>
+                  <td className="p-4 text-green-400">₹{item.profit_amount || 0}</td>
+                  <td className="p-4 text-blue-400 font-medium">₹{item.amount || 0}</td>
                   {user?.role === 'admin' && <td className="p-4 text-slate-400">{item.staff_name}</td>}
+                  {user?.role === 'admin' && (
+                    <td className="p-4 text-right">
+                      <button 
+                        onClick={() => handleDelete(item.id)}
+                        className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                        title="Delete Entry"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
               <tr className="bg-slate-700/50 font-bold border-t-2 border-slate-600">
-                <td colSpan={3} className="p-4 text-right text-slate-200">Total Revenue:</td>
-                <td className="p-4 text-cyan-400 text-xl">₹{total}</td>
+                <td colSpan={3} className="p-4 text-right text-slate-200">Totals:</td>
+                <td className="p-4 text-slate-300">₹{filtered.reduce((sum, item) => sum + (item.principle_amount || 0), 0)}</td>
+                <td className="p-4 text-green-400">₹{totalProfit}</td>
+                <td className="p-4 text-cyan-400 text-xl">₹{totalRevenue}</td>
+                {user?.role === 'admin' && <td></td>}
                 {user?.role === 'admin' && <td></td>}
               </tr>
             </tbody>

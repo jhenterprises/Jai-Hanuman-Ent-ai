@@ -23,7 +23,8 @@ import {
   Bell,
   Link as LinkIcon,
   CheckCircle2,
-  Clock
+  Clock,
+  Trash2
 } from 'lucide-react';
 
 const DashboardLayout = () => {
@@ -100,7 +101,7 @@ const DashboardLayout = () => {
     { path: '/app/users', label: 'Users List', icon: <Users size={20} />, roles: ['admin', 'staff'] },
     { path: '/app/staff-management', label: 'Staff Management', icon: <Users size={20} />, roles: ['admin'] },
     { path: '/app/admin/wallets', label: 'Wallet Management', icon: <WalletIcon size={20} />, roles: ['admin'] },
-    { path: '/app/recycle-bin', label: 'Recycle Bin', icon: <LogOut size={20} className="rotate-180" />, roles: ['admin'] },
+    { path: '/app/recycle-bin', label: 'Recycle Bin', icon: <Trash2 size={20} />, roles: ['admin'] },
     { path: '/app/settings/portal', label: 'Portal Config', icon: <Settings size={20} />, roles: ['admin'] },
     { path: '/app/settings', label: 'Settings', icon: <Settings size={20} />, roles: ['admin', 'staff', 'user'] },
     { path: '/', label: 'Public Site', icon: <Home size={20} />, roles: ['admin', 'staff', 'user'] },

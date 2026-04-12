@@ -22,7 +22,12 @@ const AcknowledgementReceipt: React.FC<AcknowledgementReceiptProps> = ({ applica
   ].filter(Boolean).join(', ') + (formData.pincode ? ` - ${formData.pincode}` : '');
 
   // Get dynamic fields (excluding standard ones we already show)
-  const standardFields = ['fullName', 'givenName', 'dob', 'gender', 'mobile', 'email', 'houseNo', 'street', 'village', 'district', 'state', 'pincode'];
+  const standardFields = [
+    'fullName', 'givenName', 'surname', 'dob', 'gender', 'mobile', 'email', 
+    'houseNo', 'street', 'village', 'district', 'state', 'pincode',
+    'fatherName', 'parentName', 'aadhaarNumber', 'panType', 'passportType',
+    'serviceType', 'updateType', 'constituency', 'assemblyArea', 'placeOfBirth', 'maritalStatus'
+  ];
   const dynamicFields = Object.keys(formData).filter(key => !standardFields.includes(key));
 
   return (
@@ -63,7 +68,8 @@ const AcknowledgementReceipt: React.FC<AcknowledgementReceiptProps> = ({ applica
               <User size={14} /> Applicant Details
             </h3>
             <div className="space-y-3">
-              <DetailRow label="Full Name" value={formData.fullName || formData.givenName || application.user_name} />
+              <DetailRow label="Full Name" value={formData.fullName || `${formData.givenName || ''} ${formData.surname || ''}`.trim() || application.user_name} />
+              <DetailRow label="Father/Parent Name" value={formData.fatherName || formData.parentName} />
               <DetailRow label="Date of Birth" value={formData.dob} />
               <DetailRow label="Gender" value={formData.gender} />
               <DetailRow label="Mobile Number" value={formData.mobile || application.user_phone} />
@@ -78,11 +84,31 @@ const AcknowledgementReceipt: React.FC<AcknowledgementReceiptProps> = ({ applica
             </h3>
             <div className="space-y-3">
               {fullAddress && <DetailRow label="Full Address" value={fullAddress} />}
+              <DetailRow label="Aadhaar Number" value={formData.aadhaarNumber} />
               <DetailRow label="Application Status" value={application.status} highlight />
               <DetailRow label="Payment Status" value={application.payment_status || 'Pending'} highlight color={application.payment_status === 'Paid' ? 'text-emerald-600' : 'text-amber-600'} />
             </div>
           </div>
         </div>
+
+        {/* Service Specific Details */}
+        {(formData.panType || formData.passportType || formData.serviceType || formData.updateType || formData.constituency) && (
+          <div className="space-y-4">
+            <h3 className="text-xs font-black text-blue-600 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-2">
+              <Activity size={14} /> Service Specific Details
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">
+              {formData.panType && <DetailRow label="PAN Application Type" value={formData.panType} />}
+              {formData.passportType && <DetailRow label="Passport Application Type" value={formData.passportType} />}
+              {formData.serviceType && <DetailRow label="Service Type" value={formData.serviceType} />}
+              {formData.updateType && <DetailRow label="Update Type" value={formData.updateType} />}
+              {formData.constituency && <DetailRow label="Constituency" value={formData.constituency} />}
+              {formData.assemblyArea && <DetailRow label="Assembly Area" value={formData.assemblyArea} />}
+              {formData.placeOfBirth && <DetailRow label="Place of Birth" value={formData.placeOfBirth} />}
+              {formData.maritalStatus && <DetailRow label="Marital Status" value={formData.maritalStatus} />}
+            </div>
+          </div>
+        )}
 
         {/* Dynamic Form Data Section */}
         {dynamicFields.length > 0 && (

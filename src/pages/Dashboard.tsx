@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { db, auth } from '../lib/firebase';
 import api from '../services/api';
 import { motion } from 'framer-motion';
 import { FileText, ArrowRight, Plus, Download, Calendar, Loader2, Wallet, ArrowUpRight, History } from 'lucide-react';
@@ -18,15 +20,36 @@ const Dashboard = () => {
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
 
   useEffect(() => {
-    Promise.all([
-      api.get('/applications'),
-      api.get('/application-drafts'),
-      api.get('/wallet/balance')
-    ]).then(([appRes, draftRes, walletRes]) => {
-      setApplications(appRes.data);
-      setDrafts(draftRes.data);
-      setWalletBalance(walletRes.data.balance || 0);
-    }).finally(() => setLoading(false));
+    const fetchData = async () => {
+      try {
+        const user = auth.currentUser;
+        if (!user) return;
+
+        // Fetch from Firestore
+        const q = query(
+          collection(db, 'applications'),
+          where('userId', '==', user.uid),
+          orderBy('created_at', 'desc')
+        );
+        const appSnap = await getDocs(q);
+        const apps = appSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setApplications(apps);
+
+        // Fetch drafts and wallet from API (as they might still be handled there)
+        const [draftRes, walletRes] = await Promise.all([
+          api.get('/application-drafts'),
+          api.get('/wallet/balance')
+        ]);
+        setDrafts(draftRes.data);
+        setWalletBalance(walletRes.data.balance || 0);
+      } catch (err) {
+        console.error('Error fetching dashboard data:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
   }, []);
 
   const getStatusColor = (status: string) => {

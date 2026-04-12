@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import api from '../services/api';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 import { motion } from 'framer-motion';
 import { CheckCircle, Clock, ArrowLeft, Shield, Download } from 'lucide-react';
 import { safeFormat } from '../utils/dateUtils';
@@ -11,11 +12,23 @@ const ApplicationTrack = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.get(`/applications/${id}`).then(res => {
-      setApp(res.data);
-    }).catch(err => {
-      console.error('Error fetching application:', err);
-    }).finally(() => setLoading(false));
+    const fetchApp = async () => {
+      if (!id) return;
+      try {
+        const appRef = doc(db, 'applications', id);
+        const appSnap = await getDoc(appRef);
+        if (appSnap.exists()) {
+          setApp({ id: appSnap.id, ...appSnap.data() });
+        } else {
+          console.error('Application not found in Firestore');
+        }
+      } catch (err) {
+        console.error('Error fetching application from Firestore:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchApp();
   }, [id]);
 
   if (loading) return <div className="h-screen flex items-center justify-center">Tracking Application...</div>;

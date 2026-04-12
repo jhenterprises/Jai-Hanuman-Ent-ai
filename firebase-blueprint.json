@@ -28,27 +28,25 @@
     },
     "services": {
       "title": "Service",
-      "description": "Available digital services",
+      "description": "Available government services",
       "type": "object",
       "properties": {
-        "name": { "type": "string", "description": "Service name" },
-        "description": { "type": "string", "description": "Service description" },
-        "category": { "type": "string", "description": "Service category" },
-        "price": { "type": "number", "description": "Service fee" },
-        "isActive": { "type": "boolean", "description": "Whether service is available" }
-      },
-      "required": ["name", "price", "isActive"]
+        "service_name": { "type": "string" },
+        "description": { "type": "string" },
+        "service_url": { "type": "string" },
+        "icon": { "type": "string" },
+        "is_active": { "type": "boolean" },
+        "is_visible": { "type": "boolean" }
+      }
     },
-    "wallets": {
-      "title": "Wallet",
-      "description": "User wallet balance and transactions",
+    "portal_config": {
+      "title": "Portal Config",
+      "description": "Global portal settings",
       "type": "object",
       "properties": {
-        "userId": { "type": "string", "description": "UID of the wallet owner" },
-        "balance": { "type": "number", "description": "Current balance" },
-        "transactions": { "type": "array", "description": "List of transactions" }
-      },
-      "required": ["userId", "balance"]
+        "portal_name": { "type": "string" },
+        "theme_color": { "type": "string" }
+      }
     }
   },
   "firestore": {
@@ -62,11 +60,11 @@
     },
     "/services/{serviceId}": {
       "schema": "services",
-      "description": "Service definition documents"
+      "description": "Available services"
     },
-    "/wallets/{walletId}": {
-      "schema": "wallets",
-      "description": "User wallet documents"
+    "/portal_config/main": {
+      "schema": "portal_config",
+      "description": "Main portal configuration"
     }
   }
 }

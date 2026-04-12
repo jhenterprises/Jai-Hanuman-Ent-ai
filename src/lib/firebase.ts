@@ -1,5 +1,8 @@
-import { auth, db } from '../config/firebase';
-import { getDocFromServer, doc } from 'firebase/firestore';
+import { initializeApp } from 'firebase/app';
+import { getAuth } from 'firebase/auth';
+import { getFirestore, getDocFromServer, doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
+import firebaseConfig from '../../firebase-applet-config.json';
 
 export enum OperationType {
   CREATE = 'create',
@@ -52,7 +55,21 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   throw new Error(JSON.stringify(errInfo));
 }
 
-export { auth, db };
+const app = initializeApp(firebaseConfig);
+
+console.log('--------------------------------------------------');
+console.log('FIREBASE DEBUG LOGS');
+console.log('Project ID:', firebaseConfig.projectId);
+console.log('Firestore Database ID:', firebaseConfig.firestoreDatabaseId || '(default)');
+console.log('--------------------------------------------------');
+
+// Use getFirestore without databaseId if it's (default)
+export const db = firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== '(default)'
+  ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
+  : getFirestore(app);
+
+export const auth = getAuth(app);
+export const storage = getStorage(app);
 
 // Test connection
 async function testConnection() {
@@ -60,11 +77,19 @@ async function testConnection() {
     // Use getDocFromServer to bypass cache and test real connection
     await getDocFromServer(doc(db, 'test', 'connection'));
     console.log("Firestore connection test successful");
+    
+    // Perform a test write as requested
+    await setDoc(doc(db, 'test', 'connection'), {
+      lastTest: serverTimestamp(),
+      status: 'working'
+    }, { merge: true });
+    console.log("Firestore test write successful");
   } catch (error) {
     if(error instanceof Error && error.message.includes('the client is offline')) {
       console.error("Please check your Firebase configuration. The client is offline.");
+    } else {
+      console.error("Firestore connection test failed:", error);
     }
-    // Skip logging for other errors, as this is simply a connection test.
   }
 }
 testConnection();

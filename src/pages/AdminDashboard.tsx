@@ -14,6 +14,9 @@ const AdminDashboard = () => {
       .finally(() => setLoading(false));
   }, []);
 
+  if (loading) return <div className="h-screen flex items-center justify-center">Loading Analytics...</div>;
+  if (!stats || !stats.overview) return <div className="h-screen flex items-center justify-center text-red-500">Failed to load analytics. Please try again later.</div>;
+
   const chartData = stats.dailyApps && stats.dailyApps.length > 0 
     ? stats.dailyApps.map((d: any) => ({ name: d.date.split('-').slice(1).join('/'), apps: d.count, rev: 0 }))
     : [
@@ -25,9 +28,6 @@ const AdminDashboard = () => {
         { name: 'Sat', apps: 0, rev: 0 },
         { name: 'Sun', apps: 0, rev: 0 },
       ];
-
-  if (loading) return <div className="h-screen flex items-center justify-center">Loading Analytics...</div>;
-  if (!stats || !stats.overview) return <div className="h-screen flex items-center justify-center text-red-500">Failed to load analytics. Please try again later.</div>;
 
   return (
     <div className="space-y-10">
@@ -43,6 +43,7 @@ const AdminDashboard = () => {
           { label: 'Applications', value: stats.overview.totalApplications, icon: FileText, color: 'amber' },
           { label: 'Pending Tasks', value: stats.overview.pendingApplications, icon: Activity, color: 'emerald' },
           { label: 'Total Revenue', value: `₹${stats.overview.totalRevenue || 0}`, icon: DollarSign, color: 'purple' },
+          { label: 'Total Profit', value: `₹${stats.overview.totalProfit || 0}`, icon: TrendingUp, color: 'emerald' },
         ].map((s, i) => (
           <motion.div 
             key={i}

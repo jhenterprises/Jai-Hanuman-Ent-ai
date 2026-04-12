@@ -57,8 +57,8 @@ const UsersPage = () => {
   const handleDelete = (id: string) => {
     setConfirmDialog({
       isOpen: true,
-      title: 'Delete User',
-      message: 'Are you sure you want to delete this user? This action cannot be undone.',
+      title: 'Move to Recycle Bin',
+      message: 'Are you sure you want to move this user to the Recycle Bin? You can restore them later if needed.',
       onConfirm: async () => {
         try {
           await api.delete(`/users/${id}`);

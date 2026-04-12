@@ -10,10 +10,10 @@ import ModernButton from '../components/ModernButton';
 import { useConfig } from '../context/ConfigContext';
 
 const FALLBACK_SERVICES = [
-  { service_id: 'aadhaar', service_name: 'Aadhaar Card', description: 'Aadhaar related services including update and download', icon: 'fa-fingerprint', is_active: true, is_visible: true, service_price: 0 },
-  { service_id: 'pan', service_name: 'PAN Card', description: 'New PAN card application and corrections', icon: 'fa-id-card', is_active: true, is_visible: true, service_price: 0 },
-  { service_id: 'voter', service_name: 'Voter ID', description: 'Voter registration and ID card services', icon: 'fa-id-badge', is_active: true, is_visible: true, service_price: 0 },
-  { service_id: 'passport', service_name: 'Passport', description: 'Passport application and renewal services', icon: 'fa-globe', is_active: true, is_visible: true, service_price: 0 }
+  { service_id: 'aadhaar', service_name: 'Aadhaar Card', description: 'Aadhaar related services including update and download', icon: 'fa-fingerprint', is_active: true, is_visible: true, service_price: 0, visit_count: 0 },
+  { service_id: 'pan', service_name: 'PAN Card', description: 'New PAN card application and corrections', icon: 'fa-id-card', is_active: true, is_visible: true, service_price: 0, visit_count: 0 },
+  { service_id: 'voter', service_name: 'Voter ID', description: 'Voter registration and ID card services', icon: 'fa-id-badge', is_active: true, is_visible: true, service_price: 0, visit_count: 0 },
+  { service_id: 'passport', service_name: 'Passport', description: 'Passport application and renewal services', icon: 'fa-globe', is_active: true, is_visible: true, service_price: 0, visit_count: 0 }
 ];
 
 const Services = () => {
@@ -22,6 +22,8 @@ const Services = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [sortBy, setSortBy] = useState('name-asc');
+  const [filterType, setFilterType] = useState('all');
   const { user } = useAuth();
   const [showForm, setShowForm] = useState(false);
   const [editingService, setEditingService] = useState<any>(null);
@@ -173,8 +175,8 @@ const Services = () => {
   const handleDelete = (id: string) => {
     setConfirmDialog({
       isOpen: true,
-      title: 'Delete Service',
-      message: 'Are you sure you want to delete this service? This action cannot be undone.',
+      title: 'Move to Recycle Bin',
+      message: 'Are you sure you want to move this service to the Recycle Bin? You can restore it later if needed.',
       onConfirm: async () => {
         try {
           await api.delete(`/services/${id}`);
@@ -225,7 +227,14 @@ const Services = () => {
     return 'general';
   };
 
-  const handleApply = (service: any) => {
+  const handleApply = async (service: any) => {
+    // Track visit
+    try {
+      await api.post(`/services/${service.service_id}/visit`);
+    } catch (err) {
+      console.error('Failed to track visit:', err);
+    }
+
     const key = getServiceKey(service.service_name);
     // If it's a hardcoded one, use that key. 
     // Otherwise, use the service name itself so ApplyService can find it.
@@ -234,6 +243,13 @@ const Services = () => {
   };
 
   const handleOpenUrl = async (service: any) => {
+    // Track visit
+    try {
+      await api.post(`/services/${service.service_id}/visit`);
+    } catch (err) {
+      console.error('Failed to track visit:', err);
+    }
+
     if (service.service_url) {
       try {
         await api.post(`/services/${service.service_id}/log-access`, { action: 'Opened Service URL' });
@@ -246,7 +262,26 @@ const Services = () => {
     }
   };
 
-  const filtered = (services || []).filter(s => (s.service_name || '').toLowerCase().includes(search.toLowerCase()));
+  const filtered = (services || [])
+    .filter(s => {
+      const matchesSearch = (s.service_name || '').toLowerCase().includes(search.toLowerCase());
+      const matchesFilter = filterType === 'all' || 
+                           (filterType === 'internal' && s.application_type === 'internal') ||
+                           (filterType === 'external' && s.application_type === 'external') ||
+                           (filterType === 'paid' && s.payment_required);
+      return matchesSearch && matchesFilter;
+    })
+    .sort((a, b) => {
+      if (sortBy === 'name-asc') return a.service_name.localeCompare(b.service_name);
+      if (sortBy === 'name-desc') return b.service_name.localeCompare(a.service_name);
+      if (sortBy === 'most-visited') return (b.visit_count || 0) - (a.visit_count || 0);
+      if (sortBy === 'newest') {
+        const dateA = a.created_at?._seconds || 0;
+        const dateB = b.created_at?._seconds || 0;
+        return dateB - dateA;
+      }
+      return 0;
+    });
 
   const isAdmin = user?.role === 'admin';
   console.log('User:', user, 'isAdmin:', isAdmin);
@@ -259,17 +294,46 @@ const Services = () => {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <h1 className="text-3xl font-bold text-white">Digital Services</h1>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-4">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
             <input 
               type="text" 
               placeholder="Search services..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-10 pr-4 py-2 bg-slate-800/60 border border-slate-700/50 rounded-xl text-slate-200 focus:outline-none focus:border-blue-500 w-full sm:w-64"
+              className="pl-10 pr-4 py-2 bg-slate-800/60 border border-slate-700/50 rounded-xl text-slate-200 focus:outline-none focus:border-blue-500 w-full sm:w-64 text-sm"
             />
           </div>
+          
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-400 font-medium whitespace-nowrap">Sort by:</span>
+            <select 
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="bg-slate-800/60 border border-slate-700/50 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500"
+            >
+              <option value="name-asc">A-Z</option>
+              <option value="name-desc">Z-A</option>
+              <option value="most-visited">Most Visited</option>
+              <option value="newest">Newest First</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-400 font-medium whitespace-nowrap">Filter:</span>
+            <select 
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
+              className="bg-slate-800/60 border border-slate-700/50 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500"
+            >
+              <option value="all">All Services</option>
+              <option value="internal">Internal Only</option>
+              <option value="external">External Only</option>
+              <option value="paid">Paid Services</option>
+            </select>
+          </div>
+
           {isAdmin && (
             <ModernButton 
               text="Add Service" 

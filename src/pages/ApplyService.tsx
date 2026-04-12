@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
+import { collection, addDoc, serverTimestamp, doc, updateDoc, getDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, auth, storage } from '../lib/firebase';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useConfig } from '../context/ConfigContext';
@@ -682,57 +685,60 @@ const ApplyService = () => {
         });
       });
 
-      // Use the actual service name from serviceDetails to avoid 404 on backend
       const serviceName = serviceDetails?.service_name || serviceType || 'general';
 
-      // If payment is required and not yet paid, save as draft and show payment step
-      if (serviceDetails?.payment_required && serviceDetails?.service_price > 0 && !paymentStatus.paid && user?.role === 'user') {
-        const data = new FormData();
-        data.append('service_id', serviceDetails.service_id.toString());
-        data.append('service_type', serviceName);
-        data.append('form_data', JSON.stringify(filteredFormData));
-        if (draftId) {
-          data.append('draft_id', draftId.toString());
-        }
-        
-        Object.entries(files).forEach(([type, file]) => {
-          // Create a new File object with the field name prefixed to the original name
-          // This helps the admin identify which file belongs to which field
-          const renamedFile = new window.File([file], `${type}_${file.name}`, { type: file.type });
-          data.append('documents', renamedFile);
+      // Upload files to Firebase Storage
+      const uploadedDocuments: any[] = [];
+      for (const [type, file] of Object.entries(files)) {
+        const storageRef = ref(storage, `applications/${user?.uid}/${Date.now()}_${type}_${file.name}`);
+        const snapshot = await uploadBytes(storageRef, file);
+        const url = await getDownloadURL(snapshot.ref);
+        uploadedDocuments.push({
+          id: Math.random().toString(36).substr(2, 9),
+          file_name: file.name,
+          file_url: url,
+          document_type: type
         });
+      }
 
-        const res = await api.post('/application-drafts', data, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
-        setDraftId(res.data.id);
+      // Generate a reference number
+      const referenceNumber = `APP-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+
+      // Save application to Firestore
+      const applicationData = {
+        userId: user?.uid,
+        user_name: user?.name,
+        user_email: user?.email,
+        user_phone: user?.phone,
+        service_id: serviceDetails?.service_id || 0,
+        service_name: serviceName,
+        service_type: serviceName,
+        form_data: filteredFormData,
+        documents: uploadedDocuments,
+        status: 'Pending',
+        payment_status: serviceDetails?.payment_required ? 'Pending' : 'Free',
+        reference_number: referenceNumber,
+        created_at: serverTimestamp(),
+        updated_at: serverTimestamp()
+      };
+
+      const docRef = await addDoc(collection(db, 'applications'), applicationData);
+      
+      // If payment is required, we still show the payment step but now we have a Firestore ID
+      if (serviceDetails?.payment_required && serviceDetails?.service_price > 0 && !paymentStatus.paid && user?.role === 'user') {
+        setDraftId(docRef.id as any); // Using Firestore ID as draft ID
         setShowPaymentStep(true);
         setIsSubmitting(false);
         window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }
 
-      // Direct submission for free services or staff/admin
-      const data = new FormData();
-      data.append('service_type', serviceName);
-      data.append('form_data', JSON.stringify(filteredFormData));
-      if (paymentStatus.payment_id) {
-        data.append('payment_id', paymentStatus.payment_id.toString());
-      }
-      
-      Object.entries(files).forEach(([type, file]) => {
-        const renamedFile = new window.File([file], `${type}_${file.name}`, { type: file.type });
-        data.append('documents', renamedFile);
-      });
-
-      const res = await api.post('/applications', data, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-      setSubmittedApp(res.data);
+      setSubmittedApp({ ...applicationData, id: docRef.id });
       setSuccess(true);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to submit application. Please try again.');
+      console.error('Submission error:', err);
+      setError(err.message || 'Failed to submit application. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -754,17 +760,21 @@ const ApplyService = () => {
         amount: serviceDetails.service_price
       });
       
-      // 2. Finalize application
-      const res = await api.post('/applications/finalize', {
-        draft_id: draftId,
-        payment_id: payRes.data.payment_id
+      // 2. Update Firestore application status
+      const appRef = doc(db, 'applications', draftId.toString());
+      await updateDoc(appRef, {
+        payment_status: 'Paid',
+        payment_id: payRes.data.payment_id,
+        updated_at: serverTimestamp()
       });
       
-      setSubmittedApp(res.data);
+      const updatedDoc = await getDoc(appRef);
+      setSubmittedApp({ ...updatedDoc.data(), id: updatedDoc.id });
       setSuccess(true);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Payment failed.');
+      console.error('Finalization error:', err);
+      setError(err.message || 'Payment failed.');
     } finally {
       setIsSubmitting(false);
     }
@@ -793,16 +803,20 @@ const ApplyService = () => {
               service_id: serviceDetails.service_id
             });
             
-            // Finalize
-            const res = await api.post('/applications/finalize', {
-              draft_id: draftId,
-              payment_id: verifyRes.data.payment_id
+            // Finalize in Firestore
+            const appRef = doc(db, 'applications', draftId.toString());
+            await updateDoc(appRef, {
+              payment_status: 'Paid',
+              payment_id: verifyRes.data.payment_id,
+              updated_at: serverTimestamp()
             });
             
-            setSubmittedApp(res.data);
+            const updatedDoc = await getDoc(appRef);
+            setSubmittedApp({ ...updatedDoc.data(), id: updatedDoc.id });
             setSuccess(true);
             window.scrollTo({ top: 0, behavior: 'smooth' });
           } catch (err) {
+            console.error('Razorpay verification/finalize error:', err);
             alert('Payment verification failed. Please contact support.');
           }
         },

@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
+import { collection, query, where, getDocs, orderBy, limit, doc, updateDoc, getDoc } from 'firebase/firestore';
+import { db, auth } from '../lib/firebase';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import { auth } from '../lib/firebase';
 import { Search, FileText, CheckCircle, XCircle, Clock, Eye, Download, User, ExternalLink, Activity, Upload, MessageSquare, Filter, Shield, Loader2 } from 'lucide-react';
 import { downloadPDF } from '../utils/pdfGenerator';
 import AcknowledgementReceipt from '../components/AcknowledgementReceipt';
@@ -62,7 +63,7 @@ const Applications = () => {
     const params = new URLSearchParams(location.search);
     const appId = params.get('id');
     if (appId && applications.length > 0) {
-      const app = applications.find(a => a.id === parseInt(appId));
+      const app = applications.find(a => String(a.id) === String(appId));
       if (app) setSelectedApp(app);
     }
   }, [location, applications]);
@@ -81,18 +82,40 @@ const Applications = () => {
 
   const fetchApplications = async () => {
     try {
-      const params = new URLSearchParams();
-      if (filters.service_id) params.append('service_id', filters.service_id);
-      if (filters.status !== 'All') params.append('status', filters.status);
-      if (filters.payment_status !== 'All') params.append('payment_status', filters.payment_status);
-      if (filters.start_date) params.append('start_date', filters.start_date);
-      if (filters.end_date) params.append('end_date', filters.end_date);
-      if (search) params.append('search', search);
+      let q = query(collection(db, 'applications'));
+      
+      if (user?.role === 'user') {
+        q = query(q, where('userId', '==', user.uid));
+      } else if (user?.role === 'staff') {
+        q = query(q, where('assigned_staff', '==', user.uid));
+      }
 
-      const res = await api.get(`/applications?${params.toString()}`);
-      setApplications(res.data);
+      if (filters.status !== 'All') {
+        q = query(q, where('status', '==', filters.status));
+      }
+      
+      if (filters.payment_status !== 'All') {
+        q = query(q, where('payment_status', '==', filters.payment_status));
+      }
+
+      q = query(q, orderBy('created_at', 'desc'));
+
+      const snapshot = await getDocs(q);
+      const apps = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+      
+      // Apply client-side search if needed
+      if (search) {
+        const searchLower = search.toLowerCase();
+        setApplications(apps.filter(app => 
+          (app.reference_number || '').toLowerCase().includes(searchLower) ||
+          (app.user_name || '').toLowerCase().includes(searchLower) ||
+          (app.user_phone || '').toLowerCase().includes(searchLower)
+        ));
+      } else {
+        setApplications(apps);
+      }
     } catch (err) {
-      console.error('Error fetching applications:', err);
+      console.error('Error fetching applications from Firestore:', err);
     }
   };
 
