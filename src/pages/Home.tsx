@@ -5,13 +5,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { useConfig } from '../context/ConfigContext';
 import ModernButton from '../components/ModernButton';
-
-const FALLBACK_SERVICES = [
-  { service_id: 'aadhaar', service_name: 'Aadhaar Card', description: 'Aadhaar related services including update and download', icon: 'fa-fingerprint', is_active: true, is_visible: true, service_price: 0 },
-  { service_id: 'pan', service_name: 'PAN Card', description: 'New PAN card application and corrections', icon: 'fa-id-card', is_active: true, is_visible: true, service_price: 0 },
-  { service_id: 'voter', service_name: 'Voter ID', description: 'Voter registration and ID card services', icon: 'fa-id-badge', is_active: true, is_visible: true, service_price: 0 },
-  { service_id: 'passport', service_name: 'Passport', description: 'Passport application and renewal services', icon: 'fa-globe', is_active: true, is_visible: true, service_price: 0 }
-];
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 const Home = () => {
   const { config } = useConfig();
@@ -19,12 +14,40 @@ const Home = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    api.get('/services')
-      .then(res => setServices(res.data))
-      .catch(err => {
-        console.error('Error fetching services for home:', err);
-        setServices(FALLBACK_SERVICES);
-      });
+    const fetchServices = async () => {
+      try {
+        console.log('Fetching services from Firestore for Home...');
+        const querySnapshot = await getDocs(collection(db, 'services'));
+        let servicesData = querySnapshot.docs.map(doc => {
+          const data = doc.data() as any;
+          return {
+            service_id: doc.id,
+            ...data,
+            service_name: data.service_name || data.name || 'Unnamed Service',
+            description: data.description || 'No description available',
+            service_url: data.service_url || data.url || '',
+            icon: data.icon || 'fa-file',
+            is_active: data.is_active !== undefined ? data.is_active : (data.enabled !== undefined ? data.enabled : 1),
+            is_visible: data.is_visible !== undefined ? data.is_visible : 1,
+            application_type: data.application_type || (data.url ? 'external' : 'internal')
+          };
+        });
+        
+        // Filter for active and visible services
+        servicesData = servicesData.filter((s: any) => 
+          (s.is_active === true || s.is_active === 1) && 
+          (s.is_visible === true || s.is_visible === 1)
+        );
+        
+        console.log('Fetched services for Home:', servicesData);
+        setServices(servicesData);
+      } catch (err) {
+        console.error('Error fetching services from Firestore for Home:', err);
+        setServices([]);
+      }
+    };
+    
+    fetchServices();
   }, []);
 
   const getServiceKey = (name: string) => {

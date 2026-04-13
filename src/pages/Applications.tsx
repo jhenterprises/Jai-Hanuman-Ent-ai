@@ -121,10 +121,25 @@ const Applications = () => {
 
   const fetchServices = async () => {
     try {
-      const res = await api.get('/services');
-      setServices(res.data);
+      console.log('Fetching services from Firestore for Applications...');
+      const querySnapshot = await getDocs(collection(db, 'services'));
+      const servicesData = querySnapshot.docs.map(doc => {
+        const data = doc.data() as any;
+        return {
+          service_id: doc.id,
+          ...data,
+          service_name: data.service_name || data.name || 'Unnamed Service',
+          description: data.description || 'No description available',
+          service_url: data.service_url || data.url || '',
+          icon: data.icon || 'fa-file',
+          is_active: data.is_active !== undefined ? data.is_active : (data.enabled !== undefined ? data.enabled : 1),
+          is_visible: data.is_visible !== undefined ? data.is_visible : 1,
+          application_type: data.application_type || (data.url ? 'external' : 'internal')
+        };
+      });
+      setServices(servicesData);
     } catch (err) {
-      console.error('Error fetching services:', err);
+      console.error('Error fetching services from Firestore for Applications:', err);
     }
   };
 

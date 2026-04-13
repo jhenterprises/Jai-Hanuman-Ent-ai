@@ -6,15 +6,10 @@ import { Search, Plus, Trash2, ExternalLink, ArrowRight, X, Check, Eye, EyeOff, 
 import { useNavigate } from 'react-router-dom';
 import ConfirmDialog from '../components/ConfirmDialog';
 import ModernButton from '../components/ModernButton';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 import { useConfig } from '../context/ConfigContext';
-
-const FALLBACK_SERVICES = [
-  { service_id: 'aadhaar', service_name: 'Aadhaar Card', description: 'Aadhaar related services including update and download', icon: 'fa-fingerprint', is_active: true, is_visible: true, service_price: 0, visit_count: 0 },
-  { service_id: 'pan', service_name: 'PAN Card', description: 'New PAN card application and corrections', icon: 'fa-id-card', is_active: true, is_visible: true, service_price: 0, visit_count: 0 },
-  { service_id: 'voter', service_name: 'Voter ID', description: 'Voter registration and ID card services', icon: 'fa-id-badge', is_active: true, is_visible: true, service_price: 0, visit_count: 0 },
-  { service_id: 'passport', service_name: 'Passport', description: 'Passport application and renewal services', icon: 'fa-globe', is_active: true, is_visible: true, service_price: 0, visit_count: 0 }
-];
 
 const Services = () => {
   const { config } = useConfig();
@@ -67,12 +62,28 @@ const Services = () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get('/services');
-      setServices(res.data);
+      console.log('Fetching services from Firestore...');
+      const querySnapshot = await getDocs(collection(db, 'services'));
+      const servicesData = querySnapshot.docs.map(doc => {
+        const data = doc.data() as any;
+        return {
+          service_id: doc.id,
+          ...data,
+          service_name: data.service_name || data.name || 'Unnamed Service',
+          description: data.description || 'No description available',
+          service_url: data.service_url || data.url || '',
+          icon: data.icon || 'fa-file',
+          is_active: data.is_active !== undefined ? data.is_active : (data.enabled !== undefined ? data.enabled : 1),
+          is_visible: data.is_visible !== undefined ? data.is_visible : 1,
+          application_type: data.application_type || (data.url ? 'external' : 'internal')
+        };
+      });
+      console.log('Fetched services:', servicesData);
+      setServices(servicesData);
     } catch (err) {
-      console.error('Error fetching services:', err);
-      setError('Services temporarily unavailable. Showing default services.');
-      setServices(FALLBACK_SERVICES);
+      console.error('Error fetching services from Firestore:', err);
+      setError('Failed to load services. Please try again later.');
+      setServices([]);
     } finally {
       setLoading(false);
     }
@@ -593,12 +604,14 @@ const Services = () => {
                       gradient="blue-gold-gradient"
                       className="w-full !py-2 !text-xs"
                     />
-                    <button 
-                      onClick={() => handleOpenUrl(service)}
-                      className="inline-flex items-center justify-center w-full py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl transition-all font-bold text-xs gap-2"
-                    >
-                      Open Service URL
-                    </button>
+                    {(service.application_type === 'external' || service.service_url) && (
+                      <button 
+                        onClick={() => handleOpenUrl(service)}
+                        className="inline-flex items-center justify-center w-full py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl transition-all font-bold text-xs gap-2"
+                      >
+                        Open Service URL
+                      </button>
+                    )}
                   </>
                 ) : (
                   <ModernButton 

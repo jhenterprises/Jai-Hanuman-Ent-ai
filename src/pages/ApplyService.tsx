@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
-import { collection, addDoc, serverTimestamp, doc, updateDoc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, updateDoc, getDoc, getDocs } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, auth, storage } from '../lib/firebase';
 import api from '../services/api';
@@ -302,7 +302,7 @@ const ApplyService = () => {
     }
   };
 
-  const fetchPaymentStatus = async (serviceId: number) => {
+  const fetchPaymentStatus = async (serviceId: string | number) => {
     try {
       const payRes = await api.get(`/payments/status/${serviceId}`);
       setPaymentStatus(payRes.data);
@@ -329,8 +329,23 @@ const ApplyService = () => {
         }
       }
 
-      const res = await api.get('/services');
-      const services = res.data;
+      console.log('Fetching services from Firestore for ApplyService...');
+      const querySnapshot = await getDocs(collection(db, 'services'));
+      const services = querySnapshot.docs.map(doc => {
+        const data = doc.data() as any;
+        return {
+          service_id: doc.id,
+          ...data,
+          service_name: data.service_name || data.name || 'Unnamed Service',
+          description: data.description || 'No description available',
+          service_url: data.service_url || data.url || '',
+          icon: data.icon || 'fa-file',
+          is_active: data.is_active !== undefined ? data.is_active : (data.enabled !== undefined ? data.enabled : 1),
+          is_visible: data.is_visible !== undefined ? data.is_visible : 1,
+          application_type: data.application_type || (data.url ? 'external' : 'internal')
+        };
+      });
+      
       const decodedType = decodeURIComponent(serviceType || '').toLowerCase();
       
       const currentService = services.find((s: any) => {

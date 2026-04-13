@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { auth } from '../lib/firebase';
+import { auth, db } from '../lib/firebase';
+import { collection, query, where, orderBy, limit, getDocs, updateDoc, doc } from 'firebase/firestore';
 import { useConfig } from '../context/ConfigContext';
 import AIChatbot from '../components/AIChatbot';
 import api from '../services/api';
@@ -53,22 +54,29 @@ const DashboardLayout = () => {
     fetchNotifications();
     const interval = setInterval(fetchNotifications, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [user]);
 
   const fetchNotifications = async () => {
-    if (!auth.currentUser) return;
+    if (!auth.currentUser || !user) return;
     try {
-      const res = await api.get('/user-alerts');
-      setNotifications(Array.isArray(res.data) ? res.data : []);
+      const q = query(
+        collection(db, 'notifications'),
+        where('user_id', '==', user.uid),
+        orderBy('created_at', 'desc'),
+        limit(20)
+      );
+      const snapshot = await getDocs(q);
+      const alerts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setNotifications(alerts);
     } catch (err) {
       console.error('Error fetching notifications:', err);
       setNotifications([]);
     }
   };
 
-  const markAsRead = async (id: number) => {
+  const markAsRead = async (id: string) => {
     try {
-      await api.patch(`/user-alerts/${id}/read`);
+      await updateDoc(doc(db, 'notifications', id), { is_read: true });
       fetchNotifications();
     } catch (err) {
       console.error('Error marking notification as read:', err);
