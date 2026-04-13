@@ -4,6 +4,8 @@ import { IndianRupee, Search, Calendar, Filter, CheckCircle, XCircle, Clock, Dow
 import { Link } from 'react-router-dom';
 import api from '../../services/api';
 import { safeFormat } from '../../utils/dateUtils';
+import { db } from '../../lib/firebase';
+import { collection, getDocs } from 'firebase/firestore';
 
 const AdminPayments = () => {
   const [payments, setPayments] = useState<any[]>([]);
@@ -20,8 +22,11 @@ const AdminPayments = () => {
     try {
       const res = await api.get('/admin/payments');
       setPayments(res.data);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error fetching payments:', err);
+      if (err.message?.includes('HTML')) {
+        // Silent fail for HTML responses
+      }
     } finally {
       setLoading(false);
     }
@@ -31,8 +36,11 @@ const AdminPayments = () => {
     try {
       const res = await api.get('/admin/revenue');
       setRevenueStats(res.data);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error fetching revenue stats:', err);
+      if (err.message?.includes('HTML')) {
+        // Silent fail for HTML responses
+      }
     }
   };
 

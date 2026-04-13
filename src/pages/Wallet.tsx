@@ -4,9 +4,11 @@ import { Wallet as WalletIcon, Plus, ArrowUpRight, ArrowDownLeft, History, Credi
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { safeFormat } from '../utils/dateUtils';
+import { db } from '../lib/firebase';
+import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
 
 interface Transaction {
-  id: number;
+  id: string;
   type: 'credit' | 'debit';
   amount: number;
   description: string;
@@ -35,12 +37,24 @@ const Wallet = () => {
 
   const fetchWalletData = async () => {
     try {
-      const [walletRes, transRes] = await Promise.all([
-        api.get('/wallet/balance'),
-        api.get('/wallet/transactions')
-      ]);
-      setWallet(walletRes.data);
-      setTransactions(transRes.data);
+      // Fetch balance from Firestore
+      if (user) {
+        const walletSnap = await getDocs(query(collection(db, 'wallets'), where('user_id', '==', user.uid)));
+        if (!walletSnap.empty) {
+          setWallet({ balance: walletSnap.docs[0].data().balance || 0 });
+        }
+      }
+
+      // Fetch transactions from API
+      try {
+        const transRes = await api.get('/wallet/transactions');
+        setTransactions(transRes.data);
+      } catch (transErr: any) {
+        console.error('Failed to fetch transactions:', transErr);
+        if (transErr.message?.includes('HTML')) {
+          // Silent fail
+        }
+      }
     } catch (err) {
       console.error('Failed to fetch wallet data:', err);
     } finally {

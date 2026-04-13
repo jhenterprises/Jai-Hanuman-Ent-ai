@@ -49,6 +49,27 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // Wallets collection: Users can read their own wallet, admin can read/write all
+    match /wallets/{walletId} {
+      allow read: if isOwner(walletId) || (isAuthenticated() && resource.data.user_id == request.auth.uid) || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // Ledger collection: Only admin can read/write
+    match /ledger/{document=**} {
+      allow read, write: if isAdmin();
+    }
+
+    // Activity Logs collection: Only admin can read/write
+    match /activity_logs/{document=**} {
+      allow read, write: if isAdmin();
+    }
+
+    // Service Payments collection: Only admin can read/write
+    match /service_payments/{document=**} {
+      allow read, write: if isAdmin();
+    }
+
     // Default deny for anything else
     match /{document=**} {
       allow read, write: if isAdmin();

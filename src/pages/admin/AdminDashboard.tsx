@@ -14,6 +14,8 @@ import {
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { safeFormat } from '../../utils/dateUtils';
+import { db } from '../../lib/firebase';
+import { collection, query, where, getDocs, orderBy, limit, Timestamp } from 'firebase/firestore';
 
 const COLORS = ['#3b82f6', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6'];
 
@@ -24,7 +26,7 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [openActionMenuId, setOpenActionMenuId] = useState<number | null>(null);
+  const [openActionMenuId, setOpenActionMenuId] = useState<string | null>(null);
   const profileMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -51,12 +53,93 @@ const AdminDashboard = () => {
 
   const fetchStats = async () => {
     try {
+      // Try API first
       const res = await api.get('/admin/dashboard-overview');
       setStats(res.data);
-    } catch (err) {
-      console.error('Error fetching admin stats:', err);
-    } finally {
       setLoading(false);
+    } catch (err: any) {
+      console.error('Error fetching admin stats from API:', err);
+      
+      // If API fails (e.g. server restarting), try to fetch basic stats from Firestore
+      if (err.message?.includes('HTML') || !err.response) {
+        try {
+          console.log('Attempting to fetch stats from Firestore fallback...');
+          const usersSnap = await getDocs(query(collection(db, 'users'), where('role', '==', 'user')));
+          const staffSnap = await getDocs(query(collection(db, 'users'), where('role', '==', 'staff')));
+          const appsSnap = await getDocs(collection(db, 'applications'));
+          const ledgerSnap = await getDocs(collection(db, 'ledger'));
+          const logsSnap = await getDocs(query(collection(db, 'activity_logs'), orderBy('timestamp', 'desc'), limit(10)));
+          
+          const totalUsers = usersSnap.size;
+          const totalStaff = staffSnap.size;
+          const totalApplications = appsSnap.size;
+          
+          const pendingStatuses = ['Submitted', 'Under Review', 'Processing', 'Documents Required'];
+          const approvedStatuses = ['Approved', 'Completed'];
+          
+          let pendingApplications = 0;
+          let approvedApplications = 0;
+          let rejectedApplications = 0;
+          const statusMap = new Map();
+          const dailyAppsMap = new Map();
+          const sevenDaysAgo = new Date();
+          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+          appsSnap.docs.forEach(doc => {
+            const data = doc.data();
+            const status = data.status;
+            statusMap.set(status, (statusMap.get(status) || 0) + 1);
+            
+            if (pendingStatuses.includes(status)) pendingApplications++;
+            if (approvedStatuses.includes(status)) approvedApplications++;
+            if (status === 'Rejected') rejectedApplications++;
+            
+            const createdAt = data.created_at?.toDate?.() || (data.created_at ? new Date(data.created_at) : null);
+            if (createdAt && createdAt >= sevenDaysAgo) {
+              const date = createdAt.toISOString().split('T')[0];
+              dailyAppsMap.set(date, (dailyAppsMap.get(date) || 0) + 1);
+            }
+          });
+
+          let totalRevenue = 0;
+          ledgerSnap.docs.forEach(doc => {
+            totalRevenue += (doc.data().amount || 0);
+          });
+
+          const recentApplications = appsSnap.docs
+            .sort((a, b) => (b.data().created_at?.toDate?.() || 0) - (a.data().created_at?.toDate?.() || 0))
+            .slice(0, 5)
+            .map(doc => ({
+              id: doc.id,
+              ...doc.data()
+            }));
+
+          const fallbackStats = {
+            overview: {
+              totalUsers,
+              totalStaff,
+              totalApplications,
+              pendingApplications,
+              approvedApplications,
+              rejectedApplications,
+              totalRevenue,
+              serviceRevenue: 0
+            },
+            appsByStatus: Array.from(statusMap.entries()).map(([name, value]) => ({ name, value })),
+            dailyApps: Array.from(dailyAppsMap.entries()).map(([date, count]) => ({ date, count })).sort((a, b) => a.date.localeCompare(b.date)),
+            recentApplications,
+            topServices: [],
+            staffPerformance: [],
+            adminLogs: logsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })),
+            systemNotifications: []
+          };
+          
+          setStats(fallbackStats);
+          setLoading(false);
+        } catch (fsErr) {
+          console.error('Firestore fallback failed:', fsErr);
+        }
+      }
     }
   };
 

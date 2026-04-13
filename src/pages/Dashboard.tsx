@@ -17,7 +17,7 @@ const Dashboard = () => {
   const [drafts, setDrafts] = useState<any[]>([]);
   const [walletBalance, setWalletBalance] = useState<number>(0);
   const [loading, setLoading] = useState(true);
-  const [downloadingId, setDownloadingId] = useState<number | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -35,13 +35,22 @@ const Dashboard = () => {
         const apps = appSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setApplications(apps);
 
-        // Fetch drafts and wallet from API (as they might still be handled there)
-        const [draftRes, walletRes] = await Promise.all([
-          api.get('/application-drafts'),
-          api.get('/wallet/balance')
-        ]);
-        setDrafts(draftRes.data);
-        setWalletBalance(walletRes.data.balance || 0);
+        // Fetch wallet from Firestore
+        const walletDoc = await getDocs(query(collection(db, 'wallets'), where('user_id', '==', user.uid)));
+        if (!walletDoc.empty) {
+          setWalletBalance(walletDoc.docs[0].data().balance || 0);
+        }
+
+        // Fetch drafts from API
+        try {
+          const draftRes = await api.get('/application-drafts');
+          setDrafts(draftRes.data);
+        } catch (draftErr: any) {
+          console.error('Error fetching drafts:', draftErr);
+          if (draftErr.message?.includes('HTML')) {
+            // Silent fail
+          }
+        }
       } catch (err) {
         console.error('Error fetching dashboard data:', err);
       } finally {
