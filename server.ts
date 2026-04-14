@@ -2218,33 +2218,60 @@ const getEnrichedApplication = async (applicationId: string) => {
 // Admin Dashboard Stats
 app.get('/api/admin/dashboard-overview', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
-    const usersSnapshot = await db.collection('users').where('role', '==', 'user').get();
-    const staffSnapshot = await db.collection('users').where('role', '==', 'staff').get();
-    const appsSnapshot = await db.collection('applications').get();
-    const ledgerSnapshot = await db.collection('ledger').get();
-    const servicePaymentsSnapshot = await db.collection('service_payments').where('status', '==', 'success').get();
-    const logsSnapshot = await db.collection('activity_logs').orderBy('timestamp', 'desc').limit(10).get();
+    const usersSnapshot = await db.collection('users').select('role', 'deleted_at', 'name').get();
+    
+    let totalUsers = 0;
+    let totalStaff = 0;
+    const staffDocs: any[] = [];
+    const usersMap = new Map();
+    
+    usersSnapshot.forEach(doc => {
+      const data = doc.data();
+      usersMap.set(doc.id, data);
+      if (!data.deleted_at) {
+        if (data.role === 'user') totalUsers++;
+        if (data.role === 'staff') {
+          totalStaff++;
+          staffDocs.push({ id: doc.id, ...data });
+        }
+      }
+    });
+
+    const appsSnapshot = await db.collection('applications').select('status', 'created_at', 'user_id', 'service_type', 'assigned_staff', 'deleted_at', 'reference_number').get();
+    const ledgerSnapshot = await db.collection('ledger').select('amount', 'profit_amount', 'deleted_at').get();
+    const servicePaymentsSnapshot = await db.collection('service_payments').where('status', '==', 'success').select('amount').get();
+    const logsSnapshot = await db.collection('activity_logs').orderBy('timestamp', 'desc').limit(20).get();
     const notificationsSnapshot = await db.collection('notifications').orderBy('created_at', 'desc').limit(10).get();
 
-    // Filter non-deleted items in memory
-    const totalUsers = usersSnapshot.docs.filter(doc => !doc.data().deleted_at).length;
-    const totalStaff = staffSnapshot.docs.filter(doc => !doc.data().deleted_at).length;
-    const totalApplications = appsSnapshot.docs.filter(doc => !doc.data().deleted_at).length;
+    let totalApplications = 0;
+    const activeApps: any[] = [];
     
-    const activeApps = appsSnapshot.docs.filter(doc => !doc.data().deleted_at);
-    const activeLedger = ledgerSnapshot.docs.filter(doc => !doc.data().deleted_at);
+    appsSnapshot.forEach(doc => {
+      const data = doc.data();
+      if (!data.deleted_at) {
+        totalApplications++;
+        activeApps.push({ id: doc.id, ...data });
+      }
+    });
+
+    const activeLedger: any[] = [];
+    ledgerSnapshot.forEach(doc => {
+      const data = doc.data();
+      if (!data.deleted_at) {
+        activeLedger.push(data);
+      }
+    });
     
     const pendingStatuses = ['Submitted', 'Under Review', 'Processing', 'Documents Required'];
     const approvedStatuses = ['Approved', 'Completed'];
     
-    const pendingApplications = activeApps.filter(doc => pendingStatuses.includes(doc.data().status)).length;
-    const approvedApplications = activeApps.filter(doc => approvedStatuses.includes(doc.data().status)).length;
-    const rejectedApplications = activeApps.filter(doc => doc.data().status === 'Rejected').length;
+    const pendingApplications = activeApps.filter(data => pendingStatuses.includes(data.status)).length;
+    const approvedApplications = activeApps.filter(data => approvedStatuses.includes(data.status)).length;
+    const rejectedApplications = activeApps.filter(data => data.status === 'Rejected').length;
     
     let ledgerRevenue = 0;
     let ledgerProfit = 0;
-    activeLedger.forEach(doc => {
-      const data = doc.data();
+    activeLedger.forEach(data => {
       ledgerRevenue += (data.amount || 0);
       ledgerProfit += (data.profit_amount || 0);
     });
@@ -2257,8 +2284,8 @@ app.get('/api/admin/dashboard-overview', authenticateToken, requireRole(['admin'
 
     // Applications by Status
     const statusMap = new Map();
-    appsSnapshot.forEach(doc => {
-      const status = doc.data().status;
+    activeApps.forEach(data => {
+      const status = data.status;
       statusMap.set(status, (statusMap.get(status) || 0) + 1);
     });
     const appsByStatus = Array.from(statusMap.entries()).map(([name, value]) => ({ name, value }));
@@ -2267,8 +2294,8 @@ app.get('/api/admin/dashboard-overview', authenticateToken, requireRole(['admin'
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     const dailyAppsMap = new Map();
-    appsSnapshot.forEach(doc => {
-      const createdAt = doc.data().created_at?.toDate();
+    activeApps.forEach(data => {
+      const createdAt = data.created_at?.toDate();
       if (createdAt && createdAt >= sevenDaysAgo) {
         const date = createdAt.toISOString().split('T')[0];
         dailyAppsMap.set(date, (dailyAppsMap.get(date) || 0) + 1);
@@ -2279,18 +2306,13 @@ app.get('/api/admin/dashboard-overview', authenticateToken, requireRole(['admin'
       .sort((a, b) => a.date.localeCompare(b.date));
 
     // Recent Applications
-    const usersMap = new Map();
-    const allUsersSnapshot = await db.collection('users').get();
-    allUsersSnapshot.docs.forEach(doc => usersMap.set(doc.id, doc.data()));
-
-    const recentApplications = appsSnapshot.docs
-      .sort((a, b) => (b.data().created_at?.toDate() || 0) - (a.data().created_at?.toDate() || 0))
+    const recentApplications = activeApps
+      .sort((a, b) => (b.created_at?.toDate() || 0) - (a.created_at?.toDate() || 0))
       .slice(0, 5)
-      .map(doc => {
-        const data = doc.data();
+      .map(data => {
         const user = usersMap.get(data.user_id);
         return {
-          id: doc.id,
+          id: data.id,
           reference_number: data.reference_number,
           service_name: data.service_type,
           status: data.status,
@@ -2301,8 +2323,8 @@ app.get('/api/admin/dashboard-overview', authenticateToken, requireRole(['admin'
 
     // Service Usage (Top 5)
     const serviceUsageMap = new Map();
-    appsSnapshot.forEach(doc => {
-      const type = doc.data().service_type;
+    activeApps.forEach(data => {
+      const type = data.service_type;
       serviceUsageMap.set(type, (serviceUsageMap.get(type) || 0) + 1);
     });
     const topServices = Array.from(serviceUsageMap.entries())
@@ -2312,11 +2334,10 @@ app.get('/api/admin/dashboard-overview', authenticateToken, requireRole(['admin'
 
     // Staff Performance
     const staffPerfMap = new Map();
-    staffSnapshot.forEach(doc => {
-      staffPerfMap.set(doc.id, { staff_name: doc.data().name, assigned: 0, completed: 0, pending: 0 });
+    staffDocs.forEach(staff => {
+      staffPerfMap.set(staff.id, { staff_name: staff.name, assigned: 0, completed: 0, pending: 0 });
     });
-    appsSnapshot.forEach(doc => {
-      const data = doc.data();
+    activeApps.forEach(data => {
       if (data.assigned_staff && staffPerfMap.has(data.assigned_staff)) {
         const perf = staffPerfMap.get(data.assigned_staff);
         perf.assigned += 1;
@@ -2335,6 +2356,7 @@ app.get('/api/admin/dashboard-overview', authenticateToken, requireRole(['admin'
         const user = usersMap.get(doc.data().user_id);
         return user?.role === 'admin';
       })
+      .slice(0, 10)
       .map(doc => ({
         ...doc.data(),
         admin_name: usersMap.get(doc.data().user_id)?.name
