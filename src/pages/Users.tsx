@@ -118,15 +118,13 @@ const UsersPage = () => {
       message: 'Are you sure you want to move this user to the Recycle Bin? You can restore them later if needed.',
       onConfirm: async () => {
         try {
-          await api.delete(`/users/${id}`);
+          const res = await api.delete(`/users/${id}`);
           fetchUsers();
+          alert(res.data.message || 'User moved to Recycle Bin');
         } catch (err: any) {
-          if (err.response && err.response.status === 400) {
-            alert(err.response.data.error);
-          } else {
-            console.error('Error deleting user:', err);
-            alert('Failed to delete user. Please try again.');
-          }
+          console.error('Error deleting user:', err);
+          const errorMsg = err.response?.data?.error || err.message || 'Failed to delete user. Please try again.';
+          alert(errorMsg);
         }
         setConfirmDialog(prev => ({ ...prev, isOpen: false }));
       }

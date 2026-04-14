@@ -685,6 +685,14 @@ const ApplyService = () => {
     setError('');
 
     try {
+      // Ensure user is authenticated
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        setError('You must be logged in to submit an application.');
+        setIsSubmitting(false);
+        return;
+      }
+
       // Filter out hidden fields from formData
       const filteredFormData: Record<string, string> = {};
       config.sections.forEach((section: any) => {
@@ -704,27 +712,38 @@ const ApplyService = () => {
 
       // Upload files to Firebase Storage
       const uploadedDocuments: any[] = [];
-      for (const [type, file] of Object.entries(files)) {
-        const storageRef = ref(storage, `applications/${user?.uid}/${Date.now()}_${type}_${file.name}`);
-        const snapshot = await uploadBytes(storageRef, file);
-        const url = await getDownloadURL(snapshot.ref);
-        uploadedDocuments.push({
-          id: Math.random().toString(36).substr(2, 9),
-          file_name: file.name,
-          file_url: url,
-          document_type: type
-        });
+      try {
+        for (const [type, file] of Object.entries(files)) {
+          const storageRef = ref(storage, `applications/${user?.uid}/${Date.now()}_${type}_${file.name}`);
+          const snapshot = await uploadBytes(storageRef, file);
+          const url = await getDownloadURL(snapshot.ref);
+          uploadedDocuments.push({
+            id: Math.random().toString(36).substr(2, 9),
+            file_name: file.name,
+            file_url: url,
+            document_type: type
+          });
+        }
+      } catch (uploadErr: any) {
+        console.error('File upload failed:', uploadErr);
+        if (uploadErr.code === 'storage/retry-limit-exceeded' || uploadErr.code === 'storage/unauthorized') {
+          setError('Failed to upload files. Please check your internet connection or contact support if the issue persists (Storage Rules may need to be updated).');
+        } else {
+          setError(`File upload error: ${uploadErr.message}`);
+        }
+        setIsSubmitting(false);
+        return;
       }
 
       // Generate a reference number
       const referenceNumber = `APP-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
 
       // Save application to Firestore
-      const applicationData = {
-        userId: user?.uid,
-        user_name: user?.name,
-        user_email: user?.email,
-        user_phone: user?.phone,
+      const applicationData: any = {
+        userId: currentUser.uid,
+        user_name: user?.name || currentUser.displayName || 'Unknown',
+        user_email: user?.email || currentUser.email || 'No Email',
+        user_phone: user?.phone || 'No Phone',
         service_id: serviceDetails?.service_id || 0,
         service_name: serviceName,
         service_type: serviceName,
@@ -736,6 +755,19 @@ const ApplyService = () => {
         created_at: serverTimestamp(),
         updated_at: serverTimestamp()
       };
+
+      // Clean data: remove any undefined values to prevent Firestore errors
+      Object.keys(applicationData).forEach(key => {
+        if (applicationData[key] === undefined) {
+          delete applicationData[key];
+        }
+      });
+
+      console.log('Submitting application to Firestore:', {
+        userId: applicationData.userId,
+        service: applicationData.service_name,
+        ref: applicationData.reference_number
+      });
 
       const docRef = await addDoc(collection(db, 'applications'), applicationData);
       

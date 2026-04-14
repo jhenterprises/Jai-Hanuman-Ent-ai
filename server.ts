@@ -1439,20 +1439,27 @@ app.delete('/api/users/:id', authenticateToken, requireRole(['admin']), async (r
   try {
     const userRef = db.collection('users').doc(req.params.id);
     const userDoc = await userRef.get();
-    if (!userDoc.exists) return res.status(404).json({ error: 'User not found' });
+    if (!userDoc.exists) {
+      console.log(`[Delete User] User not found: ${req.params.id}`);
+      return res.status(404).json({ error: 'User not found' });
+    }
 
-    await userRef.update({ deleted_at: admin.firestore.FieldValue.serverTimestamp() });
+    console.log(`[Delete User] Moving user to Recycle Bin: ${req.params.id} (${userDoc.data()?.email})`);
+    await userRef.update({ 
+      deleted_at: admin.firestore.FieldValue.serverTimestamp(),
+      updated_at: admin.firestore.FieldValue.serverTimestamp()
+    });
     
     await db.collection('activity_logs').add({
       user_id: req.user.id,
-      action: `Moved user to Recycle Bin: ${userDoc.data()?.name}`,
+      action: `Moved user to Recycle Bin: ${userDoc.data()?.name} (${userDoc.data()?.email})`,
       timestamp: admin.firestore.FieldValue.serverTimestamp()
     });
 
     res.json({ message: 'User moved to Recycle Bin' });
-  } catch (err) {
+  } catch (err: any) {
     console.error('Error deleting user:', err);
-    res.status(500).json({ error: 'Failed to delete user' });
+    res.status(500).json({ error: 'Failed to delete user', details: err.message });
   }
 });
 
