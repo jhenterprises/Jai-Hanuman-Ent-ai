@@ -23,9 +23,29 @@ const AdminPayments = () => {
       const res = await api.get('/admin/payments');
       setPayments(res.data);
     } catch (err: any) {
-      console.error('Error fetching payments:', err);
-      if (err.message?.includes('HTML')) {
-        // Silent fail for HTML responses
+      console.error('Error fetching payments from API:', err);
+      
+      // Fallback to Firestore if API fails (e.g. server restarting)
+      if (err.message?.includes('HTML') || !err.response || err.code === 'ECONNABORTED' || err.response?.status >= 500) {
+        try {
+          console.log('Attempting to fetch payments from Firestore fallback...');
+          const snapshot = await getDocs(collection(db, 'service_payments'));
+          const paymentsList = snapshot.docs
+            .map(doc => ({
+              id: doc.id,
+              ...doc.data()
+            }))
+            .sort((a: any, b: any) => {
+              const dateA = a.created_at?.toDate ? a.created_at.toDate() : new Date(a.created_at || 0);
+              const dateB = b.created_at?.toDate ? b.created_at.toDate() : new Date(b.created_at || 0);
+              return dateB.getTime() - dateA.getTime();
+            });
+          
+          console.log('Payments fetched from Firestore successfully');
+          setPayments(paymentsList);
+        } catch (fsErr) {
+          console.error('Firestore fallback failed:', fsErr);
+        }
       }
     } finally {
       setLoading(false);
@@ -37,9 +57,28 @@ const AdminPayments = () => {
       const res = await api.get('/admin/revenue');
       setRevenueStats(res.data);
     } catch (err: any) {
-      console.error('Error fetching revenue stats:', err);
-      if (err.message?.includes('HTML')) {
-        // Silent fail for HTML responses
+      console.error('Error fetching revenue stats from API:', err);
+      
+      // Fallback to Firestore if API fails
+      if (err.message?.includes('HTML') || !err.response || err.code === 'ECONNABORTED' || err.response?.status >= 500) {
+        try {
+          console.log('Attempting to calculate revenue from Firestore fallback...');
+          const snapshot = await getDocs(collection(db, 'service_payments'));
+          const successfulPayments = snapshot.docs
+            .map(doc => doc.data())
+            .filter(p => p.status === 'success');
+          
+          const totalRevenue = successfulPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+          const totalTransactions = successfulPayments.length;
+          
+          setRevenueStats({
+            totalRevenue,
+            totalTransactions,
+            averageTransaction: totalTransactions > 0 ? totalRevenue / totalTransactions : 0
+          });
+        } catch (fsErr) {
+          console.error('Firestore revenue fallback failed:', fsErr);
+        }
       }
     }
   };

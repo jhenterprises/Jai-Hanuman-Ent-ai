@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import api from '../services/api';
 import { Search, Shield, User, Lock, RefreshCw, Plus, X } from 'lucide-react';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 const StaffManagement = () => {
   const [staff, setStaff] = useState<any[]>([]);
@@ -18,9 +20,30 @@ const StaffManagement = () => {
       const res = await api.get('/users?role=staff');
       console.log('Staff fetched successfully:', res.data);
       setStaff(Array.isArray(res.data) ? res.data : []);
-    } catch (err) {
-      console.error('Error fetching staff:', err);
-      setStaff([]);
+    } catch (err: any) {
+      console.error('Error fetching staff from API:', err);
+      
+      // Fallback to Firestore if API fails (e.g. server restarting)
+      if (err.message?.includes('HTML') || !err.response || err.code === 'ECONNABORTED' || err.response?.status >= 500) {
+        try {
+          console.log('Attempting to fetch staff from Firestore fallback...');
+          const snapshot = await getDocs(query(collection(db, 'users'), where('role', '==', 'staff')));
+          const staffList = snapshot.docs
+            .map(doc => ({
+              id: doc.id,
+              ...doc.data()
+            }))
+            .filter((s: any) => !s.deleted_at);
+          
+          console.log('Staff fetched from Firestore successfully');
+          setStaff(staffList);
+        } catch (fsErr) {
+          console.error('Firestore fallback failed:', fsErr);
+          setStaff([]);
+        }
+      } else {
+        setStaff([]);
+      }
     }
   };
 

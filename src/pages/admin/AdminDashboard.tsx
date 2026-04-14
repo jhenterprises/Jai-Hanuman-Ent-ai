@@ -73,20 +73,25 @@ const AdminDashboard = () => {
           );
 
           const fetchDataPromise = (async () => {
-            const usersSnap = await getDocs(query(collection(db, 'users'), where('role', '==', 'user')));
-            const staffSnap = await getDocs(query(collection(db, 'users'), where('role', '==', 'staff')));
+            const usersSnap = await getDocs(collection(db, 'users'));
             const appsSnap = await getDocs(collection(db, 'applications'));
             const ledgerSnap = await getDocs(collection(db, 'ledger'));
             const logsSnap = await getDocs(query(collection(db, 'activity_logs'), orderBy('timestamp', 'desc'), limit(10)));
-            return { usersSnap, staffSnap, appsSnap, ledgerSnap, logsSnap };
+            return { usersSnap, appsSnap, ledgerSnap, logsSnap };
           })();
 
-          const { usersSnap, staffSnap, appsSnap, ledgerSnap, logsSnap } = await Promise.race([fetchDataPromise, timeoutPromise]) as any;
+          const { usersSnap, appsSnap, ledgerSnap, logsSnap } = await Promise.race([fetchDataPromise, timeoutPromise]) as any;
           
-          console.log('Firestore data fetched successfully');
-          const totalUsers = usersSnap.size;
-          const totalStaff = staffSnap.size;
-          const totalApplications = appsSnap.size;
+          console.log('Firestore data fetched successfully for fallback');
+          
+          // Filter non-deleted items in memory
+          const activeUsers = usersSnap.docs.filter((doc: any) => !doc.data().deleted_at);
+          const activeApps = appsSnap.docs.filter((doc: any) => !doc.data().deleted_at);
+          const activeLedger = ledgerSnap.docs.filter((doc: any) => !doc.data().deleted_at);
+
+          const totalUsers = activeUsers.filter((doc: any) => doc.data().role === 'user').length;
+          const totalStaff = activeUsers.filter((doc: any) => doc.data().role === 'staff').length;
+          const totalApplications = activeApps.length;
           
           const pendingStatuses = ['Submitted', 'Under Review', 'Processing', 'Documents Required'];
           const approvedStatuses = ['Approved', 'Completed'];
@@ -99,9 +104,9 @@ const AdminDashboard = () => {
           const sevenDaysAgo = new Date();
           sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-          appsSnap.docs.forEach(doc => {
+          activeApps.forEach((doc: any) => {
             const data = doc.data();
-            const status = data.status;
+            const status = data.status || 'Unknown';
             statusMap.set(status, (statusMap.get(status) || 0) + 1);
             
             if (pendingStatuses.includes(status)) pendingApplications++;
@@ -116,14 +121,14 @@ const AdminDashboard = () => {
           });
 
           let totalRevenue = 0;
-          ledgerSnap.docs.forEach(doc => {
+          activeLedger.forEach((doc: any) => {
             totalRevenue += (doc.data().amount || 0);
           });
 
-          const recentApplications = appsSnap.docs
-            .sort((a, b) => (b.data().created_at?.toDate?.() || 0) - (a.data().created_at?.toDate?.() || 0))
+          const recentApplications = activeApps
+            .sort((a: any, b: any) => (b.data().created_at?.toDate?.() || 0) - (a.data().created_at?.toDate?.() || 0))
             .slice(0, 5)
-            .map(doc => ({
+            .map((doc: any) => ({
               id: doc.id,
               ...doc.data()
             }));
@@ -140,11 +145,11 @@ const AdminDashboard = () => {
               serviceRevenue: 0
             },
             appsByStatus: Array.from(statusMap.entries()).map(([name, value]) => ({ name, value })),
-            dailyApps: Array.from(dailyAppsMap.entries()).map(([date, count]) => ({ date, count })).sort((a, b) => a.date.localeCompare(b.date)),
+            dailyApps: Array.from(dailyAppsMap.entries()).map(([date, count]) => ({ date, count })).sort((a: any, b: any) => a.date.localeCompare(b.date)),
             recentApplications,
             topServices: [],
             staffPerformance: [],
-            adminLogs: logsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })),
+            adminLogs: logsSnap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() })),
             systemNotifications: []
           };
           
@@ -152,7 +157,7 @@ const AdminDashboard = () => {
           setLoading(false);
         } catch (fsErr) {
           console.error('Firestore fallback failed:', fsErr);
-          setError('Failed to load dashboard data. Please check your connection.');
+          setError('Failed to load dashboard data. The server may be restarting. Please try again in a few seconds.');
           setLoading(false);
         }
       } else {

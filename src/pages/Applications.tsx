@@ -150,8 +150,22 @@ const Applications = () => {
     try {
       const res = await api.get('/users');
       setStaffMembers(res.data.filter((u: any) => u.role === 'staff' || u.role === 'admin'));
-    } catch (err) {
-      console.error('Error fetching staff members:', err);
+    } catch (err: any) {
+      console.error('Error fetching staff members from API:', err);
+      
+      // Fallback to Firestore
+      if (err.message?.includes('HTML') || !err.response || err.code === 'ECONNABORTED' || err.response?.status >= 500) {
+        try {
+          console.log('Attempting to fetch staff from Firestore fallback for Applications...');
+          const snapshot = await getDocs(collection(db, 'users'));
+          const staffList = snapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() }))
+            .filter((u: any) => (u.role === 'staff' || u.role === 'admin') && !u.deleted_at);
+          setStaffMembers(staffList);
+        } catch (fsErr) {
+          console.error('Firestore staff fallback failed:', fsErr);
+        }
+      }
     }
   };
 
@@ -159,8 +173,19 @@ const Applications = () => {
     try {
       const res = await api.get('/service-links');
       setServiceLinks(res.data);
-    } catch (err) {
-      console.error('Error fetching service links:', err);
+    } catch (err: any) {
+      console.error('Error fetching service links from API:', err);
+      
+      // Fallback to Firestore
+      if (err.message?.includes('HTML') || !err.response || err.code === 'ECONNABORTED' || err.response?.status >= 500) {
+        try {
+          console.log('Attempting to fetch service links from Firestore fallback...');
+          const snapshot = await getDocs(collection(db, 'service_links'));
+          setServiceLinks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        } catch (fsErr) {
+          console.error('Firestore service links fallback failed:', fsErr);
+        }
+      }
     }
   };
 

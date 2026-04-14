@@ -3,6 +3,8 @@ import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { Search, Plus, Trash2, Shield, User, Edit2, Check, X } from 'lucide-react';
 import ConfirmDialog from '../components/ConfirmDialog';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 const UsersPage = () => {
   const { user } = useAuth();
@@ -40,9 +42,30 @@ const UsersPage = () => {
       const res = await api.get('/users');
       console.log('Users fetched successfully:', res.data);
       setUsers(Array.isArray(res.data) ? res.data : []);
-    } catch (err) {
-      console.error('Error fetching users:', err);
-      setUsers([]);
+    } catch (err: any) {
+      console.error('Error fetching users from API:', err);
+      
+      // Fallback to Firestore if API fails (e.g. server restarting)
+      if (err.message?.includes('HTML') || !err.response || err.code === 'ECONNABORTED' || err.response?.status >= 500) {
+        try {
+          console.log('Attempting to fetch users from Firestore fallback...');
+          const snapshot = await getDocs(collection(db, 'users'));
+          const usersList = snapshot.docs
+            .map(doc => ({
+              id: doc.id,
+              ...doc.data()
+            }))
+            .filter((u: any) => !u.deleted_at);
+          
+          console.log('Users fetched from Firestore successfully');
+          setUsers(usersList);
+        } catch (fsErr) {
+          console.error('Firestore fallback failed:', fsErr);
+          setUsers([]);
+        }
+      } else {
+        setUsers([]);
+      }
     }
   };
 

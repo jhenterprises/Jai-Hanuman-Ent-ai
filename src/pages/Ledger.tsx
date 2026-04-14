@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { Plus, Download, Search, Filter, Trash2 } from 'lucide-react';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 const Ledger = () => {
   const [ledger, setLedger] = useState<any[]>([]);
@@ -22,8 +24,45 @@ const Ledger = () => {
   }, []);
 
   const fetchLedger = async () => {
-    const res = await api.get('/ledger');
-    setLedger(res.data);
+    try {
+      const res = await api.get('/ledger');
+      setLedger(res.data);
+    } catch (err: any) {
+      console.error('Error fetching ledger from API:', err);
+      
+      // Fallback to Firestore if API fails (e.g. server restarting)
+      if (err.message?.includes('HTML') || !err.response || err.code === 'ECONNABORTED' || err.response?.status >= 500) {
+        try {
+          console.log('Attempting to fetch ledger from Firestore fallback...');
+          let q = query(collection(db, 'ledger'));
+          
+          if (user?.role === 'staff') {
+            q = query(collection(db, 'ledger'), where('staff_id', '==', user.uid));
+          }
+          
+          const snapshot = await getDocs(q);
+          const ledgerList = snapshot.docs
+            .map(doc => ({
+              id: doc.id,
+              ...doc.data()
+            }))
+            .filter((item: any) => !item.deleted_at)
+            .sort((a: any, b: any) => {
+              const dateA = a.created_at?.toDate ? a.created_at.toDate() : new Date(a.created_at || 0);
+              const dateB = b.created_at?.toDate ? b.created_at.toDate() : new Date(b.created_at || 0);
+              return dateB.getTime() - dateA.getTime();
+            });
+          
+          console.log('Ledger fetched from Firestore successfully');
+          setLedger(ledgerList);
+        } catch (fsErr) {
+          console.error('Firestore fallback failed:', fsErr);
+          setLedger([]);
+        }
+      } else {
+        setLedger([]);
+      }
+    }
   };
 
   const handleAdd = async (e: React.FormEvent) => {

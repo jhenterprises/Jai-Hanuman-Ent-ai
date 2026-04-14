@@ -50,9 +50,20 @@ const Dashboard = () => {
           const draftRes = await api.get('/application-drafts');
           setDrafts(draftRes.data);
         } catch (draftErr: any) {
-          console.error('Error fetching drafts:', draftErr);
-          if (draftErr.message?.includes('HTML')) {
-            // Silent fail
+          console.error('Error fetching drafts from API:', draftErr);
+          
+          // Fallback to Firestore for drafts
+          if (draftErr.message?.includes('HTML') || !draftErr.response || draftErr.code === 'ECONNABORTED' || draftErr.response?.status >= 500) {
+            try {
+              console.log('Attempting to fetch drafts from Firestore fallback...');
+              const draftSnap = await getDocs(query(
+                collection(db, 'application_drafts'),
+                where('userId', '==', user.uid)
+              ));
+              setDrafts(draftSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            } catch (fsErr) {
+              console.error('Firestore drafts fallback failed:', fsErr);
+            }
           }
         }
       } catch (err) {
