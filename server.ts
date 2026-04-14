@@ -1347,26 +1347,31 @@ app.delete('/api/application-drafts/:id', authenticateToken, async (req: any, re
 app.get('/api/users', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
     const { role } = req.query;
-    let query: any = db.collection('users').where('deleted_at', '==', null);
+    let query: any = db.collection('users');
     
     if (role) {
       query = query.where('role', '==', role);
     }
     
     const snapshot = await query.get();
-    console.log(`Fetching users: role=${role || 'all'}, count=${snapshot.size}`);
+    console.log(`Fetching users: role=${role || 'all'}, total_count=${snapshot.size}`);
     
-    const users = snapshot.docs.map(doc => {
-      const data = doc.data();
-      return {
-        id: doc.id,
-        name: data.name || 'Unknown',
-        email: data.email || '',
-        phone: data.phone || '',
-        role: data.role || 'user',
-        created_at: data.created_at
-      };
-    });
+    const users = snapshot.docs
+      .map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          name: data.name || 'Unknown',
+          email: data.email || '',
+          phone: data.phone || '',
+          role: data.role || 'user',
+          created_at: data.created_at,
+          deleted_at: data.deleted_at
+        };
+      })
+      .filter(u => !u.deleted_at); // Filter out deleted users in memory
+
+    console.log(`Returning ${users.length} non-deleted users`);
     res.json(users);
   } catch (err) {
     console.error('Error fetching users:', err);
@@ -1412,6 +1417,7 @@ app.post('/api/users', authenticateToken, requireRole(['admin']), async (req, re
       email,
       phone,
       role,
+      deleted_at: null,
       created_at: admin.firestore.FieldValue.serverTimestamp()
     });
 
@@ -1460,6 +1466,54 @@ app.put('/api/users/:id/role', authenticateToken, requireRole(['admin']), async 
     res.json({ message: 'User role updated' });
   } catch (err) {
     res.status(500).json({ error: 'Failed to update user role' });
+  }
+});
+
+app.post('/api/users/:id/set-password', authenticateToken, requireRole(['admin']), async (req: any, res) => {
+  const { id } = req.params;
+  const { password } = req.body;
+  
+  if (!password || password.length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters' });
+  }
+
+  try {
+    await admin.auth().updateUser(id, { password });
+    
+    const hashedPassword = bcrypt.hashSync(password, 10);
+    await db.collection('users').doc(id).update({ 
+      password: hashedPassword,
+      updated_at: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    res.json({ message: 'Password updated successfully' });
+  } catch (err: any) {
+    console.error('Set password error:', err);
+    res.status(500).json({ error: err.message || 'Failed to set password' });
+  }
+});
+
+app.post('/api/users/:id/reset-password', authenticateToken, requireRole(['admin']), async (req: any, res) => {
+  const { id } = req.params;
+  try {
+    const userRecord = await admin.auth().getUser(id);
+    if (!userRecord.email) {
+      return res.status(400).json({ error: 'User has no email address' });
+    }
+    
+    const tempPassword = Math.random().toString(36).slice(-8) + '123!';
+    await admin.auth().updateUser(id, { password: tempPassword });
+    
+    const hashedPassword = bcrypt.hashSync(tempPassword, 10);
+    await db.collection('users').doc(id).update({ 
+      password: hashedPassword,
+      updated_at: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    res.json({ message: 'Password reset successfully', tempPassword });
+  } catch (err: any) {
+    console.error('Reset password error:', err);
+    res.status(500).json({ error: err.message || 'Failed to reset password' });
   }
 });
 
@@ -1858,26 +1912,33 @@ app.patch('/api/service-links/:id/status', authenticateToken, requireRole(['admi
 // Ledger
 app.get('/api/ledger', authenticateToken, requireRole(['admin', 'staff']), async (req: any, res) => {
   try {
-    let query = db.collection('ledger').where('deleted_at', '==', null);
+    let query: any = db.collection('ledger');
     
     if (req.user.role === 'staff') {
-      query = query.where('staff_id', '==', req.user.id) as any;
+      query = query.where('staff_id', '==', req.user.id);
     }
     
-    const snapshot = await query.orderBy('created_at', 'desc').get();
+    const snapshot = await query.get();
     const usersSnapshot = await db.collection('users').get();
     const usersMap = new Map();
     usersSnapshot.docs.forEach(doc => usersMap.set(doc.id, doc.data()));
 
-    const ledger = snapshot.docs.map(doc => {
-      const data = doc.data();
-      const staff = usersMap.get(data.staff_id);
-      return {
-        id: doc.id,
-        ...data,
-        staff_name: staff?.name
-      };
-    });
+    const ledger = snapshot.docs
+      .map(doc => {
+        const data = doc.data();
+        const staff = usersMap.get(data.staff_id);
+        return {
+          id: doc.id,
+          ...data,
+          staff_name: staff?.name
+        };
+      })
+      .filter((item: any) => !item.deleted_at)
+      .sort((a: any, b: any) => {
+        const dateA = a.created_at?.toDate ? a.created_at.toDate() : new Date(a.created_at || 0);
+        const dateB = b.created_at?.toDate ? b.created_at.toDate() : new Date(b.created_at || 0);
+        return dateB.getTime() - dateA.getTime();
+      });
     res.json(ledger);
   } catch (err) {
     console.error('Ledger Error:', err);
@@ -1923,15 +1984,16 @@ app.delete('/api/ledger/:id', authenticateToken, requireRole(['admin']), async (
 // Analytics
 app.get('/api/analytics', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
-    const ledgerSnapshot = await db.collection('ledger').where('deleted_at', '==', null).get();
+    const ledgerSnapshot = await db.collection('ledger').get();
     const usersSnapshot = await db.collection('users').get();
     const appsSnapshot = await db.collection('applications').get();
     const logsSnapshot = await db.collection('activity_logs').orderBy('timestamp', 'desc').limit(10).get();
 
+    const activeLedger = ledgerSnapshot.docs.filter(doc => !doc.data().deleted_at);
     let totalRevenue = 0;
     let totalProfit = 0;
-    let totalTransactions = ledgerSnapshot.size;
-    ledgerSnapshot.forEach(doc => {
+    let totalTransactions = activeLedger.length;
+    activeLedger.forEach(doc => {
       const data = doc.data();
       totalRevenue += (data.amount || 0);
       totalProfit += (data.profit_amount || 0);
@@ -2119,28 +2181,32 @@ const getEnrichedApplication = async (applicationId: string) => {
 // Admin Dashboard Stats
 app.get('/api/admin/dashboard-overview', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
-    const usersSnapshot = await db.collection('users').where('role', '==', 'user').where('deleted_at', '==', null).get();
-    const staffSnapshot = await db.collection('users').where('role', '==', 'staff').where('deleted_at', '==', null).get();
-    const appsSnapshot = await db.collection('applications').where('deleted_at', '==', null).get();
-    const ledgerSnapshot = await db.collection('ledger').where('deleted_at', '==', null).get();
+    const usersSnapshot = await db.collection('users').where('role', '==', 'user').get();
+    const staffSnapshot = await db.collection('users').where('role', '==', 'staff').get();
+    const appsSnapshot = await db.collection('applications').get();
+    const ledgerSnapshot = await db.collection('ledger').get();
     const servicePaymentsSnapshot = await db.collection('service_payments').where('status', '==', 'success').get();
     const logsSnapshot = await db.collection('activity_logs').orderBy('timestamp', 'desc').limit(10).get();
     const notificationsSnapshot = await db.collection('notifications').orderBy('created_at', 'desc').limit(10).get();
 
-    const totalUsers = usersSnapshot.size;
-    const totalStaff = staffSnapshot.size;
-    const totalApplications = appsSnapshot.size;
+    // Filter non-deleted items in memory
+    const totalUsers = usersSnapshot.docs.filter(doc => !doc.data().deleted_at).length;
+    const totalStaff = staffSnapshot.docs.filter(doc => !doc.data().deleted_at).length;
+    const totalApplications = appsSnapshot.docs.filter(doc => !doc.data().deleted_at).length;
+    
+    const activeApps = appsSnapshot.docs.filter(doc => !doc.data().deleted_at);
+    const activeLedger = ledgerSnapshot.docs.filter(doc => !doc.data().deleted_at);
     
     const pendingStatuses = ['Submitted', 'Under Review', 'Processing', 'Documents Required'];
     const approvedStatuses = ['Approved', 'Completed'];
     
-    const pendingApplications = appsSnapshot.docs.filter(doc => pendingStatuses.includes(doc.data().status)).length;
-    const approvedApplications = appsSnapshot.docs.filter(doc => approvedStatuses.includes(doc.data().status)).length;
-    const rejectedApplications = appsSnapshot.docs.filter(doc => doc.data().status === 'Rejected').length;
+    const pendingApplications = activeApps.filter(doc => pendingStatuses.includes(doc.data().status)).length;
+    const approvedApplications = activeApps.filter(doc => approvedStatuses.includes(doc.data().status)).length;
+    const rejectedApplications = activeApps.filter(doc => doc.data().status === 'Rejected').length;
     
     let ledgerRevenue = 0;
     let ledgerProfit = 0;
-    ledgerSnapshot.forEach(doc => {
+    activeLedger.forEach(doc => {
       const data = doc.data();
       ledgerRevenue += (data.amount || 0);
       ledgerProfit += (data.profit_amount || 0);
@@ -2726,7 +2792,7 @@ app.post('/api/applications/finalize', authenticateToken, async (req: any, res) 
 
 app.get('/api/applications', authenticateToken, async (req: any, res) => {
   try {
-    let query = db.collection('applications').where('deleted_at', '==', null);
+    let query: any = db.collection('applications');
     
     if (req.user.role === 'user') {
       query = query.where('user_id', '==', req.user.id);
@@ -2734,11 +2800,14 @@ app.get('/api/applications', authenticateToken, async (req: any, res) => {
     
     const snapshot = await query.get();
     const applications = await Promise.all(snapshot.docs.map(doc => getEnrichedApplication(doc.id)));
-    const sortedApps = applications.filter(Boolean).sort((a: any, b: any) => {
-      const dateA = a.created_at?.toDate ? a.created_at.toDate() : new Date(a.created_at || 0);
-      const dateB = b.created_at?.toDate ? b.created_at.toDate() : new Date(b.created_at || 0);
-      return dateB.getTime() - dateA.getTime();
-    });
+    const sortedApps = applications
+      .filter(Boolean)
+      .filter((app: any) => !app.deleted_at)
+      .sort((a: any, b: any) => {
+        const dateA = a.created_at?.toDate ? a.created_at.toDate() : new Date(a.created_at || 0);
+        const dateB = b.created_at?.toDate ? b.created_at.toDate() : new Date(b.created_at || 0);
+        return dateB.getTime() - dateA.getTime();
+      });
     res.json(sortedApps);
   } catch (err) {
     console.error('Fetch applications error:', err);

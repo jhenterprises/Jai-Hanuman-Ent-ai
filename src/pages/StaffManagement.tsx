@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import api from '../services/api';
-import { Search, Shield, User, Lock, RefreshCw } from 'lucide-react';
+import { Search, Shield, User, Lock, RefreshCw, Plus, X } from 'lucide-react';
 
 const StaffManagement = () => {
   const [staff, setStaff] = useState<any[]>([]);
   const [search, setSearch] = useState('');
+  const [showAdd, setShowAdd] = useState(false);
+  const [newStaff, setNewStaff] = useState({ name: '', email: '', phone: '', password: '', role: 'staff' });
 
   useEffect(() => {
     fetchStaff();
@@ -22,14 +24,45 @@ const StaffManagement = () => {
     }
   };
 
+  const handleAdd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await api.post('/users', newStaff);
+      setShowAdd(false);
+      setNewStaff({ name: '', email: '', phone: '', password: '', role: 'staff' });
+      fetchStaff();
+      alert('Staff member added successfully');
+    } catch (err: any) {
+      console.error('Error adding staff:', err);
+      alert(err.response?.data?.error || 'Failed to add staff member');
+    }
+  };
+
   const handleResetPassword = async (id: string) => {
-    // Implementation for password reset
-    alert('Temporary password generated successfully.');
+    if (!window.confirm('Are you sure you want to reset this staff member\'s password?')) return;
+    try {
+      const res = await api.post(`/users/${id}/reset-password`);
+      alert(`Password reset successfully. Temporary password: ${res.data.tempPassword}\n\nPlease share this with the staff member.`);
+    } catch (err: any) {
+      console.error('Reset password error:', err);
+      alert(err.response?.data?.error || 'Failed to reset password');
+    }
   };
 
   const handleSetPassword = async (id: string) => {
-    // Implementation for setting password
-    alert('Set new password functionality would go here.');
+    const newPassword = window.prompt('Enter new password (min 6 characters):');
+    if (!newPassword) return;
+    if (newPassword.length < 6) {
+      alert('Password must be at least 6 characters');
+      return;
+    }
+    try {
+      await api.post(`/users/${id}/set-password`, { password: newPassword });
+      alert('Password updated successfully');
+    } catch (err: any) {
+      console.error('Set password error:', err);
+      alert(err.response?.data?.error || 'Failed to set password');
+    }
   };
 
   const filtered = staff.filter(s => 
@@ -39,7 +72,66 @@ const StaffManagement = () => {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-white">Staff Management</h1>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <h1 className="text-3xl font-bold text-white">Staff Management</h1>
+        <button 
+          onClick={() => setShowAdd(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-colors w-fit"
+        >
+          <Plus size={20} />
+          <span>Add Staff</span>
+        </button>
+      </div>
+
+      {showAdd && (
+        <div className="bg-slate-800/60 backdrop-blur-xl rounded-3xl p-6 border border-slate-700/50 shadow-lg mb-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold text-white">Add New Staff Member</h2>
+            <button onClick={() => setShowAdd(false)} className="text-slate-400 hover:text-white">
+              <X size={24} />
+            </button>
+          </div>
+          <form onSubmit={handleAdd} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="space-y-1">
+              <label className="text-xs text-slate-400 ml-1">Full Name</label>
+              <input 
+                type="text" placeholder="Full Name" required
+                value={newStaff.name} onChange={e => setNewStaff({...newStaff, name: e.target.value})}
+                className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 focus:border-blue-500 outline-none"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-slate-400 ml-1">Email</label>
+              <input 
+                type="email" placeholder="Email" required
+                value={newStaff.email} onChange={e => setNewStaff({...newStaff, email: e.target.value})}
+                className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 focus:border-blue-500 outline-none"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-slate-400 ml-1">Phone</label>
+              <input 
+                type="tel" placeholder="Phone" required
+                value={newStaff.phone} onChange={e => setNewStaff({...newStaff, phone: e.target.value})}
+                className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 focus:border-blue-500 outline-none"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-slate-400 ml-1">Password</label>
+              <input 
+                type="password" placeholder="Password" required
+                value={newStaff.password} onChange={e => setNewStaff({...newStaff, password: e.target.value})}
+                className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 focus:border-blue-500 outline-none"
+              />
+            </div>
+            <div className="lg:col-span-4 flex justify-end gap-2 mt-2">
+              <button type="button" onClick={() => setShowAdd(false)} className="px-4 py-2 text-slate-400 hover:text-white">Cancel</button>
+              <button type="submit" className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-medium">Save Staff Member</button>
+            </div>
+          </form>
+        </div>
+      )}
+
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
         <input 

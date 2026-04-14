@@ -48,10 +48,44 @@ const UsersPage = () => {
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
-    await api.post('/users', newUser);
-    setShowAdd(false);
-    setNewUser({ name: '', email: '', phone: '', password: '', role: 'user' });
-    fetchUsers();
+    try {
+      await api.post('/users', newUser);
+      setShowAdd(false);
+      setNewUser({ name: '', email: '', phone: '', password: '', role: 'user' });
+      fetchUsers();
+      alert('User added successfully');
+    } catch (err: any) {
+      console.error('Error adding user:', err);
+      const errorMsg = err.response?.data?.error || 'Failed to add user. Please try again.';
+      alert(errorMsg);
+    }
+  };
+
+  const handleResetPassword = async (id: string) => {
+    if (!window.confirm('Are you sure you want to reset this user\'s password to a temporary one?')) return;
+    try {
+      const res = await api.post(`/users/${id}/reset-password`);
+      alert(`Password reset successfully. Temporary password: ${res.data.tempPassword}\n\nPlease share this with the user.`);
+    } catch (err: any) {
+      console.error('Reset password error:', err);
+      alert(err.response?.data?.error || 'Failed to reset password');
+    }
+  };
+
+  const handleSetPassword = async (id: string) => {
+    const newPassword = window.prompt('Enter new password (min 6 characters):');
+    if (!newPassword) return;
+    if (newPassword.length < 6) {
+      alert('Password must be at least 6 characters');
+      return;
+    }
+    try {
+      await api.post(`/users/${id}/set-password`, { password: newPassword });
+      alert('Password updated successfully');
+    } catch (err: any) {
+      console.error('Set password error:', err);
+      alert(err.response?.data?.error || 'Failed to set password');
+    }
   };
 
   const handleDelete = (id: string) => {
@@ -227,8 +261,8 @@ const UsersPage = () => {
                     )}
                   </td>
                   <td className="p-4 flex gap-2">
-                    <button onClick={() => alert('Reset Password functionality')} className="text-blue-400 hover:text-blue-300 text-xs">Reset</button>
-                    <button onClick={() => alert('Set Password functionality')} className="text-green-400 hover:text-green-300 text-xs">Set</button>
+                    <button onClick={() => handleResetPassword(item.id)} className="text-blue-400 hover:text-blue-300 text-xs">Reset</button>
+                    <button onClick={() => handleSetPassword(item.id)} className="text-green-400 hover:text-green-300 text-xs">Set</button>
                   </td>
                   <td className="p-4 text-right">
                     {isAdmin && (
