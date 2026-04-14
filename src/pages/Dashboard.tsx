@@ -26,6 +26,8 @@ const Dashboard = () => {
         if (!user) return;
 
         // Fetch from Firestore
+        if (!user?.uid) return;
+
         const q = query(
           collection(db, 'applications'),
           where('userId', '==', user.uid),
@@ -36,9 +38,11 @@ const Dashboard = () => {
         setApplications(apps);
 
         // Fetch wallet from Firestore
-        const walletDoc = await getDocs(query(collection(db, 'wallets'), where('user_id', '==', user.uid)));
-        if (!walletDoc.empty) {
-          setWalletBalance(walletDoc.docs[0].data().balance || 0);
+        if (user?.uid) {
+          const walletDoc = await getDocs(query(collection(db, 'wallets'), where('user_id', '==', user.uid)));
+          if (!walletDoc.empty) {
+            setWalletBalance(walletDoc.docs[0].data().balance || 0);
+          }
         }
 
         // Fetch drafts from API

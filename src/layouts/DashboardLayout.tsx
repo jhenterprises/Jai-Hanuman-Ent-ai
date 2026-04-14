@@ -57,7 +57,7 @@ const DashboardLayout = () => {
   }, [user]);
 
   const fetchNotifications = async () => {
-    if (!auth.currentUser || !user) return;
+    if (!auth.currentUser || !user?.uid) return;
     try {
       const q = query(
         collection(db, 'notifications'),

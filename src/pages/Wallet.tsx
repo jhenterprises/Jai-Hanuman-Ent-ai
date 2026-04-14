@@ -38,7 +38,7 @@ const Wallet = () => {
   const fetchWalletData = async () => {
     try {
       // Fetch balance from Firestore
-      if (user) {
+      if (user?.uid) {
         const walletSnap = await getDocs(query(collection(db, 'wallets'), where('user_id', '==', user.uid)));
         if (!walletSnap.empty) {
           setWallet({ balance: walletSnap.docs[0].data().balance || 0 });

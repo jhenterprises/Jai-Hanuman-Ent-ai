@@ -84,10 +84,13 @@ const Applications = () => {
     try {
       let q = query(collection(db, 'applications'));
       
-      if (user?.role === 'user') {
+      if (user?.role === 'user' && user?.uid) {
         q = query(q, where('userId', '==', user.uid));
-      } else if (user?.role === 'staff') {
+      } else if (user?.role === 'staff' && user?.uid) {
         q = query(q, where('assigned_staff', '==', user.uid));
+      } else if (user?.role !== 'admin') {
+        setApplications([]);
+        return;
       }
 
       if (filters.status !== 'All') {
