@@ -24,6 +24,7 @@ const AdminDashboard = () => {
   const navigate = useNavigate();
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [openActionMenuId, setOpenActionMenuId] = useState<string | null>(null);
@@ -32,7 +33,7 @@ const AdminDashboard = () => {
   useEffect(() => {
     fetchStats();
     // Poll every 30 seconds for real-time feel
-    const interval = setInterval(fetchStats, 30000);
+    const interval = setInterval(fetchStats, 60000);
     
     const handleClickOutside = (event: MouseEvent) => {
       if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
@@ -49,9 +50,10 @@ const AdminDashboard = () => {
       clearInterval(interval);
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, []);
+  }, [user]);
 
   const fetchStats = async () => {
+    setError(null);
     try {
       // Try API first
       const res = await api.get('/admin/dashboard-overview');
@@ -60,16 +62,28 @@ const AdminDashboard = () => {
     } catch (err: any) {
       console.error('Error fetching admin stats from API:', err);
       
-      // If API fails (e.g. server restarting), try to fetch basic stats from Firestore
-      if (err.message?.includes('HTML') || !err.response) {
+      // If API fails (e.g. server restarting or Vercel function timeout), try to fetch basic stats from Firestore
+      if (err.message?.includes('HTML') || !err.response || err.code === 'ECONNABORTED' || err.response?.status >= 500) {
         try {
           console.log('Attempting to fetch stats from Firestore fallback...');
-          const usersSnap = await getDocs(query(collection(db, 'users'), where('role', '==', 'user')));
-          const staffSnap = await getDocs(query(collection(db, 'users'), where('role', '==', 'staff')));
-          const appsSnap = await getDocs(collection(db, 'applications'));
-          const ledgerSnap = await getDocs(collection(db, 'ledger'));
-          const logsSnap = await getDocs(query(collection(db, 'activity_logs'), orderBy('timestamp', 'desc'), limit(10)));
           
+          // Add a timeout to Firestore calls as well
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Firestore request timed out')), 10000)
+          );
+
+          const fetchDataPromise = (async () => {
+            const usersSnap = await getDocs(query(collection(db, 'users'), where('role', '==', 'user')));
+            const staffSnap = await getDocs(query(collection(db, 'users'), where('role', '==', 'staff')));
+            const appsSnap = await getDocs(collection(db, 'applications'));
+            const ledgerSnap = await getDocs(collection(db, 'ledger'));
+            const logsSnap = await getDocs(query(collection(db, 'activity_logs'), orderBy('timestamp', 'desc'), limit(10)));
+            return { usersSnap, staffSnap, appsSnap, ledgerSnap, logsSnap };
+          })();
+
+          const { usersSnap, staffSnap, appsSnap, ledgerSnap, logsSnap } = await Promise.race([fetchDataPromise, timeoutPromise]) as any;
+          
+          console.log('Firestore data fetched successfully');
           const totalUsers = usersSnap.size;
           const totalStaff = staffSnap.size;
           const totalApplications = appsSnap.size;
@@ -138,7 +152,12 @@ const AdminDashboard = () => {
           setLoading(false);
         } catch (fsErr) {
           console.error('Firestore fallback failed:', fsErr);
+          setError('Failed to load dashboard data. Please check your connection.');
+          setLoading(false);
         }
+      } else {
+        setError('Failed to load dashboard data from server.');
+        setLoading(false);
       }
     }
   };
@@ -148,13 +167,31 @@ const AdminDashboard = () => {
     navigate('/login?loggedOut=true');
   };
 
-  if (loading || !stats) {
+  if (loading) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
         <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
   }
+
+  if (error && !stats) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center space-y-4">
+        <div className="p-4 bg-rose-50 text-rose-600 rounded-xl border border-rose-100 max-w-md text-center">
+          <p className="font-medium">{error}</p>
+          <button 
+            onClick={() => { setLoading(true); fetchStats(); }}
+            className="mt-4 px-6 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-colors"
+          >
+            Retry Loading
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!stats) return null;
 
   const { overview, appsByStatus, dailyApps, recentApplications, topServices, staffPerformance, adminLogs } = stats;
 
