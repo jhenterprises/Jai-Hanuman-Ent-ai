@@ -177,39 +177,33 @@ const DashboardLayout = () => {
             );
           })}
         </nav>
-
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-slate-700/50">
-          <div className="flex items-center gap-3 px-4 py-3 mb-2 rounded-xl bg-slate-800/50 border border-slate-700/50">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-slate-600 to-slate-700 flex items-center justify-center font-bold text-sm">
-              {user?.name.charAt(0).toUpperCase()}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-slate-200 truncate">{user?.name}</p>
-              <p className="text-xs text-slate-400 capitalize">{user?.role}</p>
-            </div>
-          </div>
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-3 px-4 py-3 w-full rounded-xl text-red-400 hover:bg-red-500/10 transition-colors"
-          >
-            <LogOut size={20} />
-            <span className="font-medium">Logout</span>
-          </button>
-        </div>
       </aside>
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-800 via-slate-900 to-black">
         {/* Topbar */}
         <header className="h-16 flex items-center justify-between px-6 bg-slate-800/40 backdrop-blur-md border-b border-slate-700/50 z-10">
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="lg:hidden text-slate-400 hover:text-white"
-          >
-            <Menu size={24} />
-          </button>
+          <div className="flex items-center">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="lg:hidden text-slate-400 hover:text-white"
+            >
+              <Menu size={24} />
+            </button>
+          </div>
+
+          {/* User Name in Center */}
+          <div className="hidden md:flex items-center gap-3 px-4 py-1.5 rounded-full bg-slate-800/50 border border-slate-700/50">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-gold-500 flex items-center justify-center font-bold text-xs text-white shadow-lg shadow-blue-500/20">
+              {user?.name.charAt(0).toUpperCase()}
+            </div>
+            <div className="flex flex-col">
+              <span className="text-sm font-bold text-white leading-none">{user?.name}</span>
+              <span className="text-[10px] text-slate-400 uppercase tracking-wider font-medium">{user?.role}</span>
+            </div>
+          </div>
           
-          <div className="flex-1 flex justify-end items-center gap-4">
+          <div className="flex items-center gap-4">
             {/* Notifications */}
             <div className="relative">
               <button 

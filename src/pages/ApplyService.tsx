@@ -739,37 +739,42 @@ const ApplyService = () => {
       const referenceNumber = `APP-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
 
       // Save application to Firestore
+      const userId = currentUser.uid;
+      if (!userId) {
+        throw new Error('User ID is missing. Please try logging out and in again.');
+      }
+
       const applicationData: any = {
-        userId: currentUser.uid,
-        user_name: user?.name || currentUser.displayName || 'Unknown',
-        user_email: user?.email || currentUser.email || 'No Email',
-        user_phone: user?.phone || 'No Phone',
-        service_id: serviceDetails?.service_id || 0,
-        service_name: serviceName,
-        service_type: serviceName,
-        form_data: filteredFormData,
-        documents: uploadedDocuments,
+        userId: String(userId),
+        user_name: String(user?.name || currentUser.displayName || 'Unknown'),
+        user_email: String(user?.email || currentUser.email || 'No Email'),
+        user_phone: String(user?.phone || 'No Phone'),
+        service_id: Number(serviceDetails?.service_id || 0),
+        service_name: String(serviceName),
+        service_type: String(serviceName),
+        form_data: filteredFormData || {},
+        documents: uploadedDocuments || [],
         status: 'Pending',
         payment_status: serviceDetails?.payment_required ? 'Pending' : 'Free',
-        reference_number: referenceNumber,
+        reference_number: String(referenceNumber),
         created_at: serverTimestamp(),
         updated_at: serverTimestamp()
       };
 
-      // Clean data: remove any undefined values to prevent Firestore errors
+      // Final safety check: remove any remaining undefined values
+      const finalData: Record<string, any> = {};
       Object.keys(applicationData).forEach(key => {
-        if (applicationData[key] === undefined) {
-          delete applicationData[key];
+        if (applicationData[key] !== undefined) {
+          finalData[key] = applicationData[key];
         }
       });
 
-      console.log('Submitting application to Firestore:', {
-        userId: applicationData.userId,
-        service: applicationData.service_name,
-        ref: applicationData.reference_number
+      console.log('Final Application Data for Firestore:', {
+        ...finalData,
+        userId: finalData.userId // Ensure we see this in logs
       });
 
-      const docRef = await addDoc(collection(db, 'applications'), applicationData);
+      const docRef = await addDoc(collection(db, 'applications'), finalData);
       
       // If payment is required, we still show the payment step but now we have a Firestore ID
       if (serviceDetails?.payment_required && serviceDetails?.service_price > 0 && !paymentStatus.paid && user?.role === 'user') {

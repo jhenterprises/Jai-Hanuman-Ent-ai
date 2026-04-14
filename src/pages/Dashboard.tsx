@@ -58,7 +58,7 @@ const Dashboard = () => {
               console.log('Attempting to fetch drafts from Firestore fallback...');
               const draftSnap = await getDocs(query(
                 collection(db, 'application_drafts'),
-                where('userId', '==', user.uid)
+                where('user_id', '==', user.uid)
               ));
               setDrafts(draftSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
             } catch (fsErr) {

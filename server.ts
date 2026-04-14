@@ -1292,9 +1292,30 @@ app.get('/api/application-drafts', authenticateToken, async (req: any, res) => {
       .where('user_id', '==', req.user.id)
       .get();
     
-    const servicesSnapshot = await db.collection('services').get();
+    if (snapshot.empty) {
+      return res.json([]);
+    }
+
+    // Get unique service IDs from drafts
+    const serviceIds = [...new Set(snapshot.docs.map(doc => doc.data().service_id).filter(Boolean))];
+    
     const servicesMap = new Map();
-    servicesSnapshot.docs.forEach(doc => servicesMap.set(doc.id, doc.data()));
+    if (serviceIds.length > 0) {
+      // Fetch only the services that are referenced in the drafts
+      // Firestore 'in' query supports up to 10 items. If more, we might need a different approach
+      // but usually a user won't have drafts for more than 10 different services at once.
+      // For safety, if there are many, we can fetch all or chunk it.
+      if (serviceIds.length <= 10) {
+        const servicesSnapshot = await db.collection('services')
+          .where(admin.firestore.FieldPath.documentId(), 'in', serviceIds)
+          .get();
+        servicesSnapshot.docs.forEach(doc => servicesMap.set(doc.id, doc.data()));
+      } else {
+        // Fallback to fetching all if there are too many unique services (rare for drafts)
+        const servicesSnapshot = await db.collection('services').get();
+        servicesSnapshot.docs.forEach(doc => servicesMap.set(doc.id, doc.data()));
+      }
+    }
 
     const drafts = snapshot.docs.map(doc => {
       const data = doc.data();
@@ -1302,7 +1323,7 @@ app.get('/api/application-drafts', authenticateToken, async (req: any, res) => {
       return {
         id: doc.id,
         ...data,
-        service_name: service?.service_name
+        service_name: service?.service_name || data.service_type || 'Unknown Service'
       };
     }).sort((a: any, b: any) => {
       const dateA = a.created_at?.toDate ? a.created_at.toDate() : new Date(a.created_at || 0);
@@ -2140,12 +2161,18 @@ const generateReferenceNumber = async () => {
 
 // Helper to get enriched application
 const getEnrichedApplication = async (applicationId: string) => {
+  if (!applicationId) return null;
+  
   const appDoc = await db.collection('applications').doc(applicationId).get();
   if (!appDoc.exists) return null;
   
   const appData = appDoc.data();
-  const userDoc = await db.collection('users').doc(appData?.user_id).get();
-  const userData = userDoc.data();
+  
+  let userData = null;
+  if (appData?.user_id) {
+    const userDoc = await db.collection('users').doc(appData.user_id).get();
+    userData = userDoc.data();
+  }
   
   let staffData = null;
   if (appData?.assigned_staff) {
@@ -2153,8 +2180,11 @@ const getEnrichedApplication = async (applicationId: string) => {
     staffData = staffDoc.data();
   }
   
-  const serviceDoc = await db.collection('services').doc(appData?.service_id).get();
-  const serviceData = serviceDoc.data();
+  let serviceData = null;
+  if (appData?.service_id) {
+    const serviceDoc = await db.collection('services').doc(appData.service_id).get();
+    serviceData = serviceDoc.data();
+  }
   
   const documentsSnapshot = await db.collection('application_documents').where('application_id', '==', applicationId).get();
   const documents = documentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -2345,6 +2375,9 @@ app.get('/api/admin/dashboard-overview', authenticateToken, requireRole(['admin'
 // Payments
 app.post('/api/payments/create-order', authenticateToken, async (req: any, res) => {
   const { service_id } = req.body;
+  if (!service_id) {
+    return res.status(400).json({ error: 'Service ID is required' });
+  }
   try {
     const serviceDoc = await db.collection('services').doc(service_id).get();
     if (!serviceDoc.exists) return res.status(404).json({ error: 'Service not found' });
@@ -2416,6 +2449,10 @@ app.post('/api/payments/wallet-pay', authenticateToken, async (req: any, res) =>
   const { serviceId, service_id } = req.body;
   const sId = serviceId || service_id;
   const userId = req.user.id;
+
+  if (!sId) {
+    return res.status(400).json({ error: 'Service ID is required' });
+  }
 
   try {
     const serviceDoc = await db.collection('services').doc(sId).get();
@@ -2632,6 +2669,24 @@ app.post('/api/applications', authenticateToken, upload.array('documents', 20), 
     const appRef = db.collection('applications').doc();
     const applicationId = appRef.id;
 
+    let assignedStaffId = req.user.role === 'staff' ? req.user.id : null;
+    if (!assignedStaffId) {
+      try {
+        const staffSnapshot = await db.collection('users').where('role', 'in', ['staff', 'admin']).get();
+        if (!staffSnapshot.empty) {
+          const staffDocs = staffSnapshot.docs.filter(d => d.data().role === 'staff');
+          const adminDocs = staffSnapshot.docs.filter(d => d.data().role === 'admin');
+          const available = staffDocs.length > 0 ? staffDocs : adminDocs;
+          if (available.length > 0) {
+            const randomIndex = Math.floor(Math.random() * available.length);
+            assignedStaffId = available[randomIndex].id;
+          }
+        }
+      } catch (e) {
+        console.error('Error auto-assigning staff:', e);
+      }
+    }
+
     const applicationData = {
       reference_number,
       user_id: userId,
@@ -2641,7 +2696,7 @@ app.post('/api/applications', authenticateToken, upload.array('documents', 20), 
       status: 'Submitted',
       payment_status: (payment_id ? 'Paid' : 'Pending'),
       created_by: createdBy,
-      assigned_staff: (req.user.role === 'staff' ? req.user.id : null),
+      assigned_staff: assignedStaffId,
       payment_id: payment_id || null,
       payment_mode,
       created_at: admin.firestore.FieldValue.serverTimestamp(),
@@ -2710,6 +2765,10 @@ app.post('/api/applications/finalize', authenticateToken, async (req: any, res) 
   const { draft_id, payment_id } = req.body;
   const userId = req.user.id;
 
+  if (!draft_id) {
+    return res.status(400).json({ error: 'Draft ID is required' });
+  }
+
   try {
     const draftRef = db.collection('application_drafts').doc(draft_id);
     const draftDoc = await draftRef.get();
@@ -2718,13 +2777,20 @@ app.post('/api/applications/finalize', authenticateToken, async (req: any, res) 
     }
     const draft = draftDoc.data();
 
-    const serviceDoc = await db.collection('services').doc(draft?.service_id).get();
+    if (!draft?.service_id) {
+      return res.status(400).json({ error: 'Invalid draft: missing service ID' });
+    }
+
+    const serviceDoc = await db.collection('services').doc(draft.service_id).get();
     if (!serviceDoc.exists) {
       return res.status(404).json({ error: 'Service not found' });
     }
     const service = serviceDoc.data();
 
     // Verify payment
+    if (!payment_id) {
+      return res.status(400).json({ error: 'Payment ID is required' });
+    }
     const paymentDoc = await db.collection('service_payments').doc(payment_id).get();
     const payment = paymentDoc.data();
     if (!paymentDoc.exists || payment?.user_id !== userId || payment?.service_id !== draft?.service_id || payment?.status !== 'success') {
@@ -2734,6 +2800,24 @@ app.post('/api/applications/finalize', authenticateToken, async (req: any, res) 
     const reference_number = await generateReferenceNumber();
     const appRef = db.collection('applications').doc();
     const applicationId = appRef.id;
+
+    let assignedStaffId = req.user.role === 'staff' ? req.user.id : null;
+    if (!assignedStaffId) {
+      try {
+        const staffSnapshot = await db.collection('users').where('role', 'in', ['staff', 'admin']).get();
+        if (!staffSnapshot.empty) {
+          const staffDocs = staffSnapshot.docs.filter(d => d.data().role === 'staff');
+          const adminDocs = staffSnapshot.docs.filter(d => d.data().role === 'admin');
+          const available = staffDocs.length > 0 ? staffDocs : adminDocs;
+          if (available.length > 0) {
+            const randomIndex = Math.floor(Math.random() * available.length);
+            assignedStaffId = available[randomIndex].id;
+          }
+        }
+      } catch (e) {
+        console.error('Error auto-assigning staff:', e);
+      }
+    }
 
     await db.runTransaction(async (transaction) => {
       // 1. Create application
@@ -2746,6 +2830,7 @@ app.post('/api/applications/finalize', authenticateToken, async (req: any, res) 
         status: 'Submitted',
         payment_status: 'Paid',
         created_by: 'user',
+        assigned_staff: assignedStaffId,
         payment_id: payment_id,
         payment_mode: payment?.payment_mode,
         created_at: admin.firestore.FieldValue.serverTimestamp(),
@@ -2941,54 +3026,71 @@ app.patch('/api/applications/:id/status', authenticateToken, requireRole(['admin
     const appData = appDoc.data();
 
     await db.runTransaction(async (transaction) => {
-      transaction.update(appRef, {
+      const updateData: any = {
         status,
         assigned_staff: req.user.id,
         updated_at: admin.firestore.FieldValue.serverTimestamp()
-      });
+      };
+      
+      // Remove undefined properties to prevent Firestore errors
+      Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
+      
+      transaction.update(appRef, updateData);
 
       const updateRef = db.collection('application_updates').doc();
-      transaction.set(updateRef, {
+      const updateEntry: any = {
         application_id: applicationId,
         status,
         comment: comment || `Status updated to ${status}`,
         updated_by: req.user.id,
         updated_at: admin.firestore.FieldValue.serverTimestamp()
-      });
+      };
+      Object.keys(updateEntry).forEach(key => updateEntry[key] === undefined && delete updateEntry[key]);
+      transaction.set(updateRef, updateEntry);
 
       // Handle new documents from staff/admin
       const files = req.files as Express.Multer.File[];
-      if (files) {
+      if (files && files.length > 0) {
         files.forEach(f => {
-          const filePath = `/uploads/${appData?.service_type}/${appData?.user_id}/${f.filename}`;
+          const serviceType = appData?.service_type || 'general';
+          const userId = appData?.user_id || appData?.userId || 'unknown';
+          const filePath = `/uploads/${serviceType}/${userId}/${f.filename}`;
           const docRef = db.collection('application_documents').doc();
-          transaction.set(docRef, {
+          const docData: any = {
             application_id: applicationId,
             file_path: filePath,
             file_name: f.originalname,
             uploaded_by: req.user.id,
             created_at: admin.firestore.FieldValue.serverTimestamp()
-          });
+          };
+          Object.keys(docData).forEach(key => docData[key] === undefined && delete docData[key]);
+          transaction.set(docRef, docData);
         });
       }
 
       // Notify User
-      const notifRef = db.collection('notifications').doc();
-      transaction.set(notifRef, {
-        user_id: appData?.user_id,
-        message: `Your application ${appData?.reference_number} status updated to ${status}.`,
-        is_read: false,
-        created_at: admin.firestore.FieldValue.serverTimestamp()
-      });
+      if (appData?.user_id || appData?.userId) {
+        const notifRef = db.collection('notifications').doc();
+        const notifData: any = {
+          user_id: appData?.user_id || appData?.userId,
+          message: `Your application ${appData?.reference_number || 'update'} status updated to ${status}.`,
+          is_read: false,
+          created_at: admin.firestore.FieldValue.serverTimestamp()
+        };
+        Object.keys(notifData).forEach(key => notifData[key] === undefined && delete notifData[key]);
+        transaction.set(notifRef, notifData);
+      }
 
       // Activity log
       const logRef = db.collection('activity_logs').doc();
-      transaction.set(logRef, {
+      const logData: any = {
         user_id: req.user.id,
-        action: `Updated status to ${status} for ${appData?.reference_number}`,
+        action: `Updated status to ${status} for ${appData?.reference_number || applicationId}`,
         application_id: applicationId,
         timestamp: admin.firestore.FieldValue.serverTimestamp()
-      });
+      };
+      Object.keys(logData).forEach(key => logData[key] === undefined && delete logData[key]);
+      transaction.set(logRef, logData);
 
       // Credit commission to staff if status is 'Completed'
       if (status === 'Completed' && req.user.role === 'staff') {
@@ -3180,6 +3282,8 @@ app.get('/api/recycle-bin', authenticateToken, requireRole(['admin']), async (re
 
 app.post('/api/recycle-bin/restore', authenticateToken, requireRole(['admin']), async (req, res) => {
   const { id, type } = req.body;
+  if (!id) return res.status(400).json({ error: 'ID is required' });
+  
   let collection = '';
   if (type === 'service') collection = 'services';
   else if (type === 'user') collection = 'users';
