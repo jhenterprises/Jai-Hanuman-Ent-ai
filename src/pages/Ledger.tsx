@@ -178,7 +178,7 @@ const Ledger = () => {
                 <th className="p-4 text-slate-300 font-semibold">Profit</th>
                 <th className="p-4 text-slate-300 font-semibold">Total</th>
                 {user?.role === 'admin' && <th className="p-4 text-slate-300 font-semibold">Staff</th>}
-                {user?.role === 'admin' && <th className="p-4 text-slate-300 font-semibold text-right">Actions</th>}
+                {(user?.role === 'admin' || user?.role === 'staff') && <th className="p-4 text-slate-300 font-semibold text-right">Actions</th>}
               </tr>
             </thead>
             <tbody>
@@ -191,7 +191,7 @@ const Ledger = () => {
                   <td className="p-4 text-green-400">₹{item.profit_amount || 0}</td>
                   <td className="p-4 text-blue-400 font-medium">₹{item.amount || 0}</td>
                   {user?.role === 'admin' && <td className="p-4 text-slate-400">{item.staff_name}</td>}
-                  {user?.role === 'admin' && (
+                  {(user?.role === 'admin' || (user?.role === 'staff' && item.staff_id === user?.uid)) && (
                     <td className="p-4 text-right">
                       <button 
                         onClick={() => handleDelete(item.id)}

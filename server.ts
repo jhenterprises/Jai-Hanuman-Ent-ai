@@ -1998,13 +1998,34 @@ app.post('/api/ledger', authenticateToken, requireRole(['admin', 'staff']), asyn
   }
 });
 
-app.delete('/api/ledger/:id', authenticateToken, requireRole(['admin']), async (req: any, res) => {
+app.delete('/api/ledger/:id', authenticateToken, requireRole(['admin', 'staff']), async (req: any, res) => {
+  const { id } = req.params;
+  if (!id) return res.status(400).json({ error: 'Ledger ID is required' });
+
   try {
-    await db.collection('ledger').doc(req.params.id).update({ 
+    const ledgerRef = db.collection('ledger').doc(id);
+    const ledgerDoc = await ledgerRef.get();
+
+    if (!ledgerDoc.exists) {
+      return res.status(404).json({ error: 'Ledger entry not found' });
+    }
+
+    const ledgerData = ledgerDoc.data();
+    const userEmail = (req.user?.email || '').toLowerCase().trim();
+    const isPrimaryAdmin = ADMIN_EMAILS.includes(userEmail);
+
+    // Only admin or the staff who created the entry can delete it
+    if (req.user.role !== 'admin' && !isPrimaryAdmin && ledgerData?.staff_id !== req.user.id) {
+      return res.status(403).json({ error: 'Unauthorized to delete this entry' });
+    }
+
+    await ledgerRef.update({ 
       deleted_at: admin.firestore.FieldValue.serverTimestamp() 
     });
+    
     res.json({ message: 'Ledger entry moved to Recycle Bin' });
   } catch (err) {
+    console.error('Delete Ledger Error:', err);
     res.status(500).json({ error: 'Failed to delete ledger entry' });
   }
 });
