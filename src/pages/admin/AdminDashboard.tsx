@@ -406,7 +406,7 @@ const AdminDashboard = () => {
                     <tr key={app.id} className="hover:bg-slate-50 transition-colors">
                       <td className="p-4 font-mono text-xs font-medium text-slate-900">{app.reference_number}</td>
                       <td className="p-4 text-sm text-slate-700">{app.user_name}</td>
-                      <td className="p-4 text-sm text-slate-700 capitalize">{(app.service_name || app.service_type || '').replace(/-/g, ' ')}</td>
+                      <td className="p-4 text-sm text-slate-700 capitalize">{(app.service_name || app.name || app.service_type || '').replace(/-/g, ' ')}</td>
                       <td className="p-4 text-sm text-slate-500">{safeFormat(app.created_at, 'dd/MM/yyyy')}</td>
                       <td className="p-4">
                         <span className={`inline-flex px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${getStatusColor(app.status)}`}>

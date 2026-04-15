@@ -23,20 +23,19 @@ const Home = () => {
           return {
             service_id: doc.id,
             ...data,
-            service_name: data.service_name || data.name || 'Unnamed Service',
+            name: data.name || data.service_name || 'Unnamed Service',
             description: data.description || 'No description available',
-            service_url: data.service_url || data.url || '',
+            url: data.url || data.service_url || '',
             icon: data.icon || 'fa-file',
-            is_active: data.is_active !== undefined ? data.is_active : (data.enabled !== undefined ? data.enabled : 1),
-            is_visible: data.is_visible !== undefined ? data.is_visible : 1,
-            application_type: data.application_type || (data.url ? 'external' : 'internal')
+            enabled: data.enabled !== undefined ? data.enabled : (data.is_active !== undefined ? data.is_active : true),
+            is_visible: data.is_visible !== undefined ? data.is_visible : true,
+            application_type: data.application_type || (data.url || data.service_url ? 'external' : 'internal')
           };
         });
         
         // Filter for active and visible services
         servicesData = servicesData.filter((s: any) => 
-          (s.is_active === true || s.is_active === 1) && 
-          (s.is_visible === true || s.is_visible === 1)
+          s.enabled && s.is_visible
         );
         
         console.log('Fetched services for Home:', servicesData);
@@ -67,8 +66,8 @@ const Home = () => {
   };
 
   const getApplyUrl = (service: any) => {
-    const key = getServiceKey(service.service_name);
-    const urlParam = (key && key !== 'general') ? key : encodeURIComponent(service.service_name);
+    const key = getServiceKey(service.name);
+    const urlParam = (key && key !== 'general') ? key : encodeURIComponent(service.name);
     return `/app/user/apply/${urlParam}`;
   };
 
@@ -171,14 +170,14 @@ const Home = () => {
               <div className="absolute -right-4 -top-4 w-20 h-20 bg-blue-600/10 rounded-full blur-2xl group-hover:bg-blue-600/20 transition-colors" />
               
               <div className="w-12 h-12 blue-gradient rounded-xl flex items-center justify-center mb-4 shadow-lg shadow-blue-500/20 shrink-0">
-                {service.service_name.includes('Aadhaar') && <Fingerprint className="text-white" size={24} />}
-                {service.service_name.includes('PAN') && <CreditCard className="text-white" size={24} />}
-                {service.service_name.includes('Voter') && <UserCheck className="text-white" size={24} />}
-                {service.service_name.includes('Passport') && <Globe className="text-white" size={24} />}
-                {!['Aadhaar', 'PAN', 'Voter', 'Passport'].some(k => service.service_name.includes(k)) && <FileText className="text-white" size={24} />}
+                {service.name.includes('Aadhaar') && <Fingerprint className="text-white" size={24} />}
+                {service.name.includes('PAN') && <CreditCard className="text-white" size={24} />}
+                {service.name.includes('Voter') && <UserCheck className="text-white" size={24} />}
+                {service.name.includes('Passport') && <Globe className="text-white" size={24} />}
+                {!['Aadhaar', 'PAN', 'Voter', 'Passport'].some(k => service.name.includes(k)) && <FileText className="text-white" size={24} />}
               </div>
 
-              <h3 className="text-lg font-bold text-white mb-2 line-clamp-1">{service.service_name}</h3>
+              <h3 className="text-lg font-bold text-white mb-2 line-clamp-1">{service.name}</h3>
               <p className="text-slate-400 text-xs leading-relaxed mb-4 line-clamp-2 flex-grow">{service.description}</p>
               
               <Link 

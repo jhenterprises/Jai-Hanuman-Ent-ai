@@ -31,11 +31,11 @@
       "description": "Available government services",
       "type": "object",
       "properties": {
-        "service_name": { "type": "string" },
+        "name": { "type": "string" },
         "description": { "type": "string" },
-        "service_url": { "type": "string" },
+        "url": { "type": "string" },
         "icon": { "type": "string" },
-        "is_active": { "type": "boolean" },
+        "enabled": { "type": "boolean" },
         "is_visible": { "type": "boolean" }
       }
     },

@@ -131,13 +131,13 @@ const Applications = () => {
         return {
           service_id: doc.id,
           ...data,
-          service_name: data.service_name || data.name || 'Unnamed Service',
+          name: data.name || data.service_name || 'Unnamed Service',
           description: data.description || 'No description available',
-          service_url: data.service_url || data.url || '',
+          url: data.url || data.service_url || '',
           icon: data.icon || 'fa-file',
-          is_active: data.is_active !== undefined ? data.is_active : (data.enabled !== undefined ? data.enabled : 1),
-          is_visible: data.is_visible !== undefined ? data.is_visible : 1,
-          application_type: data.application_type || (data.url ? 'external' : 'internal')
+          enabled: data.enabled !== undefined ? data.enabled : (data.is_active !== undefined ? data.is_active : true),
+          is_visible: data.is_visible !== undefined ? data.is_visible : true,
+          application_type: data.application_type || (data.url || data.service_url ? 'external' : 'internal')
         };
       });
       setServices(servicesData);
@@ -292,7 +292,7 @@ const Applications = () => {
               className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
             >
               <option value="">All Services</option>
-              {services.map(s => <option key={s.service_id} value={s.service_id}>{s.service_name}</option>)}
+              {services.map(s => <option key={s.service_id} value={s.service_id}>{s.name}</option>)}
             </select>
           </div>
           <div>
@@ -372,7 +372,7 @@ const Applications = () => {
                       </td>
                     )}
                     <td className="p-5">
-                      <span className="text-slate-700 font-medium text-sm capitalize">{(item.service_name || item.service_type || '').replace(/-/g, ' ')}</span>
+                      <span className="text-slate-700 font-medium text-sm capitalize">{(item.service_name || item.name || item.service_type || '').replace(/-/g, ' ')}</span>
                     </td>
                     <td className="p-5">
                       {item.payment_required ? (

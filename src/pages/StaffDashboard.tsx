@@ -78,7 +78,7 @@ const StaffDashboard = () => {
                         <FileText size={20} />
                       </div>
                       <div>
-                        <div className="text-sm font-bold text-white">{app.service_name}</div>
+                        <div className="text-sm font-bold text-white">{app.service_name || app.name}</div>
                         <div className="text-[10px] font-mono text-slate-500">#JH-{app.id.toString().padStart(6, '0')}</div>
                       </div>
                     </div>

@@ -336,21 +336,21 @@ const ApplyService = () => {
         return {
           service_id: doc.id,
           ...data,
-          service_name: data.service_name || data.name || 'Unnamed Service',
+          name: data.name || data.service_name || 'Unnamed Service',
           description: data.description || 'No description available',
-          service_url: data.service_url || data.url || '',
+          url: data.url || data.service_url || '',
           icon: data.icon || 'fa-file',
-          is_active: data.is_active !== undefined ? data.is_active : (data.enabled !== undefined ? data.enabled : 1),
-          is_visible: data.is_visible !== undefined ? data.is_visible : 1,
-          application_type: data.application_type || (data.url ? 'external' : 'internal')
+          enabled: data.enabled !== undefined ? data.enabled : (data.is_active !== undefined ? data.is_active : true),
+          is_visible: data.is_visible !== undefined ? data.is_visible : true,
+          application_type: data.application_type || (data.url || data.service_url ? 'external' : 'internal')
         };
       });
       
       const decodedType = decodeURIComponent(serviceType || '').toLowerCase();
       
       const currentService = services.find((s: any) => {
-        if (!s.service_name) return false;
-        const name = s.service_name.toLowerCase();
+        if (!s.name) return false;
+        const name = s.name.toLowerCase();
         // Match exact name, or name contains type, or type contains name, or slug match
         return name === decodedType || 
                name.includes(decodedType) || 
@@ -358,7 +358,7 @@ const ApplyService = () => {
                name.replace(/\s+/g, '-') === decodedType;
       });
 
-      if (!currentService || currentService.active_status === 0) {
+      if (!currentService || !currentService.enabled) {
         setError('This service is currently inactive or unavailable.');
         setIsChecking(false);
         return;
@@ -388,7 +388,7 @@ const ApplyService = () => {
 
       if (formSchema && formSchema.sections && formSchema.sections.length > 0) {
         setDynamicConfig({
-          title: currentService.service_name,
+          title: currentService.name,
           authority: 'Digital Services Portal',
           description: currentService.description,
           sections: formSchema.sections,
@@ -429,7 +429,7 @@ const ApplyService = () => {
         }));
 
         setDynamicConfig({
-          title: currentService.service_name,
+          title: currentService.name,
           authority: 'Digital Services Portal',
           description: currentService.description,
           sections: dynamicSections,
@@ -437,7 +437,7 @@ const ApplyService = () => {
         });
       } else if (!SERVICE_CONFIGS[serviceType || '']) {
         // Fallback for services not in hardcoded list: use general enquiry form
-        setFormData(prev => ({ ...prev, serviceName: currentService.service_name }));
+        setFormData(prev => ({ ...prev, serviceName: currentService.name }));
       }
     } catch (err) {
       console.error('Error checking service status:', err);
@@ -708,7 +708,7 @@ const ApplyService = () => {
         });
       });
 
-      const serviceName = serviceDetails?.service_name || serviceType || 'general';
+      const serviceName = serviceDetails?.name || serviceDetails?.service_name || serviceType || 'general';
 
       // Upload files to Firebase Storage
       const uploadedDocuments: any[] = [];
@@ -721,7 +721,8 @@ const ApplyService = () => {
             id: Math.random().toString(36).substr(2, 9),
             file_name: file.name,
             file_url: url,
-            document_type: type
+            document_type: type,
+            uploaded_at: new Date().toISOString()
           });
         }
       } catch (uploadErr: any) {
@@ -749,7 +750,7 @@ const ApplyService = () => {
         user_name: String(user?.name || currentUser.displayName || 'Unknown'),
         user_email: String(user?.email || currentUser.email || 'No Email'),
         user_phone: String(user?.phone || 'No Phone'),
-        service_id: Number(serviceDetails?.service_id || 0),
+        service_id: String(serviceDetails?.service_id || '0'),
         service_name: String(serviceName),
         service_type: String(serviceName),
         form_data: filteredFormData || {},

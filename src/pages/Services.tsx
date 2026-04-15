@@ -7,7 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import ConfirmDialog from '../components/ConfirmDialog';
 import ModernButton from '../components/ModernButton';
 import { collection, getDocs } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 
 import { useConfig } from '../context/ConfigContext';
 
@@ -39,14 +39,14 @@ const Services = () => {
   });
 
   const [formData, setFormData] = useState({ 
-    service_name: '', 
+    name: '', 
     description: '', 
     url: '',
     type: 'internal',
     icon: '',
     application_id: '',
     visible_status: 1,
-    active_status: 1,
+    enabled: true,
     service_price: 0,
     payment_required: false,
     fee: 0,
@@ -69,13 +69,13 @@ const Services = () => {
         return {
           service_id: doc.id,
           ...data,
-          service_name: data.service_name || data.name || 'Unnamed Service',
+          name: data.name || data.service_name || 'Unnamed Service',
           description: data.description || 'No description available',
-          service_url: data.service_url || data.url || '',
+          url: data.url || data.service_url || '',
           icon: data.icon || 'fa-file',
-          is_active: data.is_active !== undefined ? data.is_active : (data.enabled !== undefined ? data.enabled : 1),
-          is_visible: data.is_visible !== undefined ? data.is_visible : 1,
-          application_type: data.application_type || (data.url ? 'external' : 'internal')
+          enabled: data.enabled !== undefined ? data.enabled : (data.is_active !== undefined ? data.is_active : true),
+          is_visible: data.is_visible !== undefined ? data.is_visible : true,
+          application_type: data.application_type || (data.url || data.service_url ? 'external' : 'internal')
         };
       });
       console.log('Fetched services:', servicesData);
@@ -84,6 +84,7 @@ const Services = () => {
       console.error('Error fetching services from Firestore:', err);
       setError('Failed to load services. Please try again later.');
       setServices([]);
+      handleFirestoreError(err, OperationType.LIST, 'services');
     } finally {
       setLoading(false);
     }
@@ -144,14 +145,14 @@ const Services = () => {
       setShowForm(false);
       setEditingService(null);
       setFormData({ 
-        service_name: '', 
+        name: '', 
         description: '', 
         url: '', 
         type: 'internal',
         icon: '',
         application_id: '',
         visible_status: 1, 
-        active_status: 1,
+        enabled: true,
         service_price: 0,
         payment_required: false,
         fee: 0,
@@ -160,20 +161,21 @@ const Services = () => {
       fetchServices();
     } catch (err) {
       console.error('Error saving service:', err);
+      alert('Failed to save service. Check console for details.');
     }
   };
 
   const handleEdit = (service: any) => {
     setEditingService(service);
     setFormData({
-      service_name: service.service_name,
+      name: service.name || service.service_name,
       description: service.description,
-      url: service.service_url || '',
+      url: service.url || service.service_url || '',
       type: service.application_type || 'internal',
       icon: service.icon || '',
       application_id: service.application_id || '',
       visible_status: service.is_visible ? 1 : 0,
-      active_status: service.is_active ? 1 : 0,
+      enabled: !!service.enabled,
       service_price: service.service_price || 0,
       payment_required: !!service.payment_required,
       fee: service.fee || 0,
@@ -246,10 +248,10 @@ const Services = () => {
       console.error('Failed to track visit:', err);
     }
 
-    const key = getServiceKey(service.service_name);
+    const key = getServiceKey(service.name);
     // If it's a hardcoded one, use that key. 
     // Otherwise, use the service name itself so ApplyService can find it.
-    const urlParam = (key && key !== 'general') ? key : encodeURIComponent(service.service_name);
+    const urlParam = (key && key !== 'general') ? key : encodeURIComponent(service.name);
     navigate(`/app/user/apply/${urlParam}`);
   };
 
@@ -261,13 +263,13 @@ const Services = () => {
       console.error('Failed to track visit:', err);
     }
 
-    if (service.service_url) {
+    if (service.url) {
       try {
         await api.post(`/services/${service.service_id}/log-access`, { action: 'Opened Service URL' });
       } catch (err) {
         console.error('Failed to log service access', err);
       }
-      window.open(service.service_url, '_blank');
+      window.open(service.url, '_blank');
     } else {
       alert("Service URL not configured.");
     }
@@ -275,7 +277,7 @@ const Services = () => {
 
   const filtered = (services || [])
     .filter(s => {
-      const matchesSearch = (s.service_name || '').toLowerCase().includes(search.toLowerCase());
+      const matchesSearch = (s.name || '').toLowerCase().includes(search.toLowerCase());
       const matchesFilter = filterType === 'all' || 
                            (filterType === 'internal' && s.application_type === 'internal') ||
                            (filterType === 'external' && s.application_type === 'external') ||
@@ -283,8 +285,8 @@ const Services = () => {
       return matchesSearch && matchesFilter;
     })
     .sort((a, b) => {
-      if (sortBy === 'name-asc') return a.service_name.localeCompare(b.service_name);
-      if (sortBy === 'name-desc') return b.service_name.localeCompare(a.service_name);
+      if (sortBy === 'name-asc') return a.name.localeCompare(b.name);
+      if (sortBy === 'name-desc') return b.name.localeCompare(a.name);
       if (sortBy === 'most-visited') return (b.visit_count || 0) - (a.visit_count || 0);
       if (sortBy === 'newest') {
         const dateA = a.created_at?._seconds || 0;
@@ -352,14 +354,14 @@ const Services = () => {
               onClick={() => {
                 setEditingService(null);
                 setFormData({ 
-                  service_name: '', 
+                  name: '', 
                   description: '', 
                   url: '', 
                   type: 'internal',
                   icon: '',
                   application_id: '',
                   visible_status: 1, 
-                  active_status: 1,
+                  enabled: true,
                   service_price: 0,
                   payment_required: false,
                   fee: 0,
@@ -388,7 +390,7 @@ const Services = () => {
                 <label className="text-xs text-slate-400 font-medium">Service Name</label>
                 <input 
                   type="text" placeholder="e.g. Aadhaar Card" required
-                  value={formData.service_name} onChange={e => setFormData({...formData, service_name: e.target.value})}
+                  value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})}
                   className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 focus:border-blue-500 outline-none"
                 />
               </div>
@@ -481,12 +483,12 @@ const Services = () => {
               <label className="flex items-center gap-2 cursor-pointer group">
                 <input 
                   type="checkbox" 
-                  checked={formData.active_status === 1} 
-                  onChange={e => setFormData({...formData, active_status: e.target.checked ? 1 : 0})}
+                  checked={formData.enabled} 
+                  onChange={e => setFormData({...formData, enabled: e.target.checked})}
                   className="hidden"
                 />
-                <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${formData.active_status === 1 ? 'bg-green-600 border-green-600' : 'border-slate-600 group-hover:border-slate-500'}`}>
-                  {formData.active_status === 1 && <Check size={14} className="text-white" />}
+                <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${formData.enabled ? 'bg-green-600 border-green-600' : 'border-slate-600 group-hover:border-slate-500'}`}>
+                  {formData.enabled && <Check size={14} className="text-white" />}
                 </div>
                 <span className="text-sm text-slate-300">Active Status</span>
               </label>
@@ -557,7 +559,7 @@ const Services = () => {
                   <button onClick={() => toggleVisibility(service.service_id)} className={`p-1.5 rounded-lg ${service.is_visible ? 'text-blue-400' : 'text-slate-500'}`} title={service.is_visible ? 'Visible' : 'Hidden'}>
                     {service.is_visible ? <Eye size={16} /> : <EyeOff size={16} />}
                   </button>
-                  <button onClick={() => toggleStatus(service.service_id)} className={`p-1.5 rounded-lg ${service.is_active ? 'text-green-400' : 'text-slate-500'}`} title={service.is_active ? 'Deactivate' : 'Activate'}>
+                  <button onClick={() => toggleStatus(service.service_id)} className={`p-1.5 rounded-lg ${service.enabled ? 'text-green-400' : 'text-slate-500'}`} title={service.enabled ? 'Deactivate' : 'Activate'}>
                     <Power size={16} />
                   </button>
                   <button onClick={() => handleEdit(service)} className="p-1.5 rounded-lg text-slate-400 hover:text-white" title="Edit">
@@ -571,7 +573,7 @@ const Services = () => {
               <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500/20 to-cyan-400/20 border border-blue-500/30 flex items-center justify-center mb-4 text-blue-400">
                 {getIcon(service.icon)}
               </div>
-              <h3 className="text-xl font-bold text-white mb-2">{service.service_name}</h3>
+              <h3 className="text-xl font-bold text-white mb-2">{service.name}</h3>
               <div className="flex items-center gap-2 mb-2 flex-wrap">
                 <span className="text-xs font-bold px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30" title="User Price">
                   User: ₹{service.service_price || 0}

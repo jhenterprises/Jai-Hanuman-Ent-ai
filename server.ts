@@ -498,27 +498,27 @@ const seedServices = async () => {
     if (snapshot.empty) {
       console.log('No services found in Firestore. Seeding default services...');
       const initialServices = [
-        { service_name: 'Aadhaar Card', description: 'Aadhaar related services including update and download', service_url: 'https://myaadhaar.uidai.gov.in', icon: 'fa-fingerprint', application_type: 'external' },
-        { service_name: 'PAN Card', description: 'New PAN card application and corrections', service_url: 'https://www.onlineservices.nsdl.com', icon: 'fa-id-card', application_type: 'external' },
-        { service_name: 'Voter ID', description: 'Voter registration and ID card services', service_url: 'https://voters.eci.gov.in', icon: 'fa-id-badge', application_type: 'external' },
-        { service_name: 'Passport', description: 'Passport application and renewal services', service_url: 'https://passportindia.gov.in', icon: 'fa-globe', application_type: 'external' },
-        { service_name: 'Airtel Payments', description: 'Airtel Payments Bank services', service_url: 'https://portal.airtelbank.com/RetailerPortal', icon: 'fa-university', application_type: 'external' },
-        { service_name: 'CSC Portal', description: 'Common Service Centre services', service_url: 'https://digitalseva.csc.gov.in', icon: 'fa-laptop', application_type: 'external' },
-        { service_name: 'Seva Sindhu', description: 'Karnataka government services portal', service_url: 'https://sevasindhuservices.karnataka.gov.in', icon: 'fa-landmark', application_type: 'external' },
-        { service_name: 'Gruha Jyothi', description: 'Free electricity scheme registration', service_url: 'https://sevasindhugs.karnataka.gov.in', icon: 'fa-lightbulb', application_type: 'external' },
-        { service_name: 'Gruha Lakshmi', description: 'Financial assistance for women heads of households', service_url: 'https://sevasindhugs1.karnataka.gov.in/gl-sp', icon: 'fa-female', application_type: 'external' },
-        { service_name: 'Bhoomi', description: 'Land records and RTC services', service_url: 'https://landrecords.karnataka.gov.in', icon: 'fa-map', application_type: 'external' },
-        { service_name: 'Ayushman Card', description: 'Health insurance card registration', service_url: 'https://beneficiary.nha.gov.in', icon: 'fa-heartbeat', application_type: 'external' },
-        { service_name: 'Ration Card', description: 'Ration card application and status', service_url: 'https://ahara.karnataka.gov.in', icon: 'fa-shopping-basket', application_type: 'external' }
+        { name: 'Aadhaar Card', description: 'Aadhaar related services including update and download', url: 'https://myaadhaar.uidai.gov.in', icon: 'fa-fingerprint', application_type: 'external' },
+        { name: 'PAN Card', description: 'New PAN card application and corrections', url: 'https://www.onlineservices.nsdl.com', icon: 'fa-id-card', application_type: 'external' },
+        { name: 'Voter ID', description: 'Voter registration and ID card services', url: 'https://voters.eci.gov.in', icon: 'fa-id-badge', application_type: 'external' },
+        { name: 'Passport', description: 'Passport application and renewal services', url: 'https://passportindia.gov.in', icon: 'fa-globe', application_type: 'external' },
+        { name: 'Airtel Payments', description: 'Airtel Payments Bank services', url: 'https://portal.airtelbank.com/RetailerPortal', icon: 'fa-university', application_type: 'external' },
+        { name: 'CSC Portal', description: 'Common Service Centre services', url: 'https://digitalseva.csc.gov.in', icon: 'fa-laptop', application_type: 'external' },
+        { name: 'Seva Sindhu', description: 'Karnataka government services portal', url: 'https://sevasindhuservices.karnataka.gov.in', icon: 'fa-landmark', application_type: 'external' },
+        { name: 'Gruha Jyothi', description: 'Free electricity scheme registration', url: 'https://sevasindhugs.karnataka.gov.in', icon: 'fa-lightbulb', application_type: 'external' },
+        { name: 'Gruha Lakshmi', description: 'Financial assistance for women heads of households', url: 'https://sevasindhugs1.karnataka.gov.in/gl-sp', icon: 'fa-female', application_type: 'external' },
+        { name: 'Bhoomi', description: 'Land records and RTC services', url: 'https://landrecords.karnataka.gov.in', icon: 'fa-map', application_type: 'external' },
+        { name: 'Ayushman Card', description: 'Health insurance card registration', url: 'https://beneficiary.nha.gov.in', icon: 'fa-heartbeat', application_type: 'external' },
+        { name: 'Ration Card', description: 'Ration card application and status', url: 'https://ahara.karnataka.gov.in', icon: 'fa-shopping-basket', application_type: 'external' }
       ];
 
       const batch = db.batch();
       initialServices.forEach(s => {
-        const serviceId = s.service_name.toLowerCase().replace(/\s+/g, '_');
+        const serviceId = s.name.toLowerCase().replace(/\s+/g, '_');
         const ref = db.collection('services').doc(serviceId);
         batch.set(ref, {
           ...s,
-          is_active: true,
+          enabled: true,
           is_visible: true,
           service_price: 0,
           payment_required: false,
@@ -1634,16 +1634,26 @@ app.post('/api/services/:id/visit', async (req, res) => {
 });
 
 app.post('/api/services', authenticateToken, requireRole(['admin']), checkFirestore, async (req, res) => {
-  const { service_name, description, active_status, visible_status, type, url, icon, application_id, service_price, payment_required, fee, staff_commission } = req.body;
+  const { name, service_name, description, enabled, active_status, visible_status, type, url, service_url, icon, application_id, service_price, payment_required, fee, staff_commission } = req.body;
+  
+  // Validate data to prevent undefined values
+  const finalName = name || service_name;
+  const finalUrl = url || service_url || '';
+  const finalEnabled = enabled !== undefined ? enabled : (active_status !== undefined ? (active_status === 1 || active_status === true) : true);
+  
+  if (!finalName) {
+    return res.status(400).json({ error: 'Service name is required' });
+  }
+
   try {
-    const result = await db.collection('services').add({
-      service_name,
-      description,
-      is_active: active_status === 1 || active_status === true,
-      is_visible: visible_status === 1 || visible_status === true,
+    const serviceData = {
+      name: finalName,
+      description: description || '',
+      enabled: finalEnabled,
+      is_visible: visible_status === 1 || visible_status === true || visible_status === undefined,
       application_type: type || 'internal',
-      service_url: url || '',
-      icon: icon || '',
+      url: finalUrl,
+      icon: icon || 'fa-file',
       application_id: application_id || '',
       service_price: Number(service_price) || 0,
       payment_required: !!payment_required,
@@ -1652,35 +1662,52 @@ app.post('/api/services', authenticateToken, requireRole(['admin']), checkFirest
       visit_count: 0,
       created_at: admin.firestore.FieldValue.serverTimestamp(),
       updated_at: admin.firestore.FieldValue.serverTimestamp()
-    });
+    };
+
+    // Remove any undefined fields just in case
+    Object.keys(serviceData).forEach(key => (serviceData as any)[key] === undefined && delete (serviceData as any)[key]);
+
+    const result = await db.collection('services').add(serviceData);
+    console.log(`[POST] Service added: ${finalName} (ID: ${result.id})`);
     res.json({ id: result.id, message: 'Service added' });
   } catch (err) {
-    console.error('Add Service Error:', err);
+    console.error('[POST] Add Service Error:', err);
     res.status(500).json({ error: 'Failed to add service' });
   }
 });
 
 app.put('/api/services/:id', authenticateToken, requireRole(['admin']), checkFirestore, async (req, res) => {
-  const { service_name, description, active_status, visible_status, type, url, icon, application_id, service_price, payment_required, fee, staff_commission } = req.body;
+  const { name, service_name, description, enabled, active_status, visible_status, type, url, service_url, icon, application_id, service_price, payment_required, fee, staff_commission } = req.body;
+  
   try {
-    await db.collection('services').doc(req.params.id).set({
-      service_name,
-      description,
-      is_active: active_status === 1 || active_status === true,
-      is_visible: visible_status === 1 || visible_status === true,
+    const finalName = name || service_name;
+    const finalUrl = url || service_url || '';
+    const finalEnabled = enabled !== undefined ? enabled : (active_status !== undefined ? (active_status === 1 || active_status === true) : true);
+
+    const updateData = {
+      name: finalName,
+      description: description || '',
+      enabled: finalEnabled,
+      is_visible: visible_status === 1 || visible_status === true || visible_status === undefined,
       application_type: type || 'internal',
-      service_url: url || '',
-      icon: icon || '',
+      url: finalUrl,
+      icon: icon || 'fa-file',
       application_id: application_id || '',
       service_price: Number(service_price) || 0,
       payment_required: !!payment_required,
       fee: Number(fee) || 0,
       staff_commission: Number(staff_commission) || 0,
       updated_at: admin.firestore.FieldValue.serverTimestamp()
-    }, { merge: true });
+    };
+
+    // Remove any undefined fields
+    Object.keys(updateData).forEach(key => (updateData as any)[key] === undefined && delete (updateData as any)[key]);
+
+    await db.collection('services').doc(req.params.id).set(updateData, { merge: true });
+    console.log(`[PUT] Service updated: ${finalName} (ID: ${req.params.id})`);
     res.json({ message: 'Service updated' });
   } catch (err: any) {
-    console.error('Update Service Error:', err);
+    console.error('[PUT] Update Service Error:', err);
     res.status(500).json({ 
       error: 'Failed to update service',
       message: err.message
@@ -2249,7 +2276,7 @@ const getEnrichedApplication = async (applicationId: string) => {
     user_email: userData?.email,
     user_phone: userData?.phone,
     staff_name: staffData?.name,
-    service_name: serviceData?.service_name,
+    service_name: serviceData?.name || serviceData?.service_name || appData?.service_type || 'Unknown Service',
     documents,
     updates
   };
@@ -2660,8 +2687,12 @@ app.post('/api/applications', authenticateToken, upload.array('documents', 20), 
     const reference_number = await generateReferenceNumber();
     
     // Check for service
-    const servicesSnapshot = await db.collection('services').where('service_name', '==', service_type).limit(1).get();
+    const servicesSnapshot = await db.collection('services').where('name', '==', service_type).limit(1).get();
     let serviceDoc = servicesSnapshot.docs[0];
+    if (!serviceDoc) {
+      const servicesSnapshotOld = await db.collection('services').where('service_name', '==', service_type).limit(1).get();
+      serviceDoc = servicesSnapshotOld.docs[0];
+    }
     if (!serviceDoc) {
       const serviceById = await db.collection('services').doc(service_type).get();
       if (serviceById.exists) serviceDoc = serviceById as any;
@@ -2671,6 +2702,7 @@ app.post('/api/applications', authenticateToken, upload.array('documents', 20), 
       return res.status(404).json({ error: 'Service not found' });
     }
     const service = { id: serviceDoc.id, ...serviceDoc.data() } as any;
+    const serviceName = service.name || service.service_name;
 
     // Check payment requirement for users
     if (service.payment_required && req.user.role === 'user') {
@@ -2752,7 +2784,7 @@ app.post('/api/applications', authenticateToken, upload.array('documents', 20), 
     const applicationData = {
       reference_number,
       user_id: userId,
-      service_type: service.service_name,
+      service_type: serviceName,
       service_id: service.id,
       form_data,
       status: 'Submitted',
@@ -2779,7 +2811,7 @@ app.post('/api/applications', authenticateToken, upload.array('documents', 20), 
         user_id: req.user.id,
         type: 'debit',
         amount: service.fee,
-        description: `Payment for service: ${service.service_name}`,
+        description: `Payment for service: ${serviceName}`,
         reference_id: applicationId,
         status: 'success',
         created_at: admin.firestore.FieldValue.serverTimestamp()
@@ -2886,7 +2918,7 @@ app.post('/api/applications/finalize', authenticateToken, async (req: any, res) 
       transaction.set(appRef, {
         reference_number,
         user_id: userId,
-        service_type: service?.service_name,
+        service_type: service?.name || service?.service_name,
         service_id: draft?.service_id,
         form_data: draft?.form_data,
         status: 'Submitted',
@@ -2930,7 +2962,7 @@ app.post('/api/applications/finalize', authenticateToken, async (req: any, res) 
       const logRef = db.collection('activity_logs').doc();
       transaction.set(logRef, {
         user_id: userId,
-        action: `Finalized ${service?.service_name} application (${reference_number})`,
+        action: `Finalized ${service?.name || service?.service_name} application (${reference_number})`,
         application_id: applicationId,
         timestamp: admin.firestore.FieldValue.serverTimestamp()
       });
