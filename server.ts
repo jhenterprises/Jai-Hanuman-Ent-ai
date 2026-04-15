@@ -2000,13 +2000,19 @@ app.post('/api/ledger', authenticateToken, requireRole(['admin', 'staff']), asyn
 
 app.delete('/api/ledger/:id', authenticateToken, requireRole(['admin', 'staff']), async (req: any, res) => {
   const { id } = req.params;
-  if (!id) return res.status(400).json({ error: 'Ledger ID is required' });
+  console.log(`[DELETE] Ledger entry request - ID: ${id}, User: ${req.user?.email}, Role: ${req.user?.role}`);
+  
+  if (!id || id === 'undefined') {
+    console.error('[DELETE] Ledger Error: Invalid ID provided');
+    return res.status(400).json({ error: 'Valid Ledger ID is required' });
+  }
 
   try {
     const ledgerRef = db.collection('ledger').doc(id);
     const ledgerDoc = await ledgerRef.get();
 
     if (!ledgerDoc.exists) {
+      console.error(`[DELETE] Ledger Error: Entry not found for ID: ${id}`);
       return res.status(404).json({ error: 'Ledger entry not found' });
     }
 
@@ -2014,18 +2020,31 @@ app.delete('/api/ledger/:id', authenticateToken, requireRole(['admin', 'staff'])
     const userEmail = (req.user?.email || '').toLowerCase().trim();
     const isPrimaryAdmin = ADMIN_EMAILS.includes(userEmail);
 
+    console.log(`[DELETE] Ledger Entry Data - Staff ID: ${ledgerData?.staff_id}, Request User ID: ${req.user.id}`);
+
     // Only admin or the staff who created the entry can delete it
     if (req.user.role !== 'admin' && !isPrimaryAdmin && ledgerData?.staff_id !== req.user.id) {
+      console.warn(`[DELETE] Ledger Unauthorized: User ${userEmail} attempted to delete entry ${id} owned by ${ledgerData?.staff_id}`);
       return res.status(403).json({ error: 'Unauthorized to delete this entry' });
     }
 
+    // Use admin.firestore.FieldValue or fallback to new Date() if needed
+    let deletedAtValue;
+    try {
+      deletedAtValue = admin.firestore.FieldValue.serverTimestamp();
+    } catch (e) {
+      console.warn('[DELETE] Ledger: admin.firestore.FieldValue.serverTimestamp() failed, falling back to new Date()');
+      deletedAtValue = new Date();
+    }
+
     await ledgerRef.update({ 
-      deleted_at: admin.firestore.FieldValue.serverTimestamp() 
+      deleted_at: deletedAtValue 
     });
     
+    console.log(`[DELETE] Ledger Success: Entry ${id} moved to Recycle Bin`);
     res.json({ message: 'Ledger entry moved to Recycle Bin' });
   } catch (err) {
-    console.error('Delete Ledger Error:', err);
+    console.error('[DELETE] Ledger Critical Error:', err);
     res.status(500).json({ error: 'Failed to delete ledger entry' });
   }
 });

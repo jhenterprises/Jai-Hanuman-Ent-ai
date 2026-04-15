@@ -80,13 +80,18 @@ const Ledger = () => {
   };
 
   const handleDelete = async (id: string) => {
+    if (!id) {
+      alert('Error: Invalid entry ID');
+      return;
+    }
     if (!window.confirm('Are you sure you want to delete this entry?')) return;
     try {
       await api.delete(`/ledger/${id}`);
       fetchLedger();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Delete error:', err);
-      alert('Failed to delete entry');
+      const errorMessage = err.response?.data?.error || err.message || 'Unknown error';
+      alert(`Failed to delete entry: ${errorMessage}`);
     }
   };
 
