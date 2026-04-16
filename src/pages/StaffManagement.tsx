@@ -1,209 +1,478 @@
 import React, { useEffect, useState } from 'react';
 import api from '../services/api';
-import { Search, Shield, User, Lock, RefreshCw, Plus, X } from 'lucide-react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { useAuth } from '../context/AuthContext';
+import { 
+  Search, Plus, Trash2, Shield, User, Edit2, X, 
+  UserMinus, UserCheck, Key, Filter, ChevronLeft, ChevronRight,
+  Phone, Mail, Calendar, Info, Briefcase
+} from 'lucide-react';
+import ConfirmDialog from '../components/ConfirmDialog';
+import { format } from 'date-fns';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const StaffManagement = () => {
+  const { user: currentUser } = useAuth();
   const [staff, setStaff] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [showAdd, setShowAdd] = useState(false);
-  const [newStaff, setNewStaff] = useState({ name: '', email: '', phone: '', password: '', role: 'staff' });
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [page, setPage] = useState(1);
+  const itemsPerPage = 10;
+
+  // Modals State
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedStaff, setSelectedStaff] = useState<any>(null);
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    password: '',
+    role: 'staff'
+  });
+
+  // Confirm Dialog State
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
 
   useEffect(() => {
     fetchStaff();
   }, []);
 
   const fetchStaff = async () => {
+    setLoading(true);
     try {
-      console.log('Fetching staff from API...');
       const res = await api.get('/users?role=staff');
-      console.log('Staff fetched successfully:', res.data);
       setStaff(Array.isArray(res.data) ? res.data : []);
-    } catch (err: any) {
-      console.error('Error fetching staff from API:', err);
-      
-      // Fallback to Firestore if API fails (e.g. server restarting)
-      if (err.message?.includes('HTML') || !err.response || err.code === 'ECONNABORTED' || err.response?.status >= 500) {
-        try {
-          console.log('Attempting to fetch staff from Firestore fallback...');
-          const snapshot = await getDocs(query(collection(db, 'users'), where('role', '==', 'staff')));
-          const staffList = snapshot.docs
-            .map(doc => ({
-              id: doc.id,
-              ...doc.data()
-            }))
-            .filter((s: any) => !s.deleted_at);
-          
-          console.log('Staff fetched from Firestore successfully');
-          setStaff(staffList);
-        } catch (fsErr) {
-          console.error('Firestore fallback failed:', fsErr);
-          setStaff([]);
-        }
-      } else {
-        setStaff([]);
-      }
+    } catch (err) {
+      console.error('Error fetching staff:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await api.post('/users', newStaff);
-      setShowAdd(false);
-      setNewStaff({ name: '', email: '', phone: '', password: '', role: 'staff' });
+      await api.post('/users', { ...formData, role: 'staff' });
+      setShowAddModal(false);
+      resetForm();
       fetchStaff();
-      alert('Staff member added successfully');
+      alert('Staff member created successfully');
     } catch (err: any) {
-      console.error('Error adding staff:', err);
-      alert(err.response?.data?.error || 'Failed to add staff member');
+      alert(err.response?.data?.error || 'Failed to create staff member');
+    }
+  };
+
+  const handleEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedStaff) return;
+    try {
+      await api.put(`/users/${selectedStaff.id}`, {
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        role: 'staff'
+      });
+      setShowEditModal(false);
+      resetForm();
+      fetchStaff();
+      alert('Staff member updated successfully');
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to update staff member');
+    }
+  };
+
+  const handleToggleStatus = async (member: any) => {
+    const newStatus = member.status === 'active' ? 'disabled' : 'active';
+    try {
+      await api.patch(`/users/${member.id}/status`, { status: newStatus });
+      fetchStaff();
+      alert(`Staff member ${newStatus === 'active' ? 'enabled' : 'disabled'} successfully`);
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to update status');
     }
   };
 
   const handleResetPassword = async (id: string) => {
-    if (!window.confirm('Are you sure you want to reset this staff member\'s password?')) return;
+    if (!window.confirm('Reset password to a temporary one?')) return;
     try {
       const res = await api.post(`/users/${id}/reset-password`);
-      alert(`Password reset successfully. Temporary password: ${res.data.tempPassword}\n\nPlease share this with the staff member.`);
+      alert(`Password reset! Temp Password: ${res.data.tempPassword}`);
     } catch (err: any) {
-      console.error('Reset password error:', err);
       alert(err.response?.data?.error || 'Failed to reset password');
     }
   };
 
-  const handleSetPassword = async (id: string) => {
-    const newPassword = window.prompt('Enter new password (min 6 characters):');
-    if (!newPassword) return;
-    if (newPassword.length < 6) {
-      alert('Password must be at least 6 characters');
-      return;
-    }
+  const handleDelete = (id: string) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Remove Staff Member',
+      message: 'Are you sure you want to remove this staff member? This will move them to the Recycle Bin.',
+      onConfirm: async () => {
+        try {
+          await api.delete(`/users/${id}`);
+          fetchStaff();
+          alert('Staff member removed');
+        } catch (err: any) {
+          alert(err.response?.data?.error || 'Failed to remove staff member');
+        }
+        setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+      }
+    });
+  };
+
+  const resetForm = () => {
+    setFormData({ name: '', email: '', phone: '', password: '', role: 'staff' });
+    setSelectedStaff(null);
+  };
+
+  const openEditModal = (member: any) => {
+    setSelectedStaff(member);
+    setFormData({
+      name: member.name,
+      email: member.email,
+      phone: member.phone,
+      password: '',
+      role: 'staff'
+    });
+    setShowEditModal(true);
+  };
+
+  // Filtering
+  const filtered = staff
+    .filter(s => {
+      const matchesSearch = 
+        s.name?.toLowerCase().includes(search.toLowerCase()) || 
+        s.email?.toLowerCase().includes(search.toLowerCase()) ||
+        s.phone?.includes(search);
+      const matchesStatus = statusFilter === 'all' || s.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    });
+
+  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+  const paginated = filtered.slice((page - 1) * itemsPerPage, page * itemsPerPage);
+
+  const safeFormat = (timestamp: any, formatStr: string) => {
+    if (!timestamp) return 'N/A';
     try {
-      await api.post(`/users/${id}/set-password`, { password: newPassword });
-      alert('Password updated successfully');
-    } catch (err: any) {
-      console.error('Set password error:', err);
-      alert(err.response?.data?.error || 'Failed to set password');
+      const date = timestamp._seconds ? new Date(timestamp._seconds * 1000) : new Date(timestamp);
+      return format(date, formatStr);
+    } catch (e) {
+      return 'Invalid Date';
     }
   };
 
-  const filtered = staff.filter(s => 
-    (s.name || '').toLowerCase().includes(search.toLowerCase()) || 
-    (s.email || '').toLowerCase().includes(search.toLowerCase())
-  );
-
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <h1 className="text-3xl font-bold text-white">Staff Management</h1>
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-blue-600/20 flex items-center justify-center text-blue-500 border border-blue-500/20 shadow-lg shadow-blue-500/10">
+            <Briefcase size={28} />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold text-white">Staff Management</h1>
+            <p className="text-slate-400 text-sm mt-1">Manage your team, their access, and performance.</p>
+          </div>
+        </div>
         <button 
-          onClick={() => setShowAdd(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-colors w-fit"
+          onClick={() => { resetForm(); setShowAddModal(true); }}
+          className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl transition-all shadow-lg shadow-blue-600/20 font-bold text-sm w-fit"
         >
           <Plus size={20} />
-          <span>Add Staff</span>
+          Add New Staff
         </button>
       </div>
 
-      {showAdd && (
-        <div className="bg-slate-800/60 backdrop-blur-xl rounded-3xl p-6 border border-slate-700/50 shadow-lg mb-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold text-white">Add New Staff Member</h2>
-            <button onClick={() => setShowAdd(false)} className="text-slate-400 hover:text-white">
-              <X size={24} />
-            </button>
-          </div>
-          <form onSubmit={handleAdd} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="space-y-1">
-              <label className="text-xs text-slate-400 ml-1">Full Name</label>
-              <input 
-                type="text" placeholder="Full Name" required
-                value={newStaff.name} onChange={e => setNewStaff({...newStaff, name: e.target.value})}
-                className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 focus:border-blue-500 outline-none"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs text-slate-400 ml-1">Email</label>
-              <input 
-                type="email" placeholder="Email" required
-                value={newStaff.email} onChange={e => setNewStaff({...newStaff, email: e.target.value})}
-                className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 focus:border-blue-500 outline-none"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs text-slate-400 ml-1">Phone</label>
-              <input 
-                type="tel" placeholder="Phone" required
-                value={newStaff.phone} onChange={e => setNewStaff({...newStaff, phone: e.target.value})}
-                className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 focus:border-blue-500 outline-none"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs text-slate-400 ml-1">Password</label>
-              <input 
-                type="password" placeholder="Password" required
-                value={newStaff.password} onChange={e => setNewStaff({...newStaff, password: e.target.value})}
-                className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 focus:border-blue-500 outline-none"
-              />
-            </div>
-            <div className="lg:col-span-4 flex justify-end gap-2 mt-2">
-              <button type="button" onClick={() => setShowAdd(false)} className="px-4 py-2 text-slate-400 hover:text-white">Cancel</button>
-              <button type="submit" className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-medium">Save Staff Member</button>
-            </div>
-          </form>
+      {/* Filters & Search */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 bg-slate-800/40 p-4 rounded-3xl border border-slate-700/50 backdrop-blur-sm">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+          <input 
+            type="text" 
+            placeholder="Search staff by name, email..." 
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 bg-slate-900/50 border border-slate-700/50 rounded-xl text-slate-200 focus:outline-none focus:border-blue-500 text-sm"
+          />
         </div>
-      )}
+        <div className="flex items-center gap-2">
+          <Filter size={16} className="text-slate-400" />
+          <select 
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="flex-1 px-3 py-2.5 bg-slate-900/50 border border-slate-700/50 rounded-xl text-slate-200 text-sm focus:outline-none focus:border-blue-500"
+          >
+            <option value="all">All Status</option>
+            <option value="active">Active Staff</option>
+            <option value="disabled">Disabled Staff</option>
+          </select>
+        </div>
+        <div className="flex items-center justify-end text-slate-500 text-xs font-medium">
+          Total Staff: <span className="text-blue-400 ml-1 font-bold">{staff.length}</span>
+        </div>
+      </div>
 
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-        <input 
-          type="text" 
-          placeholder="Search staff..." 
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-10 pr-4 py-2 bg-slate-800/60 border border-slate-700/50 rounded-xl text-slate-200 focus:outline-none focus:border-blue-500 w-full sm:w-64"
-        />
-      </div>
-      <div className="bg-slate-800/60 backdrop-blur-xl rounded-3xl border border-slate-700/50 shadow-lg overflow-hidden">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-slate-700/30 border-b border-slate-700/50">
-              <th className="p-4 text-slate-300 font-semibold">Staff Name</th>
-              <th className="p-4 text-slate-300 font-semibold">Email</th>
-              <th className="p-4 text-slate-300 font-semibold">Role</th>
-              <th className="p-4 text-slate-300 font-semibold">Status</th>
-              <th className="p-4 text-slate-300 font-semibold">Password Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="p-8 text-center text-slate-500">
-                  No staff members found.
-                </td>
+      {/* Staff Table */}
+      <div className="bg-slate-800/60 backdrop-blur-xl rounded-[2.5rem] border border-slate-700/50 shadow-2xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-700/30 border-b border-slate-700/50">
+                <th className="p-5 text-slate-400 font-bold text-[10px] uppercase tracking-widest">Staff Member</th>
+                <th className="p-5 text-slate-400 font-bold text-[10px] uppercase tracking-widest">Contact</th>
+                <th className="p-5 text-slate-400 font-bold text-[10px] uppercase tracking-widest">Status</th>
+                <th className="p-5 text-slate-400 font-bold text-[10px] uppercase tracking-widest">Joined</th>
+                <th className="p-5 text-slate-400 font-bold text-[10px] uppercase tracking-widest text-right">Actions</th>
               </tr>
-            ) : (
-              filtered.map(s => (
-                <tr key={s.id} className="border-b border-slate-700/30 hover:bg-slate-700/20 transition-colors">
-                <td className="p-4 text-slate-200">{s.name || 'Unknown Staff'}</td>
-                <td className="p-4 text-slate-400">{s.email || 'No Email'}</td>
-                <td className="p-4 text-slate-400">{s.role || 'staff'}</td>
-                <td className="p-4 text-slate-400">Active</td>
-                <td className="p-4 flex gap-2">
-                  <button onClick={() => handleResetPassword(s.id)} className="text-blue-400 hover:text-blue-300 flex items-center gap-1 text-sm">
-                    <RefreshCw size={16} /> Reset
+            </thead>
+            <tbody className="divide-y divide-slate-700/30">
+              {loading ? (
+                <tr>
+                  <td colSpan={5} className="p-20 text-center">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                      <span className="text-slate-400 text-sm font-medium">Loading staff...</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : paginated.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="p-20 text-center text-slate-500 italic">
+                    No staff members found.
+                  </td>
+                </tr>
+              ) : (
+                paginated.map(item => (
+                  <tr key={item.id} className="hover:bg-slate-700/20 transition-colors group">
+                    <td className="p-5">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 to-blue-800 border border-blue-500/30 flex items-center justify-center text-lg font-bold text-white shadow-lg shadow-blue-500/10">
+                          {(item.name || 'S').charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <div className="text-slate-200 font-bold text-sm">{item.name || 'Unknown Staff'}</div>
+                          <div className="text-[10px] text-slate-500 font-mono mt-0.5">{item.id}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="p-5">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 text-slate-300 text-xs">
+                          <Mail size={12} className="text-slate-500" />
+                          {item.email}
+                        </div>
+                        <div className="flex items-center gap-2 text-slate-400 text-xs">
+                          <Phone size={12} className="text-slate-500" />
+                          {item.phone || 'No phone'}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="p-5">
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
+                        item.status === 'active' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                      }`}>
+                        {item.status === 'active' ? <UserCheck size={10} /> : <UserMinus size={10} />}
+                        {item.status || 'active'}
+                      </span>
+                    </td>
+                    <td className="p-5">
+                      <div className="flex items-center gap-2 text-slate-400 text-xs">
+                        <Calendar size={12} className="text-slate-500" />
+                        {safeFormat(item.created_at, 'dd MMM, yyyy')}
+                      </div>
+                    </td>
+                    <td className="p-5 text-right">
+                      <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button 
+                          onClick={() => openEditModal(item)}
+                          className="p-2 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 rounded-xl transition-all"
+                          title="Edit Staff"
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                        <button 
+                          onClick={() => handleToggleStatus(item)}
+                          className={`p-2 transition-all rounded-xl ${
+                            item.status === 'active' ? 'text-slate-400 hover:text-rose-400 hover:bg-rose-500/10' : 'text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10'
+                          }`}
+                          title={item.status === 'active' ? 'Disable Staff' : 'Enable Staff'}
+                        >
+                          {item.status === 'active' ? <UserMinus size={16} /> : <UserCheck size={16} />}
+                        </button>
+                        <button 
+                          onClick={() => handleResetPassword(item.id)}
+                          className="p-2 text-slate-400 hover:text-amber-400 hover:bg-amber-500/10 rounded-xl transition-all"
+                          title="Reset Password"
+                        >
+                          <Key size={16} />
+                        </button>
+                        <button 
+                          onClick={() => handleDelete(item.id)}
+                          className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 rounded-xl transition-all"
+                          title="Remove Staff"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="p-5 border-t border-slate-700/30 flex items-center justify-between bg-slate-800/20">
+            <span className="text-xs text-slate-500">
+              Showing <span className="text-slate-300 font-bold">{(page - 1) * itemsPerPage + 1}</span> to <span className="text-slate-300 font-bold">{Math.min(page * itemsPerPage, filtered.length)}</span> of <span className="text-slate-300 font-bold">{filtered.length}</span> staff
+            </span>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="p-2 bg-slate-900/50 border border-slate-700/50 rounded-xl text-slate-400 hover:text-white disabled:opacity-50 transition-all"
+              >
+                <ChevronLeft size={18} />
+              </button>
+              <div className="flex items-center gap-1">
+                {[...Array(totalPages)].map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setPage(i + 1)}
+                    className={`w-8 h-8 rounded-xl text-xs font-bold transition-all ${
+                      page === i + 1 ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'bg-slate-900/50 text-slate-500 hover:text-white border border-slate-700/50'
+                    }`}
+                  >
+                    {i + 1}
                   </button>
-                  <button onClick={() => handleSetPassword(s.id)} className="text-green-400 hover:text-green-300 flex items-center gap-1 text-sm">
-                    <Lock size={16} /> Set Password
-                  </button>
-                </td>
-              </tr>
-            ))
-          )}
-        </tbody>
-        </table>
+                ))}
+              </div>
+              <button 
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                className="p-2 bg-slate-900/50 border border-slate-700/50 rounded-xl text-slate-400 hover:text-white disabled:opacity-50 transition-all"
+              >
+                <ChevronRight size={18} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Add/Edit Modal */}
+      <AnimatePresence>
+        {(showAddModal || showEditModal) && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => { setShowAddModal(false); setShowEditModal(false); }}
+              className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-lg bg-slate-900 border border-slate-700 rounded-[2.5rem] shadow-2xl overflow-hidden"
+            >
+              <div className="p-8">
+                <div className="flex justify-between items-center mb-8">
+                  <div>
+                    <h2 className="text-2xl font-bold text-white">{showAddModal ? 'Add Staff Member' : 'Edit Staff Details'}</h2>
+                    <p className="text-slate-400 text-sm mt-1">{showAddModal ? 'Create a new staff account with system access.' : 'Update staff information and credentials.'}</p>
+                  </div>
+                  <button 
+                    onClick={() => { setShowAddModal(false); setShowEditModal(false); }}
+                    className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-full transition-all"
+                  >
+                    <X size={24} />
+                  </button>
+                </div>
+
+                <form onSubmit={showAddModal ? handleAdd : handleEdit} className="space-y-6">
+                  <div className="grid grid-cols-1 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-[10px] text-slate-500 uppercase font-bold tracking-widest ml-1">Full Name</label>
+                      <input 
+                        type="text" required
+                        value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})}
+                        className="w-full px-5 py-3 bg-slate-800/50 border border-slate-700 rounded-2xl text-white focus:border-blue-500 outline-none transition-all"
+                        placeholder="Staff Name"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] text-slate-500 uppercase font-bold tracking-widest ml-1">Email Address</label>
+                      <input 
+                        type="email" required
+                        value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})}
+                        className="w-full px-5 py-3 bg-slate-800/50 border border-slate-700 rounded-2xl text-white focus:border-blue-500 outline-none transition-all"
+                        placeholder="staff@example.com"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] text-slate-500 uppercase font-bold tracking-widest ml-1">Phone Number</label>
+                      <input 
+                        type="tel" required
+                        value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})}
+                        className="w-full px-5 py-3 bg-slate-800/50 border border-slate-700 rounded-2xl text-white focus:border-blue-500 outline-none transition-all"
+                        placeholder="+91 9876543210"
+                      />
+                    </div>
+                    {showAddModal && (
+                      <div className="space-y-2">
+                        <label className="text-[10px] text-slate-500 uppercase font-bold tracking-widest ml-1">Initial Password</label>
+                        <input 
+                          type="password" required
+                          value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})}
+                          className="w-full px-5 py-3 bg-slate-800/50 border border-slate-700 rounded-2xl text-white focus:border-blue-500 outline-none transition-all"
+                          placeholder="••••••••"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex gap-3 pt-4">
+                    <button 
+                      type="button" 
+                      onClick={() => { setShowAddModal(false); setShowEditModal(false); }}
+                      className="flex-1 py-4 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-2xl transition-all"
+                    >
+                      Cancel
+                    </button>
+                    <button 
+                      type="submit"
+                      className="flex-1 py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-2xl transition-all shadow-lg shadow-blue-600/20"
+                    >
+                      {showAddModal ? 'Create Staff' : 'Update Staff'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 };

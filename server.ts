@@ -1386,6 +1386,7 @@ app.get('/api/users', authenticateToken, requireRole(['admin']), async (req, res
           email: data.email || '',
           phone: data.phone || '',
           role: data.role || 'user',
+          status: data.status || 'active',
           created_at: data.created_at,
           deleted_at: data.deleted_at
         };
@@ -1438,6 +1439,7 @@ app.post('/api/users', authenticateToken, requireRole(['admin']), async (req, re
       email,
       phone,
       role,
+      status: 'active',
       deleted_at: null,
       created_at: admin.firestore.FieldValue.serverTimestamp()
     });
@@ -1481,6 +1483,60 @@ app.delete('/api/users/:id', authenticateToken, requireRole(['admin']), async (r
   } catch (err: any) {
     console.error('Error deleting user:', err);
     res.status(500).json({ error: 'Failed to delete user', details: err.message });
+  }
+});
+
+app.put('/api/users/:id', authenticateToken, requireRole(['admin']), async (req, res) => {
+  const { name, email, phone, role } = req.body;
+  const { id } = req.params;
+
+  try {
+    const userRef = db.collection('users').doc(id);
+    const userDoc = await userRef.get();
+    if (!userDoc.exists) return res.status(404).json({ error: 'User not found' });
+
+    const updateData: any = {
+      name,
+      email,
+      phone,
+      role,
+      updated_at: admin.firestore.FieldValue.serverTimestamp()
+    };
+
+    // Update Auth if email changed
+    if (email && email !== userDoc.data()?.email) {
+      await admin.auth().updateUser(id, { email });
+    }
+
+    await userRef.update(updateData);
+    res.json({ message: 'User updated successfully' });
+  } catch (err: any) {
+    console.error('Update user error:', err);
+    res.status(500).json({ error: err.message || 'Failed to update user' });
+  }
+});
+
+app.patch('/api/users/:id/status', authenticateToken, requireRole(['admin']), async (req, res) => {
+  const { status } = req.body;
+  const { id } = req.params;
+
+  if (!['active', 'disabled'].includes(status)) {
+    return res.status(400).json({ error: 'Invalid status' });
+  }
+
+  try {
+    await db.collection('users').doc(id).update({ 
+      status,
+      updated_at: admin.firestore.FieldValue.serverTimestamp()
+    });
+    
+    // Disable in Auth as well
+    await admin.auth().updateUser(id, { disabled: status === 'disabled' });
+
+    res.json({ message: `User ${status === 'active' ? 'enabled' : 'disabled'} successfully` });
+  } catch (err: any) {
+    console.error('Toggle status error:', err);
+    res.status(500).json({ error: err.message || 'Failed to update status' });
   }
 });
 
