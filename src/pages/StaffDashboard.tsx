@@ -15,7 +15,7 @@ const StaffDashboard = () => {
   const fetchApplications = async () => {
     setLoading(true);
     try {
-      const res = await api.get('/applications/staff');
+      const res = await api.get('/applications');
       setApplications(res.data);
     } finally {
       setLoading(false);

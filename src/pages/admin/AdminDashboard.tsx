@@ -393,6 +393,7 @@ const AdminDashboard = () => {
                   <th className="p-4 text-slate-500 font-bold text-xs uppercase tracking-wider">Service</th>
                   <th className="p-4 text-slate-500 font-bold text-xs uppercase tracking-wider">Date</th>
                   <th className="p-4 text-slate-500 font-bold text-xs uppercase tracking-wider">Status</th>
+                  <th className="p-4 text-slate-500 font-bold text-xs uppercase tracking-wider">Completed By</th>
                   <th className="p-4 text-slate-500 font-bold text-xs uppercase tracking-wider text-right">Action</th>
                 </tr>
               </thead>
@@ -413,6 +414,7 @@ const AdminDashboard = () => {
                           {app.status}
                         </span>
                       </td>
+                      <td className="p-4 text-sm text-slate-700">{app.completed_by_name || app.staff_name || <span className="text-slate-400 italic">N/A</span>}</td>
                       <td className="p-4 text-right">
                         <div className="relative inline-block text-left action-menu-container">
                           <button 

@@ -86,9 +86,7 @@ const Applications = () => {
       
       if (user?.role === 'user' && user?.uid) {
         q = query(q, where('userId', '==', user.uid));
-      } else if (user?.role === 'staff' && user?.uid) {
-        q = query(q, where('assigned_staff', '==', user.uid));
-      } else if (user?.role !== 'admin') {
+      } else if (user?.role !== 'staff' && user?.role !== 'admin') {
         setApplications([]);
         return;
       }
@@ -346,7 +344,7 @@ const Applications = () => {
                 <th className="p-5 text-slate-500 font-bold text-[10px] uppercase tracking-widest">Service Type</th>
                 <th className="p-5 text-slate-500 font-bold text-[10px] uppercase tracking-widest">Payment</th>
                 <th className="p-5 text-slate-500 font-bold text-[10px] uppercase tracking-widest">Status</th>
-                {(user?.role === 'admin' || user?.role === 'staff') && <th className="p-5 text-slate-500 font-bold text-[10px] uppercase tracking-widest">Assigned Staff</th>}
+                {(user?.role === 'admin' || user?.role === 'staff') && <th className="p-5 text-slate-500 font-bold text-[10px] uppercase tracking-widest">Completed By</th>}
                 <th className="p-5 text-slate-500 font-bold text-[10px] uppercase tracking-widest text-right">Action</th>
               </tr>
             </thead>
@@ -393,7 +391,7 @@ const Applications = () => {
                     </td>
                     {(user?.role === 'admin' || user?.role === 'staff') && (
                       <td className="p-5">
-                        <div className="text-slate-700 text-sm">{item.staff_name || <span className="text-slate-400 italic">Unassigned</span>}</div>
+                        <div className="text-slate-700 text-sm">{item.completed_by_name || item.staff_name || <span className="text-slate-400 italic">Not Completed</span>}</div>
                       </td>
                     )}
                     <td className="p-5 text-right flex items-center justify-end gap-2">
@@ -549,37 +547,6 @@ const Applications = () => {
                   {/* Admin/Staff Actions */}
                   {(user?.role === 'admin' || user?.role === 'staff') && (
                     <div className="space-y-6">
-                      {user?.role === 'admin' && (
-                        <div className="bg-white p-6 rounded-3xl border border-indigo-100 shadow-sm">
-                          <h3 className="text-sm font-bold text-indigo-600 mb-4 flex items-center gap-2 uppercase tracking-widest">
-                            <User size={16} /> Assign Staff
-                          </h3>
-                          <form onSubmit={handleAssignStaff} className="space-y-4">
-                            <div>
-                              <label className="text-[10px] text-slate-400 uppercase font-bold mb-2 block">Select Staff Member</label>
-                              <select 
-                                required
-                                value={assignStaffId}
-                                onChange={e => setAssignStaffId(e.target.value)}
-                                className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:border-indigo-500 outline-none text-xs"
-                              >
-                                <option value="">Select Staff</option>
-                                {staffMembers.map(staff => (
-                                  <option key={staff.id} value={staff.id}>{staff.name} ({staff.email})</option>
-                                ))}
-                              </select>
-                            </div>
-                            <button 
-                              type="submit"
-                              disabled={isUpdating || !assignStaffId}
-                              className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-indigo-600/20 disabled:opacity-50"
-                            >
-                              {isUpdating ? 'Assigning...' : 'Assign Staff'}
-                            </button>
-                          </form>
-                        </div>
-                      )}
-
                       <div className="bg-white p-6 rounded-3xl border border-blue-100 shadow-sm">
                         <h3 className="text-sm font-bold text-blue-600 mb-4 flex items-center gap-2 uppercase tracking-widest">
                           <MessageSquare size={16} /> Update Status

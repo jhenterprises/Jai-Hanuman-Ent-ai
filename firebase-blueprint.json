@@ -22,6 +22,8 @@
         "serviceType": { "type": "string", "description": "Type of service applied for" },
         "status": { "type": "string", "enum": ["pending", "processing", "approved", "rejected"], "description": "Current status" },
         "formData": { "type": "object", "description": "Dynamic form data" },
+        "completed_by": { "type": "string", "description": "UID of the staff who completed the application" },
+        "completed_by_name": { "type": "string", "description": "Name of the staff who completed the application" },
         "createdAt": { "type": "string", "format": "date-time", "description": "Submission timestamp" }
       },
       "required": ["userId", "serviceType", "status"]

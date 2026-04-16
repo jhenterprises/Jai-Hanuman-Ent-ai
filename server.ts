@@ -2139,8 +2139,8 @@ app.get('/api/analytics', authenticateToken, requireRole(['admin']), async (req,
 
     appsSnapshot.forEach(doc => {
       const data = doc.data();
-      if (data.assigned_staff && data.status !== 'Pending') {
-        staffPerfMap.set(data.assigned_staff, (staffPerfMap.get(data.assigned_staff) || 0) + 1);
+      if (data.completed_by) {
+        staffPerfMap.set(data.completed_by, (staffPerfMap.get(data.completed_by) || 0) + 1);
       }
     });
     const staffPerformance = Array.from(staffPerfMap.entries()).map(([id, processed]) => ({
@@ -2246,6 +2246,12 @@ const getEnrichedApplication = async (applicationId: string) => {
     const staffDoc = await db.collection('users').doc(appData.assigned_staff).get();
     staffData = staffDoc.data();
   }
+
+  let completedByData = null;
+  if (appData?.completed_by) {
+    const completedByDoc = await db.collection('users').doc(appData.completed_by).get();
+    completedByData = completedByDoc.data();
+  }
   
   let serviceData = null;
   if (appData?.service_id) {
@@ -2276,6 +2282,7 @@ const getEnrichedApplication = async (applicationId: string) => {
     user_email: userData?.email,
     user_phone: userData?.phone,
     staff_name: staffData?.name,
+    completed_by_name: completedByData?.name,
     service_name: serviceData?.name || serviceData?.service_name || appData?.service_type || 'Unknown Service',
     documents,
     updates
@@ -2304,7 +2311,7 @@ app.get('/api/admin/dashboard-overview', authenticateToken, requireRole(['admin'
       }
     });
 
-    const appsSnapshot = await db.collection('applications').select('status', 'created_at', 'user_id', 'service_type', 'assigned_staff', 'deleted_at', 'reference_number').get();
+    const appsSnapshot = await db.collection('applications').select('status', 'created_at', 'user_id', 'service_type', 'completed_by', 'deleted_at', 'reference_number').get();
     const ledgerSnapshot = await db.collection('ledger').select('amount', 'profit_amount', 'deleted_at').get();
     const servicePaymentsSnapshot = await db.collection('service_payments').where('status', '==', 'success').select('amount').get();
     const logsSnapshot = await db.collection('activity_logs').orderBy('timestamp', 'desc').limit(20).get();
@@ -2378,13 +2385,15 @@ app.get('/api/admin/dashboard-overview', authenticateToken, requireRole(['admin'
       .slice(0, 5)
       .map(data => {
         const user = usersMap.get(data.user_id);
+        const completedBy = usersMap.get(data.completed_by);
         return {
           id: data.id,
           reference_number: data.reference_number,
           service_name: data.service_type,
           status: data.status,
           created_at: data.created_at,
-          user_name: user?.name
+          user_name: user?.name,
+          completed_by_name: completedBy?.name
         };
       });
 
@@ -2402,17 +2411,12 @@ app.get('/api/admin/dashboard-overview', authenticateToken, requireRole(['admin'
     // Staff Performance
     const staffPerfMap = new Map();
     staffDocs.forEach(staff => {
-      staffPerfMap.set(staff.id, { staff_name: staff.name, assigned: 0, completed: 0, pending: 0 });
+      staffPerfMap.set(staff.id, { staff_name: staff.name, completed: 0 });
     });
     activeApps.forEach(data => {
-      if (data.assigned_staff && staffPerfMap.has(data.assigned_staff)) {
-        const perf = staffPerfMap.get(data.assigned_staff);
-        perf.assigned += 1;
-        if (['Approved', 'Completed', 'Rejected'].includes(data.status)) {
-          perf.completed += 1;
-        } else {
-          perf.pending += 1;
-        }
+      if (data.completed_by && staffPerfMap.has(data.completed_by)) {
+        const perf = staffPerfMap.get(data.completed_by);
+        perf.completed += 1;
       }
     });
     const staffPerformance = Array.from(staffPerfMap.values());
@@ -2763,24 +2767,6 @@ app.post('/api/applications', authenticateToken, upload.array('documents', 20), 
     const appRef = db.collection('applications').doc();
     const applicationId = appRef.id;
 
-    let assignedStaffId = req.user.role === 'staff' ? req.user.id : null;
-    if (!assignedStaffId) {
-      try {
-        const staffSnapshot = await db.collection('users').where('role', 'in', ['staff', 'admin']).get();
-        if (!staffSnapshot.empty) {
-          const staffDocs = staffSnapshot.docs.filter(d => d.data().role === 'staff');
-          const adminDocs = staffSnapshot.docs.filter(d => d.data().role === 'admin');
-          const available = staffDocs.length > 0 ? staffDocs : adminDocs;
-          if (available.length > 0) {
-            const randomIndex = Math.floor(Math.random() * available.length);
-            assignedStaffId = available[randomIndex].id;
-          }
-        }
-      } catch (e) {
-        console.error('Error auto-assigning staff:', e);
-      }
-    }
-
     const applicationData = {
       reference_number,
       user_id: userId,
@@ -2790,7 +2776,7 @@ app.post('/api/applications', authenticateToken, upload.array('documents', 20), 
       status: 'Submitted',
       payment_status: (payment_id ? 'Paid' : 'Pending'),
       created_by: createdBy,
-      assigned_staff: assignedStaffId,
+      assigned_staff: null, // Removed auto-assignment
       payment_id: payment_id || null,
       payment_mode,
       created_at: admin.firestore.FieldValue.serverTimestamp(),
@@ -2895,24 +2881,6 @@ app.post('/api/applications/finalize', authenticateToken, async (req: any, res) 
     const appRef = db.collection('applications').doc();
     const applicationId = appRef.id;
 
-    let assignedStaffId = req.user.role === 'staff' ? req.user.id : null;
-    if (!assignedStaffId) {
-      try {
-        const staffSnapshot = await db.collection('users').where('role', 'in', ['staff', 'admin']).get();
-        if (!staffSnapshot.empty) {
-          const staffDocs = staffSnapshot.docs.filter(d => d.data().role === 'staff');
-          const adminDocs = staffSnapshot.docs.filter(d => d.data().role === 'admin');
-          const available = staffDocs.length > 0 ? staffDocs : adminDocs;
-          if (available.length > 0) {
-            const randomIndex = Math.floor(Math.random() * available.length);
-            assignedStaffId = available[randomIndex].id;
-          }
-        }
-      } catch (e) {
-        console.error('Error auto-assigning staff:', e);
-      }
-    }
-
     await db.runTransaction(async (transaction) => {
       // 1. Create application
       transaction.set(appRef, {
@@ -2924,7 +2892,7 @@ app.post('/api/applications/finalize', authenticateToken, async (req: any, res) 
         status: 'Submitted',
         payment_status: 'Paid',
         created_by: 'user',
-        assigned_staff: assignedStaffId,
+        assigned_staff: null, // Removed auto-assignment
         payment_id: payment_id,
         payment_mode: payment?.payment_mode,
         created_at: admin.firestore.FieldValue.serverTimestamp(),
@@ -3071,43 +3039,8 @@ app.get('/api/applications/track/:ref', async (req, res) => {
   }
 });
 
-app.patch('/api/applications/:id/assign', authenticateToken, requireRole(['admin']), async (req: any, res) => {
-  const { staff_id } = req.body;
-  const applicationId = req.params.id;
+// Removed assignment endpoint as per user request
 
-  try {
-    const appRef = db.collection('applications').doc(applicationId);
-    const appDoc = await appRef.get();
-    if (!appDoc.exists) return res.status(404).json({ error: 'Application not found' });
-
-    let staffName = 'Unassigned';
-    if (staff_id) {
-      const staffDoc = await db.collection('users').doc(staff_id).get();
-      staffName = staffDoc.data()?.name || 'Unknown Staff';
-    }
-
-    await db.runTransaction(async (transaction) => {
-      transaction.update(appRef, {
-        assigned_staff: staff_id || null,
-        updated_at: admin.firestore.FieldValue.serverTimestamp()
-      });
-
-      const updateRef = db.collection('application_updates').doc();
-      transaction.set(updateRef, {
-        application_id: applicationId,
-        status: 'Staff Assigned',
-        comment: `Application assigned to ${staffName}`,
-        updated_by: req.user.id,
-        updated_at: admin.firestore.FieldValue.serverTimestamp()
-      });
-    });
-
-    res.json({ message: 'Staff assigned successfully' });
-  } catch (err) {
-    console.error('Assign staff error:', err);
-    res.status(500).json({ error: 'Failed to assign staff' });
-  }
-});
 
 app.patch('/api/applications/:id/status', authenticateToken, requireRole(['admin', 'staff']), upload.array('documents', 20), async (req: any, res) => {
   const { status, comment } = req.body;
@@ -3122,9 +3055,13 @@ app.patch('/api/applications/:id/status', authenticateToken, requireRole(['admin
     await db.runTransaction(async (transaction) => {
       const updateData: any = {
         status,
-        assigned_staff: req.user.id,
         updated_at: admin.firestore.FieldValue.serverTimestamp()
       };
+
+      if (status === 'Completed' || status === 'Approved') {
+        updateData.completed_by = req.user.id;
+        updateData.completed_at = admin.firestore.FieldValue.serverTimestamp();
+      }
       
       // Remove undefined properties to prevent Firestore errors
       Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
