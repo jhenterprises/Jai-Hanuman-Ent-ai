@@ -52,9 +52,9 @@ const ResetPassword = () => {
     return (
       <div className="max-w-md mx-auto mt-12 px-4">
         <div className="glass rounded-[2.5rem] p-10 text-center space-y-6">
-          <AlertCircle className="text-red-400 mx-auto" size={48} />
-          <h2 className="text-2xl font-black text-white">Invalid Link</h2>
-          <p className="text-slate-500">This password reset link is invalid or has expired.</p>
+          <AlertCircle className="text-red-500 dark:text-red-400 mx-auto" size={48} />
+          <h2 className="text-2xl font-black text-slate-900 dark:text-white">Invalid Link</h2>
+          <p className="text-slate-600 dark:text-slate-500">This password reset link is invalid or has expired.</p>
           <Link to="/forgot-password" className="inline-block py-3 px-6 blue-gradient text-white font-bold rounded-xl">
             Request New Link
           </Link>
@@ -74,17 +74,17 @@ const ResetPassword = () => {
           <div className="w-16 h-16 blue-gradient rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl shadow-blue-500/20">
             <ShieldCheck className="text-white" size={32} />
           </div>
-          <h2 className="text-3xl font-black text-white">New Password</h2>
-          <p className="text-slate-500">Set a strong password for your account</p>
+          <h2 className="text-3xl font-black text-slate-900 dark:text-white">New Password</h2>
+          <p className="text-slate-600 dark:text-slate-500">Set a strong password for your account</p>
         </div>
 
         {status === 'success' ? (
           <div className="space-y-6">
             <div className="p-6 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex flex-col items-center gap-4 text-center">
-              <CheckCircle2 className="text-emerald-400" size={48} />
+              <CheckCircle2 className="text-emerald-600 dark:text-emerald-400" size={48} />
               <div className="space-y-2">
-                <h3 className="text-white font-bold text-lg">Success!</h3>
-                <p className="text-emerald-400/80 text-sm leading-relaxed">
+                <h3 className="text-slate-900 dark:text-white font-bold text-lg">Success!</h3>
+                <p className="text-emerald-600 dark:text-emerald-400/80 text-sm leading-relaxed">
                   {message}
                 </p>
               </div>
@@ -114,7 +114,7 @@ const ResetPassword = () => {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-slate-900/50 border border-white/10 rounded-2xl py-4 pl-12 pr-12 text-white focus:outline-none focus:border-blue-500 transition-colors"
+                  className="w-full bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-white/10 rounded-2xl py-4 pl-12 pr-12 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors"
                   placeholder="••••••••"
                   disabled={status === 'loading'}
                 />
@@ -137,7 +137,7 @@ const ResetPassword = () => {
                   required
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full bg-slate-900/50 border border-white/10 rounded-2xl py-4 pl-12 pr-12 text-white focus:outline-none focus:border-blue-500 transition-colors"
+                  className="w-full bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-white/10 rounded-2xl py-4 pl-12 pr-12 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors"
                   placeholder="••••••••"
                   disabled={status === 'loading'}
                 />
@@ -153,7 +153,7 @@ const ResetPassword = () => {
             </button>
 
             <div className="text-center">
-              <Link to="/login" className="inline-flex items-center justify-center gap-2 text-sm font-medium text-slate-400 hover:text-white transition-colors">
+              <Link to="/login" className="inline-flex items-center justify-center gap-2 text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
                 <ArrowLeft size={16} /> Back to Login
               </Link>
             </div>

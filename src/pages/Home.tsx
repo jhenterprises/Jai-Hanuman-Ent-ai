@@ -1,12 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowRight, ShieldCheck, Zap, Globe, FileText, Fingerprint, CreditCard, UserCheck, Rocket } from 'lucide-react';
+import { 
+  ArrowRight, ShieldCheck, Zap, Globe as GlobeIcon, FileText, 
+  Fingerprint, CreditCard, UserCheck, Rocket, Cpu, 
+  CheckCircle2, Upload, Search, Activity, Database
+} from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import api from '../services/api';
-import { useConfig } from '../context/ConfigContext';
-import ModernButton from '../components/ModernButton';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { useConfig } from '../context/ConfigContext';
+import ModernButton from '../components/ModernButton';
+import Globe from '../components/Globe';
+import Particles from '../components/Particles';
+import TypingText from '../components/TypingText';
+import AnimatedCounter from '../components/AnimatedCounter';
+import GlassCard from '../components/GlassCard';
 
 const Home = () => {
   const { config } = useConfig();
@@ -16,7 +24,6 @@ const Home = () => {
   useEffect(() => {
     const fetchServices = async () => {
       try {
-        console.log('Fetching services from Firestore for Home...');
         const querySnapshot = await getDocs(collection(db, 'services'));
         let servicesData = querySnapshot.docs.map(doc => {
           const data = doc.data() as any;
@@ -33,15 +40,10 @@ const Home = () => {
           };
         });
         
-        // Filter for active and visible services
-        servicesData = servicesData.filter((s: any) => 
-          s.enabled && s.is_visible
-        );
-        
-        console.log('Fetched services for Home:', servicesData);
+        servicesData = servicesData.filter((s: any) => s.enabled && s.is_visible);
         setServices(servicesData);
       } catch (err) {
-        console.error('Error fetching services from Firestore for Home:', err);
+        console.error('Error fetching services:', err);
         setServices([]);
       }
     };
@@ -56,12 +58,6 @@ const Home = () => {
     if (lowerName.includes('pan')) return 'pan';
     if (lowerName.includes('passport')) return 'passport';
     if (lowerName.includes('voter')) return 'voterid';
-    if (lowerName.includes('income')) return 'income';
-    if (lowerName.includes('caste')) return 'caste';
-    if (lowerName.includes('birth')) return 'birth';
-    if (lowerName.includes('scheme')) return 'scheme';
-    if (lowerName.includes('loan')) return 'loan';
-    if (lowerName.includes('bill')) return 'utility';
     return 'general';
   };
 
@@ -72,170 +68,243 @@ const Home = () => {
   };
 
   return (
-    <div className="overflow-x-hidden pt-20 md:pt-32 pb-20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-20 md:space-y-32">
-        {/* Hero Section */}
-        <section className="relative text-center space-y-8">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass border-blue-500/30 text-blue-400 text-xs font-bold uppercase tracking-widest"
-        >
-          <Zap size={14} />
-          Next-Gen Digital Governance
-        </motion.div>
+    <div className="relative min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-white dark:from-black dark:via-blue-900/20 dark:to-black text-slate-900 dark:text-white selection:bg-blue-500/30 transition-colors duration-500">
+      <Particles />
+      
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 md:pt-32 pb-20 space-y-32">
         
-        <motion.h1 
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.1 }}
-          className="text-4xl sm:text-6xl md:text-8xl font-black tracking-tighter text-white leading-[1.1] px-2"
-        >
-          JH Digital <br />
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-amber-600">Seva Kendra</span>
-        </motion.h1>
-        
-        <motion.p 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
-          className="max-w-2xl mx-auto text-slate-400 text-base sm:text-lg leading-relaxed px-4"
-        >
-          Empowering citizens with seamless access to government services. 
-          AI-driven processing, secure document vaults, and real-time tracking.
-        </motion.p>
-
-        <motion.div 
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="flex flex-wrap justify-center items-center gap-4"
-        >
-          <ModernButton 
-            text="Get Started" 
-            icon={Rocket} 
-            onClick={() => navigate('/register')}
-            gradient="blue-gold-gradient"
-          />
-          <Link to="/track" className="px-8 py-4 glass text-white font-bold rounded-[12px] hover:bg-white/10 transition-all shadow-lg">
-            Track Application
-          </Link>
-        </motion.div>
-
-        {/* Temporary Seeding Section */}
-        {/* <div className="max-w-md mx-auto">
-          <SeedFirebase />
-        </div> */}
-
-        {/* Floating Stats */}
-        <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-4 gap-4 pt-8 md:pt-12">
-          {[
-            { label: 'Services', value: '50+' },
-            { label: 'Users', value: '1M+' },
-            { label: 'Uptime', value: '99.9%' },
-            { label: 'Security', value: 'AES-256' },
-          ].map((stat) => (
+        {/* HERO SECTION */}
+        <section className="grid md:grid-cols-2 gap-12 items-center">
+          {/* TEXT */}
+          <div className="space-y-8">
             <motion.div 
-              key={stat.label}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="p-6 glass rounded-3xl"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass border-blue-500/30 text-blue-600 dark:text-blue-400 text-xs font-bold uppercase tracking-widest"
             >
-              <div className="text-2xl font-black text-white">{stat.value}</div>
-              <div className="text-xs text-slate-500 uppercase tracking-widest font-bold">{stat.label}</div>
+              <Cpu size={14} className="animate-pulse" />
+              AI-Powered Governance
             </motion.div>
-          ))}
-        </div>
-      </section>
 
-      {/* Services Grid */}
-      <section className="space-y-8 md:space-y-12">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
-          <div className="space-y-2">
-            <h2 className="text-2xl md:text-3xl font-bold text-white">Popular Services</h2>
-            <p className="text-slate-500 text-sm md:text-base">Quick access to essential government documents and registrations.</p>
-          </div>
-          <Link to="/app/services" className="text-accent font-bold flex items-center gap-2 hover:underline shrink-0">
-            View All <ArrowRight size={16} />
-          </Link>
-        </div>
-
-        <div className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-${config.grid_columns || 4} gap-4 md:gap-6`}>
-          {services.map((service, i) => (
-            <motion.div 
-              key={service.service_id}
-              whileHover={{ y: -5 }}
-              className="group p-6 glass rounded-[2rem] hover:border-blue-500/50 transition-all cursor-pointer relative overflow-hidden flex flex-col h-full"
-            >
-              <div className="absolute -right-4 -top-4 w-20 h-20 bg-blue-600/10 rounded-full blur-2xl group-hover:bg-blue-600/20 transition-colors" />
-              
-              <div className="w-12 h-12 blue-gradient rounded-xl flex items-center justify-center mb-4 shadow-lg shadow-blue-500/20 shrink-0">
-                {service.name.includes('Aadhaar') && <Fingerprint className="text-white" size={24} />}
-                {service.name.includes('PAN') && <CreditCard className="text-white" size={24} />}
-                {service.name.includes('Voter') && <UserCheck className="text-white" size={24} />}
-                {service.name.includes('Passport') && <Globe className="text-white" size={24} />}
-                {!['Aadhaar', 'PAN', 'Voter', 'Passport'].some(k => service.name.includes(k)) && <FileText className="text-white" size={24} />}
-              </div>
-
-              <h3 className="text-lg font-bold text-white mb-2 line-clamp-1">{service.name}</h3>
-              <p className="text-slate-400 text-xs leading-relaxed mb-4 line-clamp-2 flex-grow">{service.description}</p>
-              
-              <Link 
-                to={getApplyUrl(service)}
-                className="inline-flex items-center gap-2 text-xs font-bold text-blue-400 group-hover:text-blue-300 mt-auto"
+            <div className="space-y-4">
+              <motion.h1
+                className="text-5xl sm:text-7xl md:text-8xl font-black tracking-tighter text-slate-900 dark:text-white leading-[0.9]"
+                initial={{ opacity: 0, y: 50 }}
+                animate={{ opacity: 1, y: 0 }}
               >
-                Apply Now <ArrowRight size={12} />
+                Next-Gen <br />
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-cyan-500 to-purple-600 dark:from-blue-400 dark:via-cyan-400 dark:to-purple-500 animate-gradient-slow">
+                  Digital Governance
+                </span>
+              </motion.h1>
+
+              <div className="h-8">
+                <TypingText 
+                  text="AI-powered services, real-time tracking, and secure digital processing." 
+                  className="text-blue-600/80 dark:text-blue-400/80 font-mono text-sm md:text-lg tracking-widest uppercase"
+                />
+              </div>
+            </div>
+
+            <motion.p
+              className="text-slate-600 dark:text-slate-400 text-lg leading-relaxed max-w-xl"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.2 }}
+            >
+              Experience the future of citizen services. Seamlessly apply for Aadhaar, PAN, Passport and more with our AI-driven automated processing engine.
+            </motion.p>
+
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="flex flex-wrap gap-4"
+            >
+              <ModernButton 
+                text="Get Started" 
+                icon={Rocket} 
+                onClick={() => navigate('/register')}
+                gradient="blue-gradient"
+                className="ripple-effect"
+              />
+              <Link to="/track" className="px-8 py-4 glass text-slate-900 dark:text-white font-bold rounded-[12px] hover:bg-black/5 dark:hover:bg-white/10 transition-all shadow-lg border-black/5 dark:border-white/5 flex items-center gap-2 group">
+                Track Status
+                <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
               </Link>
             </motion.div>
-          ))}
-        </div>
-      </section>
+          </div>
 
-      {/* Features Section */}
-      <section className="grid lg:grid-cols-2 gap-8 md:gap-12 items-center">
-        <div className="space-y-6 md:space-y-8">
-          <h2 className="text-3xl md:text-4xl font-bold text-white leading-tight">
-            AI-Powered <br />
-            <span className="text-accent">Document Automation</span>
-          </h2>
-          <div className="space-y-6">
+          {/* 3D GLOBE */}
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 1 }}
+            className="relative h-[400px] md:h-[600px]"
+          >
+            <div className="absolute inset-0 bg-blue-500/10 blur-[120px] rounded-full" />
+            <Globe />
+            
+            {/* Floating Service Icons */}
+            <div className="absolute inset-0 pointer-events-none">
+              {[
+                { Icon: Fingerprint, delay: 0, pos: 'top-0 left-0' },
+                { Icon: CreditCard, delay: 1, pos: 'bottom-10 right-0' },
+                { Icon: GlobeIcon, delay: 2, pos: 'top-20 right-10' },
+              ].map((item, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ y: 0 }}
+                  animate={{ y: [-10, 10, -10] }}
+                  transition={{ duration: 4, repeat: Infinity, delay: item.delay }}
+                  className={`absolute ${item.pos} p-4 glass rounded-2xl text-blue-600 dark:text-blue-400 shadow-2xl border-black/5 dark:border-white/10`}
+                >
+                  <item.Icon size={24} />
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
+        </section>
+
+        {/* STATS SECTION */}
+        <section className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+          {[
+            { label: "Services", value: 50, suffix: "+" },
+            { label: "Users", value: 1000000, suffix: "+" },
+            { label: "Uptime", value: 99.9, suffix: "%" },
+            { label: "Security", value: 256, suffix: " AES" },
+          ].map((item, i) => (
+            <motion.div
+              key={i}
+              whileHover={{ scale: 1.05 }}
+              className="bg-white/40 dark:bg-white/5 backdrop-blur-lg p-8 rounded-2xl border border-black/5 dark:border-white/10 shadow-2xl space-y-2"
+            >
+              <h2 className="text-3xl font-black text-slate-900 dark:text-white">
+                <AnimatedCounter value={item.value} suffix={item.suffix} />
+              </h2>
+              <p className="text-xs text-slate-500 uppercase tracking-widest font-bold">{item.label}</p>
+            </motion.div>
+          ))}
+        </section>
+
+        {/* SERVICES SECTION */}
+        <section className="space-y-12">
+          <div className="text-center space-y-4">
+            <h2 className="text-3xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tight">
+              Popular <span className="text-blue-600 dark:text-blue-500">Services</span>
+            </h2>
+            <p className="text-slate-500 max-w-2xl mx-auto">
+              Access government services with a single click. Our 3D-accelerated interface makes navigation intuitive and fast.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            {services.length > 0 ? (
+              services.slice(0, 6).map((service, i) => (
+                <GlassCard key={service.service_id} className="p-8 flex flex-col h-full group">
+                  <div className="w-14 h-14 blue-gradient rounded-2xl flex items-center justify-center mb-6 shadow-xl shadow-blue-500/20 group-hover:rotate-12 transition-transform duration-500">
+                    {service.name.includes('Aadhaar') && <Fingerprint className="text-white" size={28} />}
+                    {service.name.includes('PAN') && <CreditCard className="text-white" size={28} />}
+                    {service.name.includes('Voter') && <UserCheck className="text-white" size={28} />}
+                    {service.name.includes('Passport') && <GlobeIcon className="text-white" size={28} />}
+                    {!['Aadhaar', 'PAN', 'Voter', 'Passport'].some(k => service.name.includes(k)) && <FileText className="text-white" size={28} />}
+                  </div>
+
+                  <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-3 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{service.name}</h3>
+                  <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed mb-8 line-clamp-2 flex-grow">{service.description}</p>
+                  
+                  <Link 
+                    to={getApplyUrl(service)}
+                    className="w-full py-4 glass-dark rounded-xl text-center text-xs font-bold text-white hover:bg-blue-600 transition-all ripple-effect border-white/5"
+                  >
+                    Apply Now
+                  </Link>
+                </GlassCard>
+              ))
+            ) : (
+              [
+                "Aadhaar",
+                "PAN Card",
+                "Passport",
+                "Ration Card",
+                "Income Tax",
+                "Voter ID",
+              ].map((service, i) => (
+                <GlassCard key={i} className="p-8 flex flex-col h-full group">
+                  <div className="w-14 h-14 blue-gradient rounded-2xl flex items-center justify-center mb-6 shadow-xl shadow-blue-500/20 group-hover:rotate-12 transition-transform duration-500">
+                    <FileText className="text-white" size={28} />
+                  </div>
+                  <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-3 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{service}</h3>
+                  <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed mb-8 flex-grow">Apply for {service} with our automated processing engine.</p>
+                  <button className="w-full py-4 glass-dark rounded-xl text-center text-xs font-bold text-white hover:bg-blue-600 transition-all ripple-effect border-white/5">
+                    Apply Now
+                  </button>
+                </GlassCard>
+              ))
+            )}
+          </div>
+        </section>
+
+        {/* AI FEATURES SECTION */}
+        <section className="space-y-12">
+          <div className="text-center space-y-4">
+            <h2 className="text-3xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tight">
+              AI <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-600 to-blue-700 dark:from-cyan-400 dark:to-blue-600">Features</span>
+            </h2>
+            <p className="text-slate-500 max-w-2xl mx-auto">
+              Our neural engine powers the next generation of digital governance.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8">
             {[
-              { title: 'Smart OCR Scanning', desc: 'Automatically extract data from your ID cards with 99% accuracy.' },
-              { title: 'DigiLocker Integration', desc: 'Fetch verified documents directly from your DigiLocker account.' },
-              { title: 'Real-time Tracking', desc: 'Get instant updates via WhatsApp and SMS on your application status.' },
-            ].map((f, i) => (
-              <div key={i} className="flex gap-4">
-                <div className="w-10 h-10 rounded-xl glass flex items-center justify-center text-accent shrink-0">
-                  <ShieldCheck size={20} />
+              { title: "OCR Document Scan", icon: Search, desc: "Automated data extraction with neural vision." },
+              { title: "DigiLocker Integration", icon: Database, desc: "Securely fetch documents from your digital vault." },
+              { title: "Real-time Tracking", icon: Activity, desc: "Instant updates on your application status." },
+            ].map((feature, i) => (
+              <motion.div
+                key={i}
+                whileHover={{ scale: 1.05 }}
+                className="bg-white/40 dark:bg-white/5 backdrop-blur-lg p-8 rounded-2xl border border-black/5 dark:border-white/10 shadow-2xl group"
+              >
+                <div className="w-12 h-12 rounded-xl glass flex items-center justify-center text-blue-600 dark:text-blue-400 group-hover:blue-gradient group-hover:text-white transition-all mb-6">
+                  <feature.icon size={24} />
                 </div>
-                <div>
-                  <h4 className="font-bold text-white">{f.title}</h4>
-                  <p className="text-sm text-slate-500">{f.desc}</p>
-                </div>
-              </div>
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">{feature.title}</h3>
+                <p className="text-slate-600 dark:text-slate-400 text-sm">{feature.desc}</p>
+              </motion.div>
             ))}
           </div>
-        </div>
-        <div className="relative">
-          <div className="aspect-square glass rounded-[3rem] p-8 flex items-center justify-center overflow-hidden">
-             <motion.div 
-               animate={{ rotate: 360 }}
-               transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-               className="w-64 h-64 border-2 border-dashed border-blue-500/30 rounded-full flex items-center justify-center"
-             >
-                <div className="w-48 h-48 border-2 border-dashed border-amber-500/30 rounded-full" />
-             </motion.div>
-             <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-32 h-32 blue-gradient rounded-3xl shadow-2xl shadow-blue-500/50 flex items-center justify-center">
-                  <Zap className="text-white" size={48} />
-                </div>
-             </div>
-          </div>
-        </div>
-      </section>
+        </section>
+
+        {/* CTA SECTION */}
+        <section className="relative py-20">
+          <GlassCard className="p-12 md:p-20 text-center space-y-8 overflow-hidden" hover={false}>
+            <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/10 blur-[100px] rounded-full" />
+            <div className="absolute bottom-0 left-0 w-64 h-64 bg-purple-600/10 blur-[100px] rounded-full" />
+            
+            <h2 className="text-4xl md:text-7xl font-black text-slate-900 dark:text-white tracking-tighter leading-none">
+              Ready to experience <br />
+              <span className="text-blue-600 dark:text-blue-500">Digital Freedom?</span>
+            </h2>
+            <p className="text-slate-600 dark:text-slate-400 max-w-xl mx-auto text-lg">
+              Join over 1 million citizens who have already transitioned to our next-gen digital governance platform.
+            </p>
+            <div className="flex justify-center gap-4">
+              <ModernButton 
+                text="Create Account" 
+                icon={UserCheck} 
+                onClick={() => navigate('/register')}
+                gradient="blue-gradient"
+                className="ripple-effect"
+              />
+            </div>
+          </GlassCard>
+        </section>
+
+      </div>
     </div>
-  </div>
-);
+  );
 };
 
 export default Home;

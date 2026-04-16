@@ -2,14 +2,18 @@ import React, { useEffect, useState } from 'react';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
 import api from '../services/api';
-import { motion } from 'framer-motion';
-import { FileText, ArrowRight, Plus, Download, Calendar, Loader2, Wallet, ArrowUpRight, History } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  FileText, ArrowRight, Plus, Download, Calendar, 
+  Loader2, Wallet, ArrowUpRight, History, Activity,
+  CheckCircle2, Clock, AlertCircle
+} from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { downloadPDF } from '../utils/pdfGenerator';
 import AcknowledgementReceipt from '../components/AcknowledgementReceipt';
 import { safeFormat } from '../utils/dateUtils';
-
 import { useConfig } from '../context/ConfigContext';
+import GlassCard from '../components/GlassCard';
 
 const Dashboard = () => {
   const { config } = useConfig();
@@ -25,9 +29,6 @@ const Dashboard = () => {
         const user = auth.currentUser;
         if (!user) return;
 
-        // Fetch from Firestore
-        if (!user?.uid) return;
-
         const q = query(
           collection(db, 'applications'),
           where('userId', '==', user.uid),
@@ -37,7 +38,6 @@ const Dashboard = () => {
         const apps = appSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setApplications(apps);
 
-        // Fetch wallet from Firestore
         if (user?.uid) {
           const walletDoc = await getDocs(query(collection(db, 'wallets'), where('user_id', '==', user.uid)));
           if (!walletDoc.empty) {
@@ -45,25 +45,17 @@ const Dashboard = () => {
           }
         }
 
-        // Fetch drafts from API
         try {
           const draftRes = await api.get('/application-drafts');
           setDrafts(draftRes.data);
         } catch (draftErr: any) {
-          console.error('Error fetching drafts from API:', draftErr);
-          
-          // Fallback to Firestore for drafts
-          if (draftErr.message?.includes('HTML') || !draftErr.response || draftErr.code === 'ECONNABORTED' || draftErr.response?.status >= 500) {
-            try {
-              console.log('Attempting to fetch drafts from Firestore fallback...');
-              const draftSnap = await getDocs(query(
-                collection(db, 'application_drafts'),
-                where('user_id', '==', user.uid)
-              ));
-              setDrafts(draftSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-            } catch (fsErr) {
-              console.error('Firestore drafts fallback failed:', fsErr);
-            }
+          console.error('Error fetching drafts:', draftErr);
+          if (user?.uid) {
+            const draftSnap = await getDocs(query(
+              collection(db, 'application_drafts'),
+              where('user_id', '==', user.uid)
+            ));
+            setDrafts(draftSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
           }
         }
       } catch (err) {
@@ -75,6 +67,15 @@ const Dashboard = () => {
 
     fetchData();
   }, []);
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'Approved': return <CheckCircle2 size={16} />;
+      case 'Rejected': return <AlertCircle size={16} />;
+      case 'Processing': return <Activity size={16} className="animate-pulse" />;
+      default: return <Clock size={16} />;
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -88,7 +89,6 @@ const Dashboard = () => {
   const handleDownload = async (app: any) => {
     setDownloadingId(app.id);
     try {
-      // Delay to ensure hidden receipt is rendered and styles are applied
       setTimeout(async () => {
         await downloadPDF(`receipt-dash-${app.id}`, `Acknowledgement_${app.reference_number}`);
         setDownloadingId(null);
@@ -100,192 +100,210 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="space-y-10">
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="space-y-10 pb-20"
+    >
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-        <div>
-          <h1 className="text-3xl sm:text-4xl font-black text-white">My Applications</h1>
-          <p className="text-sm sm:text-base text-slate-500">Track and manage your government service requests.</p>
+        <div className="space-y-1">
+          <h1 className="text-4xl font-black text-white tracking-tight">User <span className="text-blue-500">Dashboard</span></h1>
+          <p className="text-slate-500">Manage your applications and digital assets.</p>
         </div>
-        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-          <Link to="/app/wallet" className="px-6 py-3 glass border-white/10 text-white font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-white/5 transition-all">
-            <Wallet size={18} /> Wallet: ₹{(walletBalance || 0).toLocaleString()}
+        <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
+          <Link to="/app/wallet" className="px-6 py-3 glass border-white/5 text-white font-bold rounded-2xl flex items-center justify-center gap-2 hover:bg-white/5 transition-all ripple-effect">
+            <Wallet size={18} className="text-blue-400" /> ₹{(walletBalance || 0).toLocaleString()}
           </Link>
-          <Link to="/" className="px-6 py-3 gold-gradient text-slate-900 font-black rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20">
+          <Link to="/" className="px-8 py-3 blue-gradient text-white font-black rounded-2xl flex items-center justify-center gap-2 shadow-xl shadow-blue-500/20 ripple-effect">
             <Plus size={20} /> New Application
           </Link>
         </div>
       </header>
 
-      {/* Wallet Quick Actions */}
+      {/* Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="md:col-span-1 glass rounded-[2rem] p-8 flex flex-col justify-between bg-blue-600/10 border-blue-500/20">
-          <div>
-            <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white mb-4">
-              <Wallet size={24} />
+        <GlassCard className="p-8 flex flex-col justify-between bg-blue-600/5 border-blue-500/10">
+          <div className="space-y-4">
+            <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-600/30">
+              <Wallet size={28} />
             </div>
-            <h3 className="text-slate-400 text-sm font-bold uppercase tracking-wider">Available Balance</h3>
-            <p className="text-4xl font-black text-white mt-1">₹{(walletBalance || 0).toLocaleString()}</p>
+            <div>
+              <h3 className="text-slate-500 text-xs font-black uppercase tracking-[0.2em]">Wallet Balance</h3>
+              <p className="text-4xl font-black text-white mt-1 tracking-tighter">₹{(walletBalance || 0).toLocaleString()}</p>
+            </div>
           </div>
-          <div className="flex gap-2 mt-6">
-            <Link to="/app/wallet" className="flex-1 py-3 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-all">
-              <ArrowUpRight size={14} /> Add Money
+          <div className="flex gap-3 mt-8">
+            <Link to="/app/wallet" className="flex-1 py-3 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-all ripple-effect">
+              <ArrowUpRight size={14} /> Add Funds
             </Link>
             <Link to="/app/wallet" className="flex-1 py-3 glass text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-white/5 transition-all">
               <History size={14} /> History
             </Link>
           </div>
-        </div>
+        </GlassCard>
         
-        <div className="md:col-span-2 glass rounded-[2rem] p-8 flex flex-col justify-center bg-amber-500/5 border-amber-500/10">
-          <h3 className="text-xl font-bold text-white mb-2">Welcome to Digital Services Portal</h3>
-          <p className="text-slate-400 text-sm leading-relaxed max-w-lg">
-            Use your wallet for instant service payments. No need to enter card details every time. 
-            Add money once and enjoy a seamless application experience.
-          </p>
-          <div className="mt-6 flex items-center gap-4">
-            <div className="flex -space-x-2">
-              {[1, 2, 3, 4].map(i => (
-                <div key={i} className="w-8 h-8 rounded-full border-2 border-slate-900 bg-slate-800 flex items-center justify-center text-[10px] font-bold text-slate-400">
-                  {String.fromCharCode(64 + i)}
-                </div>
-              ))}
+        <GlassCard className="md:col-span-2 p-8 flex flex-col justify-center bg-purple-600/5 border-purple-500/10 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-purple-600/10 blur-[100px] rounded-full -mr-32 -mt-32" />
+          <div className="relative z-10 space-y-4">
+            <h3 className="text-2xl font-black text-white tracking-tight">Welcome back, Citizen!</h3>
+            <p className="text-slate-400 text-sm leading-relaxed max-w-lg">
+              Your digital governance portal is ready. Apply for services, track progress, and manage documents with AI-powered efficiency.
+            </p>
+            <div className="flex items-center gap-4 pt-4">
+              <div className="flex -space-x-3">
+                {[1, 2, 3, 4].map(i => (
+                  <div key={i} className="w-10 h-10 rounded-full border-4 border-slate-950 bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-400">
+                    {String.fromCharCode(64 + i)}
+                  </div>
+                ))}
+              </div>
+              <div className="h-4 w-px bg-white/10" />
+              <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">Verified Platform</p>
             </div>
-            <p className="text-xs text-slate-500 font-medium">Trusted by 10,000+ users across India</p>
           </div>
-        </div>
+        </GlassCard>
       </div>
 
       {loading ? (
         <div className="grid md:grid-cols-3 gap-6">
-          {[1, 2, 3].map(i => <div key={i} className="h-48 glass rounded-[2rem] animate-pulse" />)}
+          {[1, 2, 3].map(i => <div key={i} className="h-64 glass rounded-[2.5rem] animate-pulse" />)}
         </div>
       ) : (
-        <div className="space-y-12">
+        <div className="space-y-16">
           {/* Drafts Section */}
-          {drafts.length > 0 && (
-            <section className="space-y-6">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-orange-500/20 rounded-xl flex items-center justify-center text-orange-500">
-                  <History size={20} />
+          <AnimatePresence>
+            {drafts.length > 0 && (
+              <motion.section 
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="space-y-8"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-amber-500/10 rounded-2xl flex items-center justify-center text-amber-500 border border-amber-500/20">
+                    <History size={24} />
+                  </div>
+                  <h2 className="text-3xl font-black text-white tracking-tight">Pending <span className="text-amber-500">Drafts</span></h2>
                 </div>
-                <h2 className="text-2xl font-bold text-white">My Drafts</h2>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {drafts.map((draft, i) => (
-                  <motion.div
-                    key={draft.id}
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: i * 0.1 }}
-                    className="glass rounded-[2rem] p-6 border-orange-500/10 hover:border-orange-500/30 transition-all group"
-                  >
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="w-10 h-10 bg-orange-500/10 rounded-xl flex items-center justify-center text-orange-500">
-                        <FileText size={20} />
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {drafts.map((draft, i) => (
+                    <GlassCard key={draft.id} className="p-8 border-amber-500/10 hover:border-amber-500/40 group">
+                      <div className="flex justify-between items-start mb-6">
+                        <div className="w-12 h-12 bg-amber-500/10 rounded-2xl flex items-center justify-center text-amber-500 group-hover:bg-amber-500 group-hover:text-white transition-all duration-500">
+                          <FileText size={24} />
+                        </div>
+                        <span className="px-3 py-1 bg-amber-500/10 text-amber-500 text-[10px] font-black uppercase tracking-widest rounded-full border border-amber-500/20">
+                          Draft
+                        </span>
                       </div>
-                      <span className="px-3 py-1 bg-orange-500/10 text-orange-500 text-[10px] font-black uppercase tracking-widest rounded-full border border-orange-500/20">
-                        Draft
-                      </span>
-                    </div>
-                    <h3 className="text-lg font-bold text-white mb-1">{draft.service_name}</h3>
-                    <p className="text-xs text-slate-500 mb-6">Saved on {safeFormat(draft.created_at, 'dd MMM yyyy')}</p>
-                    <Link
-                      to={`/app/user/apply/${draft.service_type.toLowerCase().replace(/\s+/g, '-')}?draftId=${draft.id}`}
-                      className="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-orange-500/20"
-                    >
-                      Resume Application <ArrowRight size={14} />
-                    </Link>
-                  </motion.div>
-                ))}
-              </div>
-            </section>
-          )}
+                      <h3 className="text-xl font-bold text-white mb-2">{draft.service_name}</h3>
+                      <p className="text-xs text-slate-500 mb-8 flex items-center gap-2">
+                        <Clock size={12} /> Saved {safeFormat(draft.created_at, 'dd MMM yyyy')}
+                      </p>
+                      <Link
+                        to={`/app/user/apply/${draft.service_type.toLowerCase().replace(/\s+/g, '-')}?draftId=${draft.id}`}
+                        className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-2xl flex items-center justify-center gap-2 transition-all shadow-xl shadow-amber-500/20 ripple-effect"
+                      >
+                        Resume Journey <ArrowRight size={16} />
+                      </Link>
+                    </GlassCard>
+                  ))}
+                </div>
+              </motion.section>
+            )}
+          </AnimatePresence>
 
           {/* Applications Section */}
-          <section className="space-y-6">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center text-blue-500">
-                <FileText size={20} />
+          <section className="space-y-8">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-blue-500/10 rounded-2xl flex items-center justify-center text-blue-500 border border-blue-500/20">
+                <FileText size={24} />
               </div>
-              <h2 className="text-2xl font-bold text-white">My Applications</h2>
+              <h2 className="text-3xl font-black text-white tracking-tight">Active <span className="text-blue-500">Applications</span></h2>
             </div>
+            
             {applications.length === 0 ? (
-              <div className="glass rounded-[3rem] p-20 text-center space-y-6">
-                <div className="w-20 h-20 bg-slate-800 rounded-3xl flex items-center justify-center mx-auto text-slate-600">
-                  <FileText size={40} />
+              <GlassCard className="p-20 text-center space-y-8" hover={false}>
+                <div className="w-24 h-24 bg-slate-900 rounded-[2rem] flex items-center justify-center mx-auto text-slate-700 border border-white/5">
+                  <FileText size={48} />
                 </div>
                 <div className="space-y-2">
-                  <h3 className="text-2xl font-bold text-white">No applications yet</h3>
-                  <p className="text-slate-500">Start by applying for a service from the home page.</p>
+                  <h3 className="text-3xl font-black text-white">No active applications</h3>
+                  <p className="text-slate-500 max-w-sm mx-auto">Your journey starts here. Apply for a service to see it tracked in real-time.</p>
                 </div>
-                <Link to="/" className="inline-block text-accent font-bold hover:underline">Browse Services &rarr;</Link>
-              </div>
+                <Link to="/" className="inline-flex items-center gap-2 text-blue-400 font-black uppercase tracking-widest text-xs hover:text-blue-300 transition-colors">
+                  Browse Services <ArrowRight size={16} />
+                </Link>
+              </GlassCard>
             ) : (
-              <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-${config.grid_columns || 3} gap-6`}>
+              <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-${config.grid_columns || 3} gap-8`}>
                 {applications.map((app, i) => (
-                  <motion.div 
-                    key={app.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.1 }}
-                    className="glass rounded-[2rem] p-8 space-y-6 relative overflow-hidden group flex flex-col h-full"
-                  >
+                  <GlassCard key={app.id} className="p-8 space-y-8 flex flex-col h-full group">
                     {downloadingId === app.id && (
                       <div className="fixed top-[-9999px] left-[-9999px] opacity-0 pointer-events-none">
                         <AcknowledgementReceipt application={app} id={`receipt-dash-${app.id}`} />
                       </div>
                     )}
                     <div className="flex justify-between items-start">
-                      <div className="w-12 h-12 blue-gradient rounded-xl flex items-center justify-center text-white">
-                        <FileText size={24} />
+                      <div className="w-14 h-14 blue-gradient rounded-2xl flex items-center justify-center text-white shadow-xl shadow-blue-500/20 group-hover:rotate-6 transition-transform">
+                        <FileText size={28} />
                       </div>
-                      <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${getStatusColor(app.status)}`}>
+                      <div className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${getStatusColor(app.status)}`}>
+                        {getStatusIcon(app.status)}
                         {app.status}
-                      </span>
-                    </div>
-
-                    <div className="flex-grow">
-                      <h3 className="text-xl font-bold text-white mb-1 line-clamp-1">{app.service_name || app.service_type}</h3>
-                      <p className="text-xs text-slate-500 font-mono">REF: {app.reference_number}</p>
-                    </div>
-
-                    <div className="space-y-3 pt-4 border-t border-white/5">
-                      <div className="flex justify-between text-xs">
-                        <span className="text-slate-500">Submitted On</span>
-                        <span className="text-slate-300 font-bold">{safeFormat(app.created_at, 'dd/MM/yyyy')}</span>
                       </div>
-                      <div className="flex justify-between text-xs">
-                        <span className="text-slate-500">Payment</span>
-                        <span className={`font-bold ${app.payment_status === 'Paid' ? 'text-emerald-400' : 'text-red-400'}`}>
+                    </div>
+
+                    <div className="flex-grow space-y-2">
+                      <h3 className="text-2xl font-black text-white tracking-tight group-hover:text-blue-400 transition-colors">
+                        {app.service_name || app.service_type}
+                      </h3>
+                      <div className="flex items-center gap-2 text-[10px] text-slate-500 font-black uppercase tracking-widest">
+                        <span className="px-2 py-0.5 bg-white/5 rounded">REF</span>
+                        {app.reference_number}
+                      </div>
+                    </div>
+
+                    <div className="space-y-4 pt-6 border-t border-white/5">
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-2 text-slate-500 text-xs font-bold">
+                          <Calendar size={14} /> Submitted
+                        </div>
+                        <span className="text-slate-300 font-black text-xs">{safeFormat(app.created_at, 'dd MMM yyyy')}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-2 text-slate-500 text-xs font-bold">
+                          <Wallet size={14} /> Payment
+                        </div>
+                        <span className={`font-black text-xs px-2 py-0.5 rounded ${app.payment_status === 'Paid' ? 'text-emerald-400 bg-emerald-400/10' : 'text-red-400 bg-red-400/10'}`}>
                           {app.payment_status}
                         </span>
                       </div>
                     </div>
 
-                    <div className="flex gap-2">
+                    <div className="flex gap-3 pt-4">
                       <Link 
                         to={`/track/${app.reference_number}`}
-                        className="flex-1 py-3 glass rounded-xl text-xs font-bold text-white flex items-center justify-center gap-2 group-hover:bg-white/10 transition-all"
+                        className="flex-1 py-4 glass-dark rounded-2xl text-xs font-black uppercase tracking-widest text-white flex items-center justify-center gap-2 hover:bg-blue-600 transition-all ripple-effect border-white/5"
                       >
-                        Track Status <ArrowRight size={14} />
+                        Track <ArrowRight size={16} />
                       </Link>
                       <button 
                         onClick={() => handleDownload(app)}
                         disabled={downloadingId === app.id}
-                        className="p-3 glass rounded-xl text-blue-400 hover:bg-blue-400/10 transition-all disabled:opacity-50"
-                        title="Download Acknowledgement"
+                        className="w-14 h-14 glass-dark rounded-2xl text-blue-400 flex items-center justify-center hover:bg-blue-400/10 transition-all disabled:opacity-50 border-white/5"
+                        title="Download Receipt"
                       >
-                        {downloadingId === app.id ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                        {downloadingId === app.id ? <Loader2 size={20} className="animate-spin" /> : <Download size={20} />}
                       </button>
                     </div>
-                  </motion.div>
+                  </GlassCard>
                 ))}
               </div>
             )}
           </section>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 };
 

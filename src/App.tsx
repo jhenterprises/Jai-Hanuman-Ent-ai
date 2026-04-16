@@ -39,7 +39,7 @@ const ProtectedRoute = ({ children, roles }: { children: React.ReactNode, roles?
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-900">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
         <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
@@ -67,11 +67,14 @@ const DefaultRedirect = () => {
   return <Navigate to="/app/dashboard" replace />;
 };
 
+import { ThemeProvider } from './context/ThemeContext';
+
 export default function App() {
   return (
-    <AuthProvider>
-      <ConfigProvider>
-        <Router>
+    <ThemeProvider>
+      <AuthProvider>
+        <ConfigProvider>
+          <Router>
         <Routes>
           <Route element={<PublicLayout />}>
             <Route path="/" element={<Home />} />
@@ -126,8 +129,9 @@ export default function App() {
             <Route path="settings/portal" element={<ProtectedRoute roles={['admin']}><PortalConfig /></ProtectedRoute>} />
           </Route>
         </Routes>
-      </Router>
-      </ConfigProvider>
-    </AuthProvider>
+          </Router>
+        </ConfigProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
