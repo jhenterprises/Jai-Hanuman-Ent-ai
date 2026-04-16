@@ -58,7 +58,7 @@ const TrackApplication = () => {
       // Small delay to ensure styles are applied
       setTimeout(async () => {
         await downloadPDF('receipt-track', `Acknowledgement_${application.reference_number}`);
-      }, 100);
+      }, 500);
     } catch (error) {
       console.error('Error generating PDF:', error);
     }

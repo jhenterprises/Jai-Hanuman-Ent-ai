@@ -35,7 +35,13 @@ const AcknowledgementReceipt: React.FC<AcknowledgementReceiptProps> = ({ applica
       {/* Header Section */}
       <div className="border-b-4 border-blue-600 p-8 bg-slate-50 flex flex-col items-center text-center space-y-4">
         <div className="w-20 h-20 bg-white rounded-2xl shadow-md flex items-center justify-center p-3 border border-slate-100">
-          <img src="https://upload.wikimedia.org/wikipedia/commons/5/55/Emblem_of_India.svg" alt="Emblem" className="w-full h-full" />
+          <img 
+            src="https://upload.wikimedia.org/wikipedia/commons/5/55/Emblem_of_India.svg" 
+            alt="Emblem" 
+            className="w-full h-full" 
+            crossOrigin="anonymous"
+            referrerPolicy="no-referrer"
+          />
         </div>
         <div>
           <h1 className="text-3xl font-black text-slate-900 tracking-tight uppercase">JH Digital Seva Kendra</h1>

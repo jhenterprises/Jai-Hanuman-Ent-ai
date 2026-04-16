@@ -898,7 +898,7 @@ const ApplyService = () => {
     setTimeout(async () => {
       await downloadPDF('receipt-apply', `Acknowledgement_${submittedApp.reference_number}`);
       setIsGeneratingPDF(false);
-    }, 100);
+    }, 500);
   };
 
   const handlePrint = () => {
