@@ -4,6 +4,7 @@ import { Wallet as WalletIcon, Plus, ArrowUpRight, ArrowDownLeft, History, Credi
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { safeFormat } from '../utils/dateUtils';
+import { getRazorpayKey } from '../utils/razorpayUtils';
 import { db } from '../lib/firebase';
 import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
 
@@ -73,7 +74,7 @@ const Wallet = () => {
       const order = res.data;
 
       const options = {
-        key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_dummy_key',
+        key: getRazorpayKey(),
         amount: order.amount,
         currency: order.currency,
         name: 'Digital Services Portal',
@@ -101,6 +102,11 @@ const Wallet = () => {
           color: '#3b82f6',
         },
       };
+
+      if (!(window as any).Razorpay) {
+        setMessage({ type: 'error', text: 'Razorpay SDK failed to load. Please check your internet connection.' });
+        return;
+      }
 
       const rzp = new (window as any).Razorpay(options);
       rzp.open();

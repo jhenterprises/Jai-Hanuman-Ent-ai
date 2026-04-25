@@ -111,10 +111,16 @@ if (admin.apps.length > 0) {
 // If a specific database is needed, it's usually configured in the project settings.
 
 // Razorpay Setup
+const RAZORPAY_KEY_ID = 'rzp_test_Sfovbb7jBmupyK';
+const RAZORPAY_KEY_SECRET = 'cpcAkI50Xd4cPoVFsrePaI4h';
+
 const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_dummy_key',
-  key_secret: process.env.RAZORPAY_KEY_SECRET || 'dummy_secret'
+  key_id: RAZORPAY_KEY_ID,
+  key_secret: RAZORPAY_KEY_SECRET
 });
+
+// Log Razorpay status (masked) for debugging
+console.log('Razorpay Configuration: FORCED TO PROVIDED KEYS');
 
 // Auth Middleware
 const authenticateToken = async (req: any, res: any, next: any) => {
@@ -928,10 +934,6 @@ app.post('/api/wallet/add-money', authenticateToken, async (req: any, res) => {
     return res.status(400).json({ error: 'Invalid amount' });
   }
 
-  if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET || process.env.RAZORPAY_KEY_ID === 'rzp_test_dummy_key') {
-    return res.status(500).json({ error: 'Razorpay is not configured' });
-  }
-
   try {
     const options = {
       amount: Math.round(amount * 100),
@@ -943,20 +945,41 @@ app.post('/api/wallet/add-money', authenticateToken, async (req: any, res) => {
     res.json(order);
   } catch (err: any) {
     console.error('Razorpay Order Error:', err);
-    res.status(500).json({ error: 'Failed to create payment order' });
+    const message = err.error?.description || err.message || 'Failed to create payment order';
+    res.status(500).json({ 
+      error: 'Failed to create payment order',
+      details: message
+    });
   }
+});
+
+// Diagnostics endpoint (Admin only)
+app.get('/api/admin/diagnostics/razorpay', authenticateToken, async (req: any, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Unauthorized' });
+  }
+  
+  res.json({
+    status: 'CONFIGURED',
+    keyId: `${RAZORPAY_KEY_ID.substring(0, 8)}...`,
+    hasSecret: true,
+    env: {
+      RAZORPAY_KEY_ID: process.env.RAZORPAY_KEY_ID ? 'SET' : 'NOT_SET',
+      RAZORPAY_KEY_SECRET: process.env.RAZORPAY_KEY_SECRET ? 'SET' : 'NOT_SET',
+      VITE_RAZORPAY_KEY_ID: process.env.VITE_RAZORPAY_KEY_ID ? 'SET' : 'NOT_SET'
+    }
+  });
 });
 
 app.post('/api/wallet/verify-payment', authenticateToken, async (req: any, res) => {
   const { razorpay_order_id, razorpay_payment_id, razorpay_signature, amount } = req.body;
   
-  const secret = process.env.RAZORPAY_KEY_SECRET || 'dummy_secret';
   const generated_signature = crypto
-    .createHmac('sha256', secret)
+    .createHmac('sha256', RAZORPAY_KEY_SECRET)
     .update(razorpay_order_id + "|" + razorpay_payment_id)
     .digest('hex');
 
-  if (generated_signature !== razorpay_signature && secret !== 'dummy_secret') {
+  if (generated_signature !== razorpay_signature) {
     return res.status(400).json({ error: 'Invalid payment signature' });
   }
   
@@ -2291,21 +2314,27 @@ const getEnrichedApplication = async (applicationId: string) => {
   
   const appData = appDoc.data();
   
+  const userId = appData?.userId || appData?.user_id;
+
   let userData = null;
-  if (appData?.user_id) {
-    const userDoc = await db.collection('users').doc(appData.user_id).get();
+  if (userId) {
+    const userDoc = await db.collection('users').doc(userId).get();
     userData = userDoc.data();
   }
   
+  const assignedTo = appData?.assignedTo || appData?.assigned_staff;
+
   let staffData = null;
-  if (appData?.assigned_staff) {
-    const staffDoc = await db.collection('users').doc(appData.assigned_staff).get();
+  if (assignedTo) {
+    const staffDoc = await db.collection('users').doc(assignedTo).get();
     staffData = staffDoc.data();
   }
 
+  const completedBy = appData?.completed_by;
+
   let completedByData = null;
-  if (appData?.completed_by) {
-    const completedByDoc = await db.collection('users').doc(appData.completed_by).get();
+  if (completedBy) {
+    const completedByDoc = await db.collection('users').doc(completedBy).get();
     completedByData = completedByDoc.data();
   }
   
@@ -2323,8 +2352,9 @@ const getEnrichedApplication = async (applicationId: string) => {
 
   let formData = {};
   try {
-    if (appData?.form_data && appData.form_data !== 'undefined' && appData.form_data !== 'null') {
-      formData = typeof appData.form_data === 'string' ? JSON.parse(appData.form_data) : appData.form_data;
+    const rawFormData = appData?.form_data || appData?.formData;
+    if (rawFormData && rawFormData !== 'undefined' && rawFormData !== 'null') {
+      formData = typeof rawFormData === 'string' ? JSON.parse(rawFormData) : rawFormData;
     }
   } catch (e) {
     console.error('Error parsing form_data:', e);
@@ -2333,14 +2363,16 @@ const getEnrichedApplication = async (applicationId: string) => {
   return {
     id: applicationId,
     ...appData,
-    form_data: formData,
-    user_name: userData?.name,
-    user_email: userData?.email,
-    user_phone: userData?.phone,
-    staff_name: staffData?.name,
+    userId: userId,
+    userEmail: appData?.userEmail || appData?.user_email || userData?.email,
+    user_name: appData?.user_name || userData?.name,
+    user_phone: appData?.user_phone || userData?.phone,
+    assignedTo: assignedTo,
+    assignedToName: appData?.assignedToName || staffData?.name,
     completed_by_name: completedByData?.name,
-    service_name: serviceData?.name || serviceData?.service_name || appData?.service_type || 'Unknown Service',
-    documents,
+    service_name: appData?.service_name || serviceData?.name || serviceData?.service_name || appData?.service_type || 'Unknown Service',
+    created_at: appData?.created_at || appData?.createdAt,
+    documents: appData?.documents || documents,
     updates
   };
 };
@@ -2527,6 +2559,7 @@ app.post('/api/payments/create-order', authenticateToken, async (req: any, res) 
   if (!service_id) {
     return res.status(400).json({ error: 'Service ID is required' });
   }
+
   try {
     const serviceDoc = await db.collection('services').doc(service_id).get();
     if (!serviceDoc.exists) return res.status(404).json({ error: 'Service not found' });
@@ -2553,9 +2586,13 @@ app.post('/api/payments/create-order', authenticateToken, async (req: any, res) 
     });
       
     res.json(order);
-  } catch (err) {
+  } catch (err: any) {
     console.error('Razorpay Order Error:', err);
-    res.status(500).json({ error: 'Failed to create payment order' });
+    const message = err.error?.description || err.message || 'Failed to create payment order';
+    res.status(500).json({ 
+      error: 'Failed to create payment order',
+      details: message
+    });
   }
 });
 
@@ -2563,7 +2600,7 @@ app.post('/api/payments/verify', authenticateToken, async (req: any, res) => {
   const { razorpay_order_id, razorpay_payment_id, razorpay_signature, service_id } = req.body;
   
   const generated_signature = crypto
-    .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET || 'dummy_secret')
+    .createHmac('sha256', RAZORPAY_KEY_SECRET)
     .update(razorpay_order_id + "|" + razorpay_payment_id)
     .digest('hex');
 
@@ -3005,7 +3042,24 @@ app.get('/api/applications', authenticateToken, async (req: any, res) => {
     let query: any = db.collection('applications');
     
     if (req.user.role === 'user') {
-      query = query.where('user_id', '==', req.user.id);
+      // Check both userId and user_id for backward compatibility
+      const snapshot1 = await query.where('userId', '==', req.user.id).get();
+      const snapshot2 = await query.where('user_id', '==', req.user.id).get();
+      
+      const combinedDocs = [...snapshot1.docs, ...snapshot2.docs];
+      const uniqueDocs = Array.from(new Set(combinedDocs.map(d => d.id)))
+        .map(id => combinedDocs.find(d => d.id === id));
+      
+      const applications = await Promise.all(uniqueDocs.map(doc => getEnrichedApplication(doc!.id)));
+      const sortedApps = applications
+        .filter(Boolean)
+        .filter((app: any) => !app.deleted_at)
+        .sort((a: any, b: any) => {
+          const dateA = a.created_at?.toDate ? a.created_at.toDate() : new Date(a.created_at || 0);
+          const dateB = b.created_at?.toDate ? b.created_at.toDate() : new Date(b.created_at || 0);
+          return dateB.getTime() - dateA.getTime();
+        });
+      return res.json(sortedApps);
     }
     
     const snapshot = await query.get();
@@ -3077,8 +3131,13 @@ app.get('/api/applications/track/:ref', async (req, res) => {
       // Try by phone number if ref is a phone number
       const userSnapshot = await db.collection('users').where('phone', '==', ref).limit(1).get();
       if (!userSnapshot.empty) {
-        const userId = userSnapshot.docs[0].id;
-        const appSnapshot = await db.collection('applications').where('user_id', '==', userId).orderBy('created_at', 'desc').limit(1).get();
+        const uId = userSnapshot.docs[0].id;
+        // Check both userId and user_id
+        let appSnapshot = await db.collection('applications').where('userId', '==', uId).orderBy('created_at', 'desc').limit(1).get();
+        if (appSnapshot.empty) {
+          appSnapshot = await db.collection('applications').where('user_id', '==', uId).orderBy('created_at', 'desc').limit(1).get();
+        }
+        
         if (!appSnapshot.empty) {
           applicationDoc = appSnapshot.docs[0];
         }
@@ -3095,8 +3154,47 @@ app.get('/api/applications/track/:ref', async (req, res) => {
   }
 });
 
-// Removed assignment endpoint as per user request
+// Assignment endpoint
+app.patch('/api/applications/:id/assign', authenticateToken, requireRole(['admin', 'staff']), async (req: any, res) => {
+  const { staff_id } = req.body;
+  const applicationId = req.params.id;
 
+  if (!staff_id) {
+    return res.status(400).json({ error: 'Staff ID is required' });
+  }
+
+  try {
+    const appRef = db.collection('applications').doc(applicationId);
+    const appDoc = await appRef.get();
+    if (!appDoc.exists) return res.status(404).json({ error: 'Application not found' });
+
+    const staffRef = db.collection('users').doc(staff_id);
+    const staffDoc = await staffRef.get();
+    if (!staffDoc.exists) return res.status(404).json({ error: 'Staff not found' });
+    const staffData = staffDoc.data();
+
+    await appRef.update({
+      assignedTo: staff_id,
+      assignedToName: staffData?.name || 'Unknown Staff',
+      assigned_staff: staff_id, // Backward compatibility
+      updated_at: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    // Add activity log
+    await db.collection('application_updates').add({
+      application_id: applicationId,
+      status: appDoc.data()?.status || 'Pending',
+      comment: `Assigned to ${staffData?.name || 'staff'}`,
+      updated_by: req.user.id,
+      updated_at: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    res.json({ message: 'Application assigned successfully' });
+  } catch (err: any) {
+    console.error('Assign application error:', err);
+    res.status(500).json({ error: 'Failed to assign application' });
+  }
+});
 
 app.patch('/api/applications/:id/status', authenticateToken, requireRole(['admin', 'staff']), upload.array('documents', 20), async (req: any, res) => {
   const { status, comment } = req.body;
@@ -3116,6 +3214,7 @@ app.patch('/api/applications/:id/status', authenticateToken, requireRole(['admin
 
       if (status === 'Completed' || status === 'Approved') {
         updateData.completed_by = req.user.id;
+        updateData.completed_by_name = req.user.name || 'Staff';
         updateData.completed_at = admin.firestore.FieldValue.serverTimestamp();
       }
       

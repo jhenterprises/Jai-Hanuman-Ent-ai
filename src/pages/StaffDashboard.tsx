@@ -79,7 +79,7 @@ const StaffDashboard = () => {
                       </div>
                       <div>
                         <div className="text-sm font-bold text-white">{app.service_name || app.name}</div>
-                        <div className="text-[10px] font-mono text-slate-500">#JH-{app.id.toString().padStart(6, '0')}</div>
+                        <div className="text-[10px] font-mono text-slate-500">{app.reference_number || `#${app.id.toString().substring(0, 8)}`}</div>
                       </div>
                     </div>
                   </td>
@@ -88,7 +88,10 @@ const StaffDashboard = () => {
                       <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-slate-400">
                         <User size={14} />
                       </div>
-                      <span className="text-sm text-slate-300 font-medium">{app.customer_name}</span>
+                      <div>
+                        <div className="text-sm text-slate-300 font-medium">{app.user_name || app.customer_name}</div>
+                        <div className="text-[9px] text-slate-500">{app.user_email || app.userEmail}</div>
+                      </div>
                     </div>
                   </td>
                   <td className="px-8 py-6 text-sm text-slate-400">

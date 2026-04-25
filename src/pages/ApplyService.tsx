@@ -10,6 +10,8 @@ import ModernButton from '../components/ModernButton';
 import { Upload, File, X, CheckCircle2, AlertCircle, User, AlertTriangle, Download, Shield, Activity, ArrowLeft, Loader2, Printer, QrCode, Send, Rocket, Wallet as WalletIcon } from 'lucide-react';
 import { downloadPDF } from '../utils/pdfGenerator';
 import AcknowledgementReceipt from '../components/AcknowledgementReceipt';
+import { getRazorpayKey } from '../utils/razorpayUtils';
+import { getRazorpayKey } from '../utils/razorpayUtils';
 
 const SERVICE_CONFIGS: Record<string, any> = {
   aadhaar: {
@@ -483,7 +485,7 @@ const ApplyService = () => {
       const order = orderRes.data;
       
       const options = {
-        key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_dummy',
+        key: getRazorpayKey(),
         amount: order.amount,
         currency: order.currency,
         name: portalConfig.portal_name || 'JH Digital Seva',
@@ -512,11 +514,17 @@ const ApplyService = () => {
         }
       };
       
+      if (!(window as any).Razorpay) {
+        alert('Razorpay SDK failed to load. Please check your internet connection.');
+        return;
+      }
+      
       const rzp = new (window as any).Razorpay(options);
       rzp.open();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Payment Error:', err);
-      alert('Failed to initiate payment. Please try again.');
+      const errorMsg = err.response?.data?.details || err.response?.data?.error || 'Failed to initiate payment';
+      alert(`Payment Error: ${errorMsg}`);
     }
   };
 
@@ -747,6 +755,7 @@ const ApplyService = () => {
 
       const applicationData: any = {
         userId: String(userId),
+        userEmail: String(user?.email || currentUser.email || 'No Email'),
         user_name: String(user?.name || currentUser.displayName || 'Unknown'),
         user_email: String(user?.email || currentUser.email || 'No Email'),
         user_phone: String(user?.phone || 'No Phone'),
@@ -756,6 +765,8 @@ const ApplyService = () => {
         form_data: filteredFormData || {},
         documents: uploadedDocuments || [],
         status: 'Pending',
+        assignedTo: null,
+        assignedToName: null,
         payment_status: serviceDetails?.payment_required ? 'Pending' : 'Free',
         reference_number: String(referenceNumber),
         created_at: serverTimestamp(),
@@ -841,7 +852,7 @@ const ApplyService = () => {
       const order = orderRes.data;
       
       const options = {
-        key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_dummy',
+        key: getRazorpayKey(),
         amount: order.amount,
         currency: order.currency,
         name: portalConfig.portal_name || 'JH Digital Seva',
@@ -883,6 +894,11 @@ const ApplyService = () => {
         }
       };
       
+      if (!(window as any).Razorpay) {
+        alert('Razorpay SDK failed to load. Please check your internet connection.');
+        return;
+      }
+
       const rzp = new (window as any).Razorpay(options);
       rzp.open();
     } catch (err) {

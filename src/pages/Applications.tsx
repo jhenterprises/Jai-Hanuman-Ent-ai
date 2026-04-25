@@ -367,6 +367,7 @@ const Applications = () => {
                       <td className="p-5">
                         <div className="text-slate-900 font-bold text-sm">{item.user_name}</div>
                         <div className="text-xs text-slate-400">{item.user_phone}</div>
+                        <div className="text-[10px] text-slate-400">{item.userEmail || item.user_email}</div>
                       </td>
                     )}
                     <td className="p-5">
@@ -391,7 +392,18 @@ const Applications = () => {
                     </td>
                     {(user?.role === 'admin' || user?.role === 'staff') && (
                       <td className="p-5">
-                        <div className="text-slate-700 text-sm">{item.completed_by_name || item.staff_name || <span className="text-slate-400 italic">Not Completed</span>}</div>
+                        <div className="space-y-1">
+                          <div className="text-slate-700 text-sm">
+                            <span className="text-[10px] uppercase text-slate-400 block">Staff:</span>
+                            {item.assignedToName || item.staff_name || <span className="text-slate-400 italic">Unassigned</span>}
+                          </div>
+                          {item.completed_by_name && (
+                            <div className="text-emerald-600 text-sm">
+                              <span className="text-[10px] uppercase text-slate-400 block">Completed by:</span>
+                              {item.completed_by_name}
+                            </div>
+                          )}
+                        </div>
                       </td>
                     )}
                     <td className="p-5 text-right flex items-center justify-end gap-2">

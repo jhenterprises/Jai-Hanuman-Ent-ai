@@ -19,14 +19,25 @@
       "type": "object",
       "properties": {
         "userId": { "type": "string", "description": "UID of the applicant" },
-        "serviceType": { "type": "string", "description": "Type of service applied for" },
-        "status": { "type": "string", "enum": ["pending", "processing", "approved", "rejected"], "description": "Current status" },
-        "formData": { "type": "object", "description": "Dynamic form data" },
+        "user_email": { "type": "string", "description": "Email of the applicant" },
+        "user_name": { "type": "string", "description": "Name of the applicant" },
+        "user_phone": { "type": "string", "description": "Phone of the applicant" },
+        "service_id": { "type": "string", "description": "ID of the service" },
+        "service_name": { "type": "string", "description": "Name of the service" },
+        "service_type": { "type": "string", "description": "Type of service" },
+        "status": { "type": "string", "enum": ["Pending", "Processing", "Approved", "Rejected", "Completed"], "description": "Current status" },
+        "form_data": { "type": "object", "description": "Dynamic form data" },
+        "documents": { "type": "array", "description": "Uploaded documents" },
+        "assignedTo": { "type": "string", "description": "UID of the staff member assigned to this application" },
+        "assignedToName": { "type": "string", "description": "Name of the staff member assigned to this application" },
         "completed_by": { "type": "string", "description": "UID of the staff who completed the application" },
         "completed_by_name": { "type": "string", "description": "Name of the staff who completed the application" },
-        "createdAt": { "type": "string", "format": "date-time", "description": "Submission timestamp" }
+        "payment_status": { "type": "string", "description": "Status of payment" },
+        "reference_number": { "type": "string", "description": "Unique reference number" },
+        "created_at": { "type": "string", "format": "date-time", "description": "Submission timestamp" },
+        "updated_at": { "type": "string", "format": "date-time", "description": "Update timestamp" }
       },
-      "required": ["userId", "serviceType", "status"]
+      "required": ["userId", "service_id", "status", "reference_number"]
     },
     "services": {
       "title": "Service",
