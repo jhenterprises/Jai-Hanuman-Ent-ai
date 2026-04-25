@@ -51,53 +51,70 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return;
         }
 
-        // Fetch user role from Firestore
+        // Fetch user role from Firestore with retry
         const userPath = `users/${firebaseUser.uid}`;
         console.log('Fetching user document:', userPath);
-        try {
-          console.log('Firestore instance project ID:', db.app.options.projectId);
-          console.log('Firestore database ID:', db.type); // This might not be the right way to check database ID
-          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-          console.log('User document fetched:', userDoc.exists());
-          if (userDoc.exists()) {
-            const userData = userDoc.data() as User;
-            // Force admin role for primary emails
-            const adminEmails = ['pancardjhc2018@gmail.com', 'pavan.tr16@gmail.com'];
-            if (firebaseUser.email && adminEmails.includes(firebaseUser.email)) {
-              userData.role = 'admin';
-            }
+        
+        let attempts = 0;
+        const maxAttempts = 3;
+        let success = false;
+
+        async function fetchUserDoc() {
+          try {
+            console.log(`Attempt ${attempts + 1} to fetch user document...`);
+            const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+            console.log('User document fetched:', userDoc.exists());
             
-            // Update photoURL if it changed or is missing
-            if (firebaseUser.photoURL && userData.photoURL !== firebaseUser.photoURL) {
+            if (userDoc.exists()) {
+              const userData = userDoc.data() as User;
+              // Force admin role for primary emails
+              const adminEmails = ['pancardjhc2018@gmail.com', 'pavan.tr16@gmail.com', 'admin@jh.com'];
+              if (firebaseUser.email && adminEmails.includes(firebaseUser.email)) {
+                userData.role = 'admin';
+              }
+              
+              // Update photoURL if it changed or is missing
+              if (firebaseUser.photoURL && userData.photoURL !== firebaseUser.photoURL) {
+                await setDoc(doc(db, 'users', firebaseUser.uid), {
+                  photoURL: firebaseUser.photoURL
+                }, { merge: true });
+                userData.photoURL = firebaseUser.photoURL;
+              }
+              setUser(userData);
+            } else {
+              // This case handles Google login where doc might not exist yet
+              const adminEmails = ['pancardjhc2018@gmail.com', 'pavan.tr16@gmail.com', 'admin@jh.com'];
+              const newUser: User = {
+                uid: firebaseUser.uid,
+                name: firebaseUser.displayName || 'User',
+                email: firebaseUser.email || '',
+                photoURL: firebaseUser.photoURL || undefined,
+                role: (firebaseUser.email && adminEmails.includes(firebaseUser.email)) ? 'admin' : 'user'
+              };
+              console.log('Creating new user document:', newUser);
               await setDoc(doc(db, 'users', firebaseUser.uid), {
-                photoURL: firebaseUser.photoURL
-              }, { merge: true });
-              userData.photoURL = firebaseUser.photoURL;
+                ...newUser,
+                createdAt: serverTimestamp()
+              });
+              setUser(newUser);
             }
-            setUser(userData);
-          } else {
-            // This case handles Google login where doc might not exist yet
-            const adminEmails = ['pancardjhc2018@gmail.com', 'pavan.tr16@gmail.com'];
-            const newUser: User = {
-              uid: firebaseUser.uid,
-              name: firebaseUser.displayName || 'User',
-              email: firebaseUser.email || '',
-              photoURL: firebaseUser.photoURL || undefined,
-              role: (firebaseUser.email && adminEmails.includes(firebaseUser.email)) ? 'admin' : 'user'
-            };
-            console.log('Creating new user document:', newUser);
-            await setDoc(doc(db, 'users', firebaseUser.uid), {
-              ...newUser,
-              createdAt: serverTimestamp()
-            });
-            setUser(newUser);
+            success = true;
+          } catch (error: any) {
+            console.error(`Error on attempt ${attempts + 1}:`, error);
+            if (attempts < maxAttempts - 1 && (error.message?.includes('offline') || error.code === 'unavailable')) {
+              attempts++;
+              const delay = Math.pow(2, attempts) * 1000;
+              console.log(`Retrying in ${delay}ms...`);
+              setTimeout(fetchUserDoc, delay);
+            } else {
+              handleFirestoreError(error, OperationType.GET, userPath);
+            }
+          } finally {
+            if (success) setLoading(false);
           }
-        } catch (error) {
-          console.error('Error fetching user document:', error);
-          handleFirestoreError(error, OperationType.GET, userPath);
-        } finally {
-          setLoading(false);
         }
+
+        fetchUserDoc();
       } else {
         console.log('User is not authenticated');
         setUser(null);

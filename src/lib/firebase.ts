@@ -7,7 +7,8 @@ import {
   setDoc, 
   serverTimestamp, 
   initializeFirestore,
-  getFirestore
+  getFirestore,
+  enableNetwork
 } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import firebaseConfig from '../../firebase-applet-config.json';
@@ -77,6 +78,11 @@ const firebaseConfigEnv = {
 // Merge config from environment variables with the fallback from the generated config file
 const finalConfig = { ...firebaseConfig };
 
+// Fix storageBucket to appspot.com if it's the newer format, as requested
+if (finalConfig.storageBucket && finalConfig.storageBucket.includes('firebasestorage.app')) {
+  finalConfig.storageBucket = finalConfig.projectId + '.appspot.com';
+}
+
 const isSet = (val: any) => typeof val === 'string' && val.trim() !== '' && !val.includes('YOUR_');
 
 // Only override if env var is present and valid
@@ -94,6 +100,7 @@ console.log('--------------------------------------------------');
 console.log('FIREBASE DEBUG LOGS');
 console.log('Current URL:', window.location.href);
 console.log('Project ID:', finalConfig.projectId);
+console.log('Storage Bucket:', finalConfig.storageBucket);
 console.log('Sanitized Config:', {
   apiKey: finalConfig.apiKey ? finalConfig.apiKey.substring(0, 5) + '...' : 'MISSING',
   authDomain: finalConfig.authDomain,
@@ -112,9 +119,9 @@ console.log('--------------------------------------------------');
 
 // Use initializeFirestore with settings for better connectivity
 const firestoreSettings: any = {
-  // Try auto-detection first, as it's often more reliable than forced polling in mixed environments
-  experimentalAutoDetectLongPolling: true,
-  // Ensure we have a reasonable timeout
+  // Use experimentalForceLongPolling to fix connection issues in restricted environments
+  experimentalForceLongPolling: true,
+  // Ensure we don't use fetch streams which can be problematic
   useFetchStreams: false
 };
 console.log('Firestore Settings being applied:', firestoreSettings);
@@ -130,6 +137,9 @@ try {
   // Fallback to getFirestore if it fails
   dbInstance = (dbId && dbId !== '(default)' && dbId !== '') ? getFirestore(app, dbId) : getFirestore(app);
 }
+
+// Proactively enable network to prevent "offline" errors
+enableNetwork(dbInstance).catch(err => console.error('Failed to enable network explicitly:', err));
 
 export const db = dbInstance;
 
