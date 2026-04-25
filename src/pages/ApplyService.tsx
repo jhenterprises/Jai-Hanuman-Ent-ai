@@ -11,7 +11,6 @@ import { Upload, File, X, CheckCircle2, AlertCircle, User, AlertTriangle, Downlo
 import { downloadPDF } from '../utils/pdfGenerator';
 import AcknowledgementReceipt from '../components/AcknowledgementReceipt';
 import { getRazorpayKey } from '../utils/razorpayUtils';
-import { getRazorpayKey } from '../utils/razorpayUtils';
 
 const SERVICE_CONFIGS: Record<string, any> = {
   aadhaar: {
