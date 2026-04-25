@@ -1,15 +1,16 @@
 {
-  "name": "react-example",
+  "name": "jh-digital-seva-kendra",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
+    "prebuild": "rm -rf dist",
     "build": "vite build",
-    "preview": "vite preview",
+    "postbuild": "ls -la dist",
     "start": "node server.ts",
-    "clean": "rm -rf dist",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "preview": "vite preview"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

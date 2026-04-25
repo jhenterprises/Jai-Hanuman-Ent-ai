@@ -8,7 +8,7 @@ import {
   signInWithEmailAndPassword,
   User as FirebaseUser
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, getDocFromServer } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 
 interface User {
@@ -56,7 +56,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log('Fetching user document:', userPath);
         
         let attempts = 0;
-        const maxAttempts = 3;
+        const maxAttempts = 5;
         let success = false;
 
         async function fetchUserDoc() {
@@ -68,7 +68,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               console.warn('Browser reports navigator.onLine is false');
             }
 
-            const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+            // Use getDocFromServer for the first few attempts to bypass any "offline" cache state
+            let userDoc;
+            if (attempts < 2) {
+              console.log('Attempting getDocFromServer...');
+              userDoc = await getDocFromServer(doc(db, 'users', firebaseUser.uid));
+            } else {
+              console.log('Attempting standard getDoc...');
+              userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+            }
             console.log('User document fetched:', userDoc.exists());
             
             if (userDoc.exists()) {
@@ -109,7 +117,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             console.error(`Error on attempt ${attempts + 1}:`, error);
             if (attempts < maxAttempts - 1 && (error.message?.includes('offline') || error.code === 'unavailable')) {
               attempts++;
-              const delay = Math.pow(2, attempts) * 1000;
+              const delay = Math.min(Math.pow(2, attempts) * 1000 + 500, 10000);
               console.log(`Retrying in ${delay}ms...`);
               setTimeout(fetchUserDoc, delay);
             } else {

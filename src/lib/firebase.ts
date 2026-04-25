@@ -73,15 +73,15 @@ const firebaseConfigEnv = {
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
-  firestoreDatabaseId: import.meta.env.VITE_FIREBASE_DATABASE_ID
+  firestoreDatabaseId: import.meta.env.VITE_FIREBASE_DATABASE_ID || import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID
 };
 
 // Merge config from environment variables with the fallback from the generated config file
 const finalConfig = { ...firebaseConfig };
 
-// Fix storageBucket to appspot.com if it's the newer format, as requested
-if (finalConfig.storageBucket && finalConfig.storageBucket.includes('firebasestorage.app')) {
-  finalConfig.storageBucket = finalConfig.projectId + '.appspot.com';
+// Fix storageBucket to appspot.com if it's the newer format, as requested by user
+if (finalConfig.storageBucket && (finalConfig.storageBucket.includes('firebasestorage.app') || !finalConfig.storageBucket.includes('.'))) {
+  finalConfig.storageBucket = `${finalConfig.projectId}.appspot.com`;
 }
 
 const isSet = (val: any) => typeof val === 'string' && val.trim() !== '' && !val.includes('YOUR_');
@@ -107,42 +107,56 @@ console.log('Sanitized Config:', {
   authDomain: finalConfig.authDomain,
   projectId: finalConfig.projectId
 });
-const dbId = (firebaseConfigEnv.firestoreDatabaseId && firebaseConfigEnv.firestoreDatabaseId !== '') 
+// CRITICAL: Favor the specific ID from JSON if ENV is just '(default)'
+const dbId = (firebaseConfigEnv.firestoreDatabaseId && 
+              firebaseConfigEnv.firestoreDatabaseId !== '' && 
+              firebaseConfigEnv.firestoreDatabaseId !== '(default)') 
   ? firebaseConfigEnv.firestoreDatabaseId 
   : (finalConfig.firestoreDatabaseId || '(default)');
 console.log('Firestore Database ID:', dbId);
-console.log('Sources:', {
-  apiKey: firebaseConfigEnv.apiKey ? 'ENV' : 'JSON',
-  projectId: firebaseConfigEnv.projectId ? 'ENV' : 'JSON',
-  dbId: firebaseConfigEnv.firestoreDatabaseId ? 'ENV' : 'JSON'
-});
 console.log('--------------------------------------------------');
 
 // Use initializeFirestore with settings for better connectivity
 const firestoreSettings: any = {
-  // Use experimentalForceLongPolling to fix connection issues in restricted environments
+  // Explicitly set host to prevent any auto-detect issues in proxies
+  host: 'firestore.googleapis.com',
+  ssl: true,
+  // Use experimentalForceLongPolling to fix connection issues in restricted environments (like iframes/proxies)
   experimentalForceLongPolling: true,
-  // Disable fetch streams which can be problematic
+  // Disable auto-detect to ensure force is respected
+  experimentalAutoDetectLongPolling: false,
+  // Disable fetch streams which can be problematic in some browsers/sandboxes
   useFetchStreams: false,
   // Use memory cache to avoid IndexedDB issues in iframes/sandboxes
-  localCache: memoryLocalCache()
+  localCache: memoryLocalCache(),
+  // Helps with clean data
+  ignoreUndefinedProperties: true
 };
-console.log('Firestore Settings being applied:', firestoreSettings);
-console.log('Target Database ID:', dbId);
+
+console.log('FINAL FIRESTORE SETTINGS:', {
+  projectId: finalConfig.projectId,
+  databaseId: dbId,
+  forcePolling: firestoreSettings.experimentalForceLongPolling,
+  useStreams: firestoreSettings.useFetchStreams
+});
 
 let dbInstance;
 try {
-  dbInstance = (dbId && dbId !== '(default)' && dbId !== '')
+  dbInstance = (dbId && dbId !== '(default)')
     ? initializeFirestore(app, firestoreSettings, dbId)
     : initializeFirestore(app, firestoreSettings);
-} catch (e) {
-  console.warn('Firestore already initialized or error during init, falling back to getFirestore');
-  // Fallback to getFirestore if it fails
-  dbInstance = (dbId && dbId !== '(default)' && dbId !== '') ? getFirestore(app, dbId) : getFirestore(app);
+  console.log('initializeFirestore successful');
+} catch (e: any) {
+  console.warn('initializeFirestore failed (likely already initialized):', e.message);
+  // If it's already initialized, we can't change settings easily, but we try to get the instance
+  dbInstance = (dbId && dbId !== '(default)') ? getFirestore(app, dbId) : getFirestore(app);
 }
 
-// Proactively enable network to prevent "offline" errors
-enableNetwork(dbInstance).catch(err => console.error('Failed to enable network explicitly:', err));
+// Proactively try to enable network and log results
+console.log('Calling enableNetwork...');
+enableNetwork(dbInstance)
+  .then(() => console.log('Firestore network enabled explicitly SUCCESS'))
+  .catch(err => console.error('Failed to enable network explicitly ERROR:', err));
 
 export const db = dbInstance;
 
@@ -154,8 +168,18 @@ storage.maxOperationRetryTime = 15000; // 15 seconds
 storage.maxUploadRetryTime = 15000; // 15 seconds
 
 // Test connection - calling manually if needed to diagnose
+export async function ensureNetwork() {
+  try {
+    await enableNetwork(db);
+    console.log("Firestore network enabled manually");
+  } catch (e) {
+    console.warn("enableNetwork failed, might be already enabled or blocked:", e);
+  }
+}
+
 export async function testConnection() {
   console.log("Starting manual connection test...");
+  await ensureNetwork();
   
   // Basic domain reachability check
   try {
@@ -167,10 +191,6 @@ export async function testConnection() {
   }
 
   try {
-    // Proactively try to enable network again
-    await enableNetwork(db);
-    console.log("Network enabled via enableNetwork call");
-
     // Use getDocFromServer to bypass cache and test real connection
     await getDocFromServer(doc(db, 'test', 'connection'));
     console.log("Firestore connection test (getDocFromServer) successful");
@@ -184,6 +204,9 @@ export async function testConnection() {
   } catch (error) {
     if(error instanceof Error && error.message.includes('the client is offline')) {
       console.error("Please check your Firebase configuration. The client is offline.");
+      // One last ditch effort
+      console.log("Attempting one last ditch enableNetwork...");
+      await ensureNetwork();
     } else {
       console.error("Firestore connection test failed:", error);
     }

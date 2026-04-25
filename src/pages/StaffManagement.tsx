@@ -51,10 +51,41 @@ const StaffManagement = () => {
   const fetchStaff = async () => {
     setLoading(true);
     try {
+      console.log('Fetching staff members from API...');
       const res = await api.get('/users?role=staff');
-      setStaff(Array.isArray(res.data) ? res.data : []);
-    } catch (err) {
-      console.error('Error fetching staff:', err);
+      console.log('Staff received from API:', res.data);
+      if (Array.isArray(res.data)) {
+        setStaff(res.data);
+      } else {
+        throw new Error('Invalid API response');
+      }
+    } catch (err: any) {
+      console.error('Error fetching staff from API, trying Firestore fallback:', err);
+      try {
+        const { getDocs, collection, query, where } = await import('firebase/firestore');
+        const { db } = await import('../lib/firebase');
+        
+        const q = query(collection(db, 'users'), where('role', '==', 'staff'));
+        const snapshot = await getDocs(q);
+        const staffList = snapshot.docs
+          .map(doc => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              ...data,
+              role: data.role || 'staff',
+              status: data.status || 'active'
+            };
+          })
+          .filter((u: any) => !u.deleted_at);
+        
+        console.log('Staff fetched from Firestore fallback:', staffList);
+        setStaff(staffList);
+      } catch (fsErr: any) {
+        console.error('Firestore fallback failed:', fsErr);
+        const msg = fsErr.message || 'Failed to fetch staff from all sources';
+        alert('Error: ' + msg);
+      }
     } finally {
       setLoading(false);
     }

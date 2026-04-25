@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, getDocFromServer } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
 interface ConfigContextType {
@@ -16,52 +16,74 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [error, setError] = useState<string | null>(null);
 
   const fetchConfig = async () => {
-    try {
-      const docRef = doc(db, 'settings', 'portal');
-      const docSnap = await getDoc(docRef);
-      
-      if (docSnap.exists()) {
-        setConfig(docSnap.data());
-      } else {
-        // Default config if not found
-        setConfig({ 
-          portal_name: 'JH Digital Seva Kendra',
-          theme_color: '#3b82f6',
-          secondary_color: '#64748b',
-          header_bg_color: '#1e293b'
-        });
-      }
-      setError(null);
-    } catch (err: any) {
-      console.error('Error fetching config:', err);
-      // Check for connectivity vs config issues
-      const isOffline = err.message?.includes('offline');
-      
-      if (isOffline) {
-        console.warn('Config fetch failed due to offline status, using defaults');
-        setConfig({ 
-          portal_name: 'JH Digital Seva Kendra (Offline Mode)',
-          theme_color: '#3b82f6',
-          secondary_color: '#64748b',
-          header_bg_color: '#1e293b'
-        });
-        setError(null); // Don't show hard error for connectivity
-      } else {
-        // For other errors, use defaults but keep error state if it's systemic
-        setConfig({ 
-          portal_name: 'JH Digital Seva Kendra',
-          theme_color: '#3b82f6',
-          secondary_color: '#64748b',
-          header_bg_color: '#1e293b'
-        });
-        // Only set error if it seems like a core config issue (e.g. permission denied)
-        if (err.message?.includes('permission') || err.message?.includes('API key')) {
-           setError('Configuration or permission error detected.');
+    let attempts = 0;
+    const maxAttempts = 5;
+    
+    const tryFetch = async (): Promise<void> => {
+      try {
+        setLoading(true);
+        const docRef = doc(db, 'settings', 'portal');
+        console.log(`Config attempt ${attempts + 1} - navigator.onLine: ${navigator.onLine}`);
+        
+        let docSnap;
+        if (attempts < 2) {
+           console.log('Fetching config via getDocFromServer...');
+           docSnap = await getDocFromServer(docRef);
+        } else {
+           console.log('Fetching config via standard getDoc...');
+           docSnap = await getDoc(docRef);
         }
+        
+        if (docSnap.exists()) {
+          setConfig(docSnap.data());
+        } else {
+          // Default config if not found
+          setConfig({ 
+            portal_name: 'JH Digital Seva Kendra',
+            theme_color: '#3b82f6',
+            secondary_color: '#64748b',
+            header_bg_color: '#1e293b'
+          });
+        }
+        setError(null);
+        setLoading(false);
+      } catch (err: any) {
+        console.error(`Error on config attempt ${attempts + 1}:`, err);
+        const isOffline = err.message?.includes('offline') || err.code === 'unavailable';
+        
+        if (isOffline && attempts < maxAttempts - 1) {
+          attempts++;
+          const delay = Math.min(Math.pow(2, attempts) * 1000 + 500, 10000);
+          console.log(`Retrying config fetch in ${delay}ms...`);
+          setTimeout(tryFetch, delay);
+          return;
+        }
+
+        if (isOffline) {
+          console.warn('Config fetch failed eventually due to offline status, using defaults');
+          setConfig({ 
+            portal_name: 'JH Digital Seva Kendra (Offline Mode)',
+            theme_color: '#3b82f6',
+            secondary_color: '#64748b',
+            header_bg_color: '#1e293b'
+          });
+          setError(null);
+        } else {
+          setConfig({ 
+            portal_name: 'JH Digital Seva Kendra',
+            theme_color: '#3b82f6',
+            secondary_color: '#64748b',
+            header_bg_color: '#1e293b'
+          });
+          if (err.message?.includes('permission') || err.message?.includes('API key')) {
+             setError('Configuration or permission error detected.');
+          }
+        }
+        setLoading(false);
       }
-    } finally {
-      setLoading(false);
-    }
+    };
+
+    await tryFetch();
   };
 
   useEffect(() => {

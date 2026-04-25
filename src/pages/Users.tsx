@@ -54,10 +54,40 @@ const UsersPage = () => {
   const fetchUsers = async () => {
     setLoading(true);
     try {
+      console.log('Fetching all users from API...');
       const res = await api.get('/users');
-      setUsers(Array.isArray(res.data) ? res.data : []);
-    } catch (err) {
-      console.error('Error fetching users:', err);
+      console.log('Users received from API:', res.data);
+      if (Array.isArray(res.data)) {
+        setUsers(res.data);
+      } else {
+        throw new Error('Invalid API response');
+      }
+    } catch (err: any) {
+      console.error('Error fetching users from API, trying Firestore fallback:', err);
+      try {
+        const { getDocs, collection, query, where } = await import('firebase/firestore');
+        const { db } = await import('../lib/firebase');
+        
+        const snapshot = await getDocs(collection(db, 'users'));
+        const usersList = snapshot.docs
+          .map(doc => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              ...data,
+              role: data.role || 'user',
+              status: data.status || 'active'
+            };
+          })
+          .filter((u: any) => !u.deleted_at);
+        
+        console.log('Users fetched from Firestore fallback:', usersList);
+        setUsers(usersList);
+      } catch (fsErr: any) {
+        console.error('Firestore fallback failed:', fsErr);
+        const msg = fsErr.message || 'Failed to fetch users from all sources';
+        alert('Error: ' + msg);
+      }
     } finally {
       setLoading(false);
     }

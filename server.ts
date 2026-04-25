@@ -1430,19 +1430,27 @@ app.delete('/api/application-drafts/:id', authenticateToken, async (req: any, re
 // Users
 app.get('/api/users', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
-    const { role, status, search } = req.query;
+    const { role, status, search: searchParam } = req.query;
+    console.log(`[API] Fetching users with filters: role=${role}, status=${status}, search=${searchParam}`);
+    
     let query: any = db.collection('users');
     
+    // Use individual queries to avoid complex indexes unless both are provided
     if (role && role !== 'all') {
-      query = query.where('role', '==', role);
+      const roleStr = String(role).toLowerCase().trim();
+      query = query.where('role', '==', roleStr);
+      console.log(`[API] Filtering by role: ${roleStr}`);
     }
     
     if (status && status !== 'all') {
-      query = query.where('status', '==', status);
+      const statusStr = String(status).toLowerCase().trim();
+      query = query.where('status', '==', statusStr);
+      console.log(`[API] Filtering by status: ${statusStr}`);
     }
     
     const snapshot = await query.get();
-    
+    console.log(`[API] Snapshot size: ${snapshot.size}`);
+
     let users = snapshot.docs
       .map(doc => {
         const data = doc.data();
@@ -1457,23 +1465,30 @@ app.get('/api/users', authenticateToken, requireRole(['admin']), async (req, res
           deleted_at: data.deleted_at
         };
       })
-      .filter(u => !u.deleted_at);
+      .filter(u => {
+        // Only return users who are NOT deleted
+        return !u.deleted_at;
+      });
 
-    // Filter by search in memory if provided
-    if (search) {
-      const searchLower = (search as string).toLowerCase();
+    // Filter by search in memory if provided to avoid complex Firestore text search requirements
+    if (searchParam) {
+      const searchLower = String(searchParam).toLowerCase().trim();
       users = users.filter(u => 
-        u.name.toLowerCase().includes(searchLower) || 
-        u.email.toLowerCase().includes(searchLower) || 
-        u.phone.includes(searchLower)
+        (u.name && u.name.toLowerCase().includes(searchLower)) || 
+        (u.email && u.email.toLowerCase().includes(searchLower)) || 
+        (u.phone && u.phone.includes(searchLower))
       );
     }
 
-    console.log(`[GET] Users fetched: role=${role || 'all'}, status=${status || 'all'}, search=${search || 'none'}, returning=${users.length}`);
+    console.log(`[API] Returning ${users.length} users after filtering`);
     res.json(users);
-  } catch (err) {
+  } catch (err: any) {
     console.error('Error fetching users:', err);
-    res.status(500).json({ error: 'Failed to fetch users' });
+    res.status(500).json({ 
+      error: 'Failed to fetch users', 
+      details: err.message,
+      code: err.code 
+    });
   }
 });
 
