@@ -746,6 +746,26 @@ const ApplyService = () => {
       // Generate a reference number
       const referenceNumber = `APP-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
 
+      // Staff/Admin Wallet Deduction check
+      if ((user?.role === 'staff' || user?.role === 'admin') && serviceFee && serviceFee > 0) {
+        if (!window.confirm(`A service fee of ₹${serviceFee} will be deducted from your wallet. Continue?`)) {
+          setIsSubmitting(false);
+          return;
+        }
+        
+        try {
+          await api.post('/wallet/deduct', {
+            amount: serviceFee,
+            description: `Service Fee for ${serviceName} (${referenceNumber})`,
+            service_id: serviceDetails.service_id
+          });
+        } catch (walletErr: any) {
+          setError(walletErr.response?.data?.error || 'Insufficient wallet balance for service fee.');
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
       // Save application to Firestore
       const userId = currentUser.uid;
       if (!userId) {

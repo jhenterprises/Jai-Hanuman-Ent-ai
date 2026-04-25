@@ -1057,6 +1057,46 @@ app.post('/api/wallet/pay-service', authenticateToken, async (req: any, res) => 
   }
 });
 
+app.post('/api/wallet/deduct', authenticateToken, async (req: any, res) => {
+  const { amount, description, service_id } = req.body;
+  
+  if (!amount || amount <= 0) {
+    return res.status(400).json({ error: 'Invalid amount' });
+  }
+
+  try {
+    const walletRef = db.collection('wallets').doc(req.user.id);
+    const transactionRef = db.collection('wallet_transactions').doc();
+
+    await db.runTransaction(async (transaction) => {
+      const walletDoc = await transaction.get(walletRef);
+      if (!walletDoc.exists || (walletDoc.data()?.balance || 0) < amount) {
+        throw new Error('Insufficient wallet balance');
+      }
+      
+      transaction.update(walletRef, {
+        balance: admin.firestore.FieldValue.increment(-amount),
+        updated_at: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      transaction.set(transactionRef, {
+        user_id: req.user.id,
+        type: 'debit',
+        amount: Number(amount),
+        description: description || 'Wallet deduction',
+        reference_id: service_id || null,
+        status: 'success',
+        created_at: admin.firestore.FieldValue.serverTimestamp()
+      });
+    });
+
+    res.json({ success: true, message: 'Balance deducted successfully' });
+  } catch (err: any) {
+    console.error('Wallet Deduction Error:', err);
+    res.status(400).json({ error: err.message || 'Failed to deduct balance' });
+  }
+});
+
 // --- Admin Wallet Endpoints ---
 
 app.get('/api/admin/wallets', authenticateToken, requireRole(['admin']), async (req: any, res) => {
@@ -1390,17 +1430,20 @@ app.delete('/api/application-drafts/:id', authenticateToken, async (req: any, re
 // Users
 app.get('/api/users', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
-    const { role } = req.query;
+    const { role, status, search } = req.query;
     let query: any = db.collection('users');
     
-    if (role) {
+    if (role && role !== 'all') {
       query = query.where('role', '==', role);
     }
     
-    const snapshot = await query.get();
-    console.log(`Fetching users: role=${role || 'all'}, total_count=${snapshot.size}`);
+    if (status && status !== 'all') {
+      query = query.where('status', '==', status);
+    }
     
-    const users = snapshot.docs
+    const snapshot = await query.get();
+    
+    let users = snapshot.docs
       .map(doc => {
         const data = doc.data();
         return {
@@ -1414,9 +1457,19 @@ app.get('/api/users', authenticateToken, requireRole(['admin']), async (req, res
           deleted_at: data.deleted_at
         };
       })
-      .filter(u => !u.deleted_at); // Filter out deleted users in memory
+      .filter(u => !u.deleted_at);
 
-    console.log(`Returning ${users.length} non-deleted users`);
+    // Filter by search in memory if provided
+    if (search) {
+      const searchLower = (search as string).toLowerCase();
+      users = users.filter(u => 
+        u.name.toLowerCase().includes(searchLower) || 
+        u.email.toLowerCase().includes(searchLower) || 
+        u.phone.includes(searchLower)
+      );
+    }
+
+    console.log(`[GET] Users fetched: role=${role || 'all'}, status=${status || 'all'}, search=${search || 'none'}, returning=${users.length}`);
     res.json(users);
   } catch (err) {
     console.error('Error fetching users:', err);

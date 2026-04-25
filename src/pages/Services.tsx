@@ -6,7 +6,7 @@ import { Search, Plus, Trash2, ExternalLink, ArrowRight, X, Check, Eye, EyeOff, 
 import { useNavigate } from 'react-router-dom';
 import ConfirmDialog from '../components/ConfirmDialog';
 import ModernButton from '../components/ModernButton';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, serverTimestamp, addDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 
 import { useConfig } from '../context/ConfigContext';
@@ -138,9 +138,46 @@ const Services = () => {
     e.preventDefault();
     try {
       if (editingService) {
-        await api.put(`/services/${editingService.service_id}`, formData);
+        // Use updateDoc directly for services as requested
+        const serviceRef = doc(db, 'services', editingService.service_id);
+        const updateData = {
+          name: formData.name,
+          description: formData.description,
+          url: formData.url,
+          application_type: formData.type,
+          icon: formData.icon,
+          application_id: formData.application_id,
+          is_visible: formData.visible_status === 1,
+          enabled: formData.enabled,
+          service_price: Number(formData.service_price),
+          payment_required: formData.payment_required,
+          fee: Number(formData.fee),
+          staff_commission: Number(formData.staff_commission),
+          updated_at: serverTimestamp()
+        };
+        await updateDoc(serviceRef, updateData);
+        console.log('Service updated successfully via updateDoc');
       } else {
-        await api.post('/services', formData);
+        // For new services, we can also use addDoc directly or keep API
+        const servicesRef = collection(db, 'services');
+        const newData = {
+          name: formData.name,
+          description: formData.description,
+          url: formData.url,
+          application_type: formData.type,
+          icon: formData.icon,
+          application_id: formData.application_id,
+          is_visible: formData.visible_status === 1,
+          enabled: formData.enabled,
+          service_price: Number(formData.service_price),
+          payment_required: formData.payment_required,
+          fee: Number(formData.fee),
+          staff_commission: Number(formData.staff_commission),
+          created_at: serverTimestamp(),
+          updated_at: serverTimestamp()
+        };
+        await addDoc(servicesRef, newData);
+        console.log('Service created successfully via addDoc');
       }
       setShowForm(false);
       setEditingService(null);

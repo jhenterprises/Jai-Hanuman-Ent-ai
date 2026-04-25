@@ -34,14 +34,31 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setError(null);
     } catch (err: any) {
       console.error('Error fetching config:', err);
-      // For other errors, use defaults to keep the app running
-      setConfig({ 
-        portal_name: 'JH Digital Seva Kendra',
-        theme_color: '#3b82f6',
-        secondary_color: '#64748b',
-        header_bg_color: '#1e293b'
-      });
-      setError(null);
+      // Check for connectivity vs config issues
+      const isOffline = err.message?.includes('offline');
+      
+      if (isOffline) {
+        console.warn('Config fetch failed due to offline status, using defaults');
+        setConfig({ 
+          portal_name: 'JH Digital Seva Kendra (Offline Mode)',
+          theme_color: '#3b82f6',
+          secondary_color: '#64748b',
+          header_bg_color: '#1e293b'
+        });
+        setError(null); // Don't show hard error for connectivity
+      } else {
+        // For other errors, use defaults but keep error state if it's systemic
+        setConfig({ 
+          portal_name: 'JH Digital Seva Kendra',
+          theme_color: '#3b82f6',
+          secondary_color: '#64748b',
+          header_bg_color: '#1e293b'
+        });
+        // Only set error if it seems like a core config issue (e.g. permission denied)
+        if (err.message?.includes('permission') || err.message?.includes('API key')) {
+           setError('Configuration or permission error detected.');
+        }
+      }
     } finally {
       setLoading(false);
     }
