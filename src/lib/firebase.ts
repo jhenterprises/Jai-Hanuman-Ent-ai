@@ -8,7 +8,8 @@ import {
   serverTimestamp, 
   initializeFirestore,
   getFirestore,
-  enableNetwork
+  enableNetwork,
+  memoryLocalCache
 } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import firebaseConfig from '../../firebase-applet-config.json';
@@ -121,8 +122,10 @@ console.log('--------------------------------------------------');
 const firestoreSettings: any = {
   // Use experimentalForceLongPolling to fix connection issues in restricted environments
   experimentalForceLongPolling: true,
-  // Ensure we don't use fetch streams which can be problematic
-  useFetchStreams: false
+  // Disable fetch streams which can be problematic
+  useFetchStreams: false,
+  // Use memory cache to avoid IndexedDB issues in iframes/sandboxes
+  localCache: memoryLocalCache()
 };
 console.log('Firestore Settings being applied:', firestoreSettings);
 console.log('Target Database ID:', dbId);
@@ -152,10 +155,25 @@ storage.maxUploadRetryTime = 15000; // 15 seconds
 
 // Test connection - calling manually if needed to diagnose
 export async function testConnection() {
+  console.log("Starting manual connection test...");
+  
+  // Basic domain reachability check
   try {
+    const start = Date.now();
+    await fetch('https://firestore.googleapis.com/generate_204', { mode: 'no-cors' });
+    console.log(`Network reachability check to firestore.googleapis.com successful (${Date.now() - start}ms)`);
+  } catch (e) {
+    console.error("Network level connectivity to firestore.googleapis.com failed:", e);
+  }
+
+  try {
+    // Proactively try to enable network again
+    await enableNetwork(db);
+    console.log("Network enabled via enableNetwork call");
+
     // Use getDocFromServer to bypass cache and test real connection
     await getDocFromServer(doc(db, 'test', 'connection'));
-    console.log("Firestore connection test successful");
+    console.log("Firestore connection test (getDocFromServer) successful");
     
     // Perform a test write as requested
     await setDoc(doc(db, 'test', 'connection'), {

@@ -62,6 +62,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         async function fetchUserDoc() {
           try {
             console.log(`Attempt ${attempts + 1} to fetch user document...`);
+            
+            // Check network status
+            if (!navigator.onLine) {
+              console.warn('Browser reports navigator.onLine is false');
+            }
+
             const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
             console.log('User document fetched:', userDoc.exists());
             
