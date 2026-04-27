@@ -39,7 +39,7 @@ const Wallet = () => {
     try {
       if (user?.uid) {
         // Fetch balance from Firestore
-        const walletSnap = await getDocs(query(collection(db, 'wallets'), where('user_id', '==', user.uid)));
+        const walletSnap = await getDocs(query(collection(db, 'wallets'), where('user_id', '==', user?.uid || '')));
         if (!walletSnap.empty) {
           setWallet({ balance: walletSnap.docs[0].data().balance || 0 });
         } else {
@@ -49,7 +49,7 @@ const Wallet = () => {
         // Fetch transactions from Firestore (ledger)
         const transSnap = await getDocs(query(
           collection(db, 'ledger'), 
-          where('user_id', '==', user.uid)
+          where('user_id', '==', user?.uid || '')
         ));
         
         const transList = transSnap.docs.map(doc => ({
@@ -105,7 +105,7 @@ const Wallet = () => {
             });
 
             // Update wallet balance
-            const walletSnap = await getDocs(query(collection(db, 'wallets'), where('user_id', '==', user?.uid)));
+            const walletSnap = await getDocs(query(collection(db, 'wallets'), where('user_id', '==', user?.uid || '')));
             if (!walletSnap.empty) {
               const walletDoc = walletSnap.docs[0];
               await updateDoc(doc(db, 'wallets', walletDoc.id), {

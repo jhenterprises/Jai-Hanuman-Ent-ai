@@ -30,7 +30,7 @@ const Dashboard = () => {
 
         const q = query(
           collection(db, 'applications'),
-          where('userId', '==', user.uid),
+          where('userId', '==', user?.uid || ''),
           orderBy('created_at', 'desc')
         );
         const appSnap = await getDocs(q);
@@ -38,7 +38,7 @@ const Dashboard = () => {
         setApplications(apps);
 
         if (user?.uid) {
-          const walletDoc = await getDocs(query(collection(db, 'wallets'), where('user_id', '==', user.uid)));
+          const walletDoc = await getDocs(query(collection(db, 'wallets'), where('user_id', '==', user?.uid || '')));
           if (!walletDoc.empty) {
             setWalletBalance(walletDoc.docs[0].data().balance || 0);
           }
@@ -47,7 +47,7 @@ const Dashboard = () => {
         // Fetch drafts from Firestore
         const draftSnap = await getDocs(query(
           collection(db, 'application_drafts'),
-          where('user_id', '==', user.uid)
+          where('user_id', '==', user?.uid || '')
         ));
         setDrafts(draftSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       } catch (err) {

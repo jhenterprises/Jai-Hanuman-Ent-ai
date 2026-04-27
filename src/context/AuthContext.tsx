@@ -63,6 +63,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             
             if (userDoc.exists()) {
               const userData = userDoc.data() as User;
+              // Ensure uid is set from firebaseUser as it might be missing in document
+              userData.uid = firebaseUser.uid;
+              
               // Force admin role for primary emails
               const adminEmails = ['pancardjhc2018@gmail.com', 'pavan.tr16@gmail.com', 'admin@jh.com'];
               if (firebaseUser.email && adminEmails.includes(firebaseUser.email)) {

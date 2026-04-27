@@ -42,9 +42,7 @@ let dbId = (finalConfig.firestoreDatabaseId && finalConfig.firestoreDatabaseId !
 
 console.log('Final Firestore Database ID:', dbId || '(default)');
 
-const firestoreSettings = {
-  ignoreUndefinedProperties: true
-};
+const firestoreSettings = {};
 
 let dbInstance;
 try {

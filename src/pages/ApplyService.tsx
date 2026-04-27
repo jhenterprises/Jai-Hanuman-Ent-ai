@@ -301,7 +301,7 @@ const ApplyService = () => {
     // In serverless, we check for a success payment in ledger or applications
     try {
       const q = query(collection(db, 'ledger'), 
-        where('user_id', '==', user?.uid), 
+        where('user_id', '==', user?.uid || ''), 
         where('service_id', '==', String(serviceId)),
         where('status', '==', 'completed')
       );
@@ -323,7 +323,7 @@ const ApplyService = () => {
       // Fetch wallet balance if user is logged in
       if (user) {
         try {
-          const walletSnap = await getDocs(query(collection(db, 'wallets'), where('user_id', '==', user.uid)));
+          const walletSnap = await getDocs(query(collection(db, 'wallets'), where('user_id', '==', user?.uid || '')));
           if (!walletSnap.empty) {
             setWalletBalance(walletSnap.docs[0].data().balance || 0);
           } else {
@@ -380,6 +380,10 @@ const ApplyService = () => {
       // For now, if it's one of the hardcoded ones, we use that.
       // Otherwise, we look for 'service_inputs' collection which we implemented in Services.tsx
       if (!SERVICE_CONFIGS[serviceType || '']) {
+        if (!currentService.service_id) {
+          console.warn('Service has no service_id attached.');
+          return;
+        }
         const inputsSnap = await getDocs(query(collection(db, 'service_inputs'), where('service_id', '==', currentService.service_id)));
         if (!inputsSnap.empty) {
           const customFields = inputsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -437,7 +441,7 @@ const ApplyService = () => {
       
       const ledgerRef = collection(db, 'ledger');
       const ledgerDoc = await addDoc(ledgerRef, {
-        user_id: user.uid,
+        user_id: user?.uid || '',
         amount: -serviceDetails.service_price,
         type: 'debit',
         description: `Wallet Payment for ${serviceDetails.name}`,
@@ -446,7 +450,7 @@ const ApplyService = () => {
         status: 'completed'
       });
 
-      const walletSnap = await getDocs(query(collection(db, 'wallets'), where('user_id', '==', user.uid)));
+      const walletSnap = await getDocs(query(collection(db, 'wallets'), where('user_id', '==', user?.uid || '')));
       if (!walletSnap.empty) {
         const walletDoc = walletSnap.docs[0];
         await updateDoc(doc(db, 'wallets', walletDoc.id), {
@@ -653,7 +657,7 @@ const ApplyService = () => {
               return; // Skip hidden field
             }
           }
-          if (formData[field.name] !== undefined) {
+          if (formData[field.name] !== undefined && formData[field.name] !== null) {
             filteredFormData[field.name] = formData[field.name];
           }
         });
@@ -710,7 +714,7 @@ const ApplyService = () => {
             status: 'completed'
           });
 
-          const walletSnap = await getDocs(query(collection(db, 'wallets'), where('user_id', '==', user?.uid)));
+          const walletSnap = await getDocs(query(collection(db, 'wallets'), where('user_id', '==', user?.uid || '')));
           if (!walletSnap.empty) {
             const walletDoc = walletSnap.docs[0];
             await updateDoc(doc(db, 'wallets', walletDoc.id), {
@@ -743,18 +747,18 @@ const ApplyService = () => {
         form_data: filteredFormData || {},
         documents: uploadedDocuments || [],
         status: 'Pending',
-        assignedTo: null,
-        assignedToName: null,
+        assignedTo: '',
+        assignedToName: '',
         payment_status: serviceDetails?.payment_required ? 'Pending' : 'Free',
         reference_number: String(referenceNumber),
         created_at: serverTimestamp(),
         updated_at: serverTimestamp()
       };
 
-      // Final safety check: remove any remaining undefined values
+      // Final safety check: remove any remaining undefined or null values
       const finalData: Record<string, any> = {};
       Object.keys(applicationData).forEach(key => {
-        if (applicationData[key] !== undefined) {
+        if (applicationData[key] !== undefined && applicationData[key] !== null) {
           finalData[key] = applicationData[key];
         }
       });
@@ -809,7 +813,7 @@ const ApplyService = () => {
       });
 
       // 2. Update wallet balance
-      const walletSnap = await getDocs(query(collection(db, 'wallets'), where('user_id', '==', user?.uid)));
+      const walletSnap = await getDocs(query(collection(db, 'wallets'), where('user_id', '==', user?.uid || '')));
       if (!walletSnap.empty) {
         const walletDoc = walletSnap.docs[0];
         await updateDoc(doc(db, 'wallets', walletDoc.id), {

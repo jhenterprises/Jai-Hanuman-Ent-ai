@@ -23,7 +23,7 @@ const Support = () => {
       if (user.role === 'admin' || user.role === 'staff') {
         q = query(collection(db, 'support_tickets'), orderBy('created_at', 'desc'));
       } else {
-        q = query(collection(db, 'support_tickets'), where('user_id', '==', user.uid), orderBy('created_at', 'desc'));
+        q = query(collection(db, 'support_tickets'), where('user_id', '==', user?.uid || ''), orderBy('created_at', 'desc'));
       }
       
       const snapshot = await getDocs(q);
@@ -43,7 +43,7 @@ const Support = () => {
     try {
       await addDoc(collection(db, 'support_tickets'), {
         ...newTicket,
-        user_id: user.uid,
+        user_id: user?.uid || '',
         user_name: user.name || 'Anonymous',
         user_email: user.email || 'No email',
         status: 'Open',

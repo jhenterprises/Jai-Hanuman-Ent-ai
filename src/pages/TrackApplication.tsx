@@ -33,6 +33,10 @@ const TrackApplication = () => {
   }, [location, urlRef]);
 
   const fetchStatus = async (ref: string) => {
+    if (!ref) {
+      setError('Please enter a valid reference number or mobile number.');
+      return;
+    }
     setLoading(true);
     setError('');
     setApplication(null);

@@ -90,8 +90,13 @@ const Services = () => {
   };
 
   const fetchServiceInputs = async (serviceId: string) => {
+    if (!serviceId) {
+      setServiceInputs([]);
+      return;
+    }
     try {
-      const snapshot = await getDocs(query(collection(db, 'service_inputs'), where('service_id', '==', serviceId)));
+      const q = query(collection(db, 'service_inputs'), where('service_id', '==', serviceId));
+      const snapshot = await getDocs(q);
       setServiceInputs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     } catch (err) {
       console.error('Error fetching service inputs:', err);
@@ -134,48 +139,57 @@ const Services = () => {
     });
   };
 
+  const cleanData = (obj: any) => {
+    return Object.entries(obj).reduce((acc: any, [key, varValue]) => {
+      if (varValue !== undefined && varValue !== null) {
+        acc[key] = varValue;
+      }
+      return acc;
+    }, {});
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       if (editingService) {
         // Use updateDoc directly for services as requested
         const serviceRef = doc(db, 'services', editingService.service_id);
-        const updateData = {
-          name: formData.name,
-          description: formData.description,
-          url: formData.url,
-          application_type: formData.type,
-          icon: formData.icon,
-          application_id: formData.application_id,
+        const updateData = cleanData({
+          name: formData.name || '',
+          description: formData.description || '',
+          url: formData.url || '',
+          application_type: formData.type || 'internal',
+          icon: formData.icon || '',
+          application_id: formData.application_id || '',
           is_visible: formData.visible_status === 1,
-          enabled: formData.enabled,
-          service_price: Number(formData.service_price),
-          payment_required: formData.payment_required,
-          fee: Number(formData.fee),
-          staff_commission: Number(formData.staff_commission),
+          enabled: formData.enabled ?? true,
+          service_price: Number(formData.service_price) || 0,
+          payment_required: !!formData.payment_required,
+          fee: Number(formData.fee) || 0,
+          staff_commission: Number(formData.staff_commission) || 0,
           updated_at: serverTimestamp()
-        };
+        });
         await updateDoc(serviceRef, updateData);
         console.log('Service updated successfully via updateDoc');
       } else {
         // For new services, we can also use addDoc directly or keep API
         const servicesRef = collection(db, 'services');
-        const newData = {
-          name: formData.name,
-          description: formData.description,
-          url: formData.url,
-          application_type: formData.type,
-          icon: formData.icon,
-          application_id: formData.application_id,
+        const newData = cleanData({
+          name: formData.name || '',
+          description: formData.description || '',
+          url: formData.url || '',
+          application_type: formData.type || 'internal',
+          icon: formData.icon || '',
+          application_id: formData.application_id || '',
           is_visible: formData.visible_status === 1,
-          enabled: formData.enabled,
-          service_price: Number(formData.service_price),
-          payment_required: formData.payment_required,
-          fee: Number(formData.fee),
-          staff_commission: Number(formData.staff_commission),
+          enabled: formData.enabled ?? true,
+          service_price: Number(formData.service_price) || 0,
+          payment_required: !!formData.payment_required,
+          fee: Number(formData.fee) || 0,
+          staff_commission: Number(formData.staff_commission) || 0,
           created_at: serverTimestamp(),
           updated_at: serverTimestamp()
-        };
+        });
         await addDoc(servicesRef, newData);
         console.log('Service created successfully via addDoc');
       }

@@ -71,17 +71,17 @@ const Applications = () => {
       let q = query(collection(db, 'applications'));
       
       if (user?.role === 'user' && user?.uid) {
-        q = query(q, where('userId', '==', user.uid));
+        q = query(q, where('userId', '==', user?.uid || ''));
       } else if (user?.role !== 'staff' && user?.role !== 'admin') {
         setApplications([]);
         return;
       }
 
-      if (filters.status !== 'All') {
+      if (filters.status && filters.status !== 'All') {
         q = query(q, where('status', '==', filters.status));
       }
       
-      if (filters.payment_status !== 'All') {
+      if (filters.payment_status && filters.payment_status !== 'All') {
         q = query(q, where('payment_status', '==', filters.payment_status));
       }
 

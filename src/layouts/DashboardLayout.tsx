@@ -60,7 +60,7 @@ const DashboardLayout = () => {
     try {
       const q = query(
         collection(db, 'notifications'),
-        where('user_id', '==', user.uid),
+        where('user_id', '==', user?.uid || ''),
         orderBy('created_at', 'desc'),
         limit(20)
       );

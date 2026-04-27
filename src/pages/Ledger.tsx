@@ -28,7 +28,7 @@ const Ledger = () => {
       let q = query(collection(db, 'ledger'));
       
       if (user?.role === 'staff') {
-        q = query(collection(db, 'ledger'), where('staff_id', '==', user.uid));
+        q = query(collection(db, 'ledger'), where('staff_id', '==', user?.uid || ''));
       }
       
       const snapshot = await getDocs(q);
