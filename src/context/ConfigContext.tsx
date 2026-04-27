@@ -26,17 +26,19 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         console.log(`Config attempt ${attempts + 1} - navigator.onLine: ${navigator.onLine}`);
         
         let docSnap;
-        if (attempts < 2) {
-           console.log('Fetching config via getDocFromServer...');
-           docSnap = await getDocFromServer(docRef);
-        } else {
-           console.log('Fetching config via standard getDoc...');
-           docSnap = await getDoc(docRef);
+        try {
+          // Standard getDoc handles connectivity better than getDocFromServer which is aggressive
+          console.log('Fetching config via standard getDoc...');
+          docSnap = await getDoc(docRef);
+        } catch (initialErr: any) {
+          console.warn('Initial getDoc failed, trying getDocFromServer as fallback...', initialErr.message);
+          docSnap = await getDocFromServer(docRef);
         }
         
-        if (docSnap.exists()) {
+        if (docSnap && docSnap.exists()) {
           setConfig(docSnap.data());
         } else {
+          console.log('Config document does not exist, using defaults');
           // Default config if not found
           setConfig({ 
             portal_name: 'JH Digital Seva Kendra',

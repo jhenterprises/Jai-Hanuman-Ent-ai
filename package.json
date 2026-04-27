@@ -5,9 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "prebuild": "rm -rf dist",
-    "build": "vite build",
-    "postbuild": "ls -la dist",
+    "build": "vite build && ls -la dist",
     "start": "node server.ts",
     "lint": "tsc --noEmit",
     "preview": "vite preview"
@@ -24,7 +22,6 @@
     "@vitejs/plugin-react": "^5.0.4",
     "axios": "^1.13.6",
     "bcryptjs": "^3.0.3",
-    "better-sqlite3": "^12.4.1",
     "chart.js": "^4.5.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
@@ -60,6 +57,7 @@
     "@types/multer": "^2.0.0",
     "@types/node": "^22.14.0",
     "autoprefixer": "^10.4.21",
+    "better-sqlite3": "^12.4.1",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",

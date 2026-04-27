@@ -107,26 +107,26 @@ console.log('Sanitized Config:', {
   authDomain: finalConfig.authDomain,
   projectId: finalConfig.projectId
 });
-// CRITICAL: Favor the specific ID from JSON if ENV is just '(default)'
-const dbId = (firebaseConfigEnv.firestoreDatabaseId && 
+// CRITICAL: Favor the specific ID from JSON if ENV is just '(default)' or empty
+let dbId = (firebaseConfigEnv.firestoreDatabaseId && 
               firebaseConfigEnv.firestoreDatabaseId !== '' && 
               firebaseConfigEnv.firestoreDatabaseId !== '(default)') 
   ? firebaseConfigEnv.firestoreDatabaseId 
   : (finalConfig.firestoreDatabaseId || '(default)');
+
+// Sanity check: if it looks like a measurement ID (G-XXXX), it's definitely NOT a database ID
+if (dbId.startsWith('G-')) {
+  console.warn(`Firestore Database ID "${dbId}" looks like a Measurement ID. Falling back to (default).`);
+  dbId = '(default)';
+}
+
 console.log('Firestore Database ID:', dbId);
 console.log('--------------------------------------------------');
 
 // Use initializeFirestore with settings for better connectivity
 const firestoreSettings: any = {
-  // Explicitly set host to prevent any auto-detect issues in proxies
-  host: 'firestore.googleapis.com',
-  ssl: true,
   // Use experimentalForceLongPolling to fix connection issues in restricted environments (like iframes/proxies)
   experimentalForceLongPolling: true,
-  // Disable auto-detect to ensure force is respected
-  experimentalAutoDetectLongPolling: false,
-  // Disable fetch streams which can be problematic in some browsers/sandboxes
-  useFetchStreams: false,
   // Use memory cache to avoid IndexedDB issues in iframes/sandboxes
   localCache: memoryLocalCache(),
   // Helps with clean data

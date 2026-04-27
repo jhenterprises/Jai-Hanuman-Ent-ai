@@ -1428,14 +1428,19 @@ app.delete('/api/application-drafts/:id', authenticateToken, async (req: any, re
 
 
 // Users
-app.get('/api/users', authenticateToken, requireRole(['admin']), async (req, res) => {
+app.get('/api/users', authenticateToken, requireRole(['admin']), async (req: any, res) => {
+  console.log(`[API] GET /api/users request received from ${req.user?.email}`);
   try {
     const { role, status, search: searchParam } = req.query;
-    console.log(`[API] Fetching users with filters: role=${role}, status=${status}, search=${searchParam}`);
+    console.log(`[API] Parameters: role=${role}, status=${status}, search=${searchParam}`);
     
+    if (!db) {
+      console.error('[API] Firestore admin db is NOT initialized!');
+      return res.status(503).json({ error: 'Database not initialized' });
+    }
+
     let query: any = db.collection('users');
     
-    // Use individual queries to avoid complex indexes unless both are provided
     if (role && role !== 'all') {
       const roleStr = String(role).toLowerCase().trim();
       query = query.where('role', '==', roleStr);
@@ -1448,8 +1453,9 @@ app.get('/api/users', authenticateToken, requireRole(['admin']), async (req, res
       console.log(`[API] Filtering by status: ${statusStr}`);
     }
     
+    console.log('[API] Executing Firestore query...');
     const snapshot = await query.get();
-    console.log(`[API] Snapshot size: ${snapshot.size}`);
+    console.log(`[API] Query successful. Items found: ${snapshot.size}`);
 
     let users = snapshot.docs
       .map(doc => {
@@ -1465,12 +1471,8 @@ app.get('/api/users', authenticateToken, requireRole(['admin']), async (req, res
           deleted_at: data.deleted_at
         };
       })
-      .filter(u => {
-        // Only return users who are NOT deleted
-        return !u.deleted_at;
-      });
+      .filter(u => !u.deleted_at);
 
-    // Filter by search in memory if provided to avoid complex Firestore text search requirements
     if (searchParam) {
       const searchLower = String(searchParam).toLowerCase().trim();
       users = users.filter(u => 
