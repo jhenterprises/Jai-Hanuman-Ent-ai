@@ -5,7 +5,6 @@ import { auth, db } from '../lib/firebase';
 import { collection, query, where, orderBy, limit, getDocs, updateDoc, doc } from 'firebase/firestore';
 import { useConfig } from '../context/ConfigContext';
 import AIChatbot from '../components/AIChatbot';
-import api from '../services/api';
 import { safeFormat } from '../utils/dateUtils';
 import { 
   LayoutDashboard, 

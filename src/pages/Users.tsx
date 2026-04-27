@@ -1,6 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { 
+  collection, getDocs, doc, setDoc, updateDoc, 
+  deleteDoc, query, where, serverTimestamp, getDoc 
+} from 'firebase/firestore';
 import { 
   Search, Plus, Trash2, Shield, User, Edit2, Check, X, 
   UserMinus, UserCheck, Key, Filter, ChevronLeft, ChevronRight,
@@ -54,40 +58,24 @@ const UsersPage = () => {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      console.log('Fetching all users from API...');
-      const res = await api.get('/users');
-      console.log('Users received from API:', res.data);
-      if (Array.isArray(res.data)) {
-        setUsers(res.data);
-      } else {
-        throw new Error('Invalid API response');
-      }
+      console.log('Fetching users from Firestore...');
+      const snapshot = await getDocs(collection(db, 'users'));
+      const usersList = snapshot.docs
+        .map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            ...data,
+            role: data.role || 'user',
+            status: data.status || 'active'
+          };
+        });
+      
+      console.log('Users fetched from Firestore:', usersList);
+      setUsers(usersList);
     } catch (err: any) {
-      console.error('Error fetching users from API, trying Firestore fallback:', err);
-      try {
-        const { getDocs, collection, query, where } = await import('firebase/firestore');
-        const { db } = await import('../lib/firebase');
-        
-        const snapshot = await getDocs(collection(db, 'users'));
-        const usersList = snapshot.docs
-          .map(doc => {
-            const data = doc.data();
-            return {
-              id: doc.id,
-              ...data,
-              role: data.role || 'user',
-              status: data.status || 'active'
-            };
-          })
-          .filter((u: any) => !u.deleted_at);
-        
-        console.log('Users fetched from Firestore fallback:', usersList);
-        setUsers(usersList);
-      } catch (fsErr: any) {
-        console.error('Firestore fallback failed:', fsErr);
-        const msg = fsErr.message || 'Failed to fetch users from all sources';
-        alert('Error: ' + msg);
-      }
+      console.error('Error fetching users from Firestore:', err);
+      handleFirestoreError(err, OperationType.LIST, 'users');
     } finally {
       setLoading(false);
     }
@@ -96,13 +84,27 @@ const UsersPage = () => {
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await api.post('/users', formData);
+      // Note: In serverless, we can't easily create auth users from client for other people 
+      // without Cloud Functions. But we can create the Firestore doc.
+      // For this app, let's assume either the user registers themselves 
+      // or we just create the document and they register later with same email.
+      // Alternatively, admins usually need a cloud function to create Auth users.
+      // Since we must use "Firebase directly", we'll just create the doc.
+      const userRef = doc(collection(db, 'users'));
+      await setDoc(userRef, {
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        role: formData.role,
+        status: 'active',
+        createdAt: serverTimestamp()
+      });
       setShowAddModal(false);
       resetForm();
       fetchUsers();
-      alert('User created successfully');
+      alert('User document created successfully. Note: User must still register via login page with this email.');
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to create user');
+      handleFirestoreError(err, OperationType.CREATE, 'users');
     }
   };
 
@@ -110,54 +112,54 @@ const UsersPage = () => {
     e.preventDefault();
     if (!selectedUser) return;
     try {
-      await api.put(`/users/${selectedUser.id}`, {
+      const userRef = doc(db, 'users', selectedUser.id);
+      await updateDoc(userRef, {
         name: formData.name,
         email: formData.email,
         phone: formData.phone,
-        role: formData.role
+        role: formData.role,
+        updatedAt: serverTimestamp()
       });
       setShowEditModal(false);
       resetForm();
       fetchUsers();
       alert('User updated successfully');
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to update user');
+      handleFirestoreError(err, OperationType.UPDATE, `users/${selectedUser.id}`);
     }
   };
 
   const handleToggleStatus = async (user: any) => {
     const newStatus = user.status === 'active' ? 'disabled' : 'active';
     try {
-      await api.patch(`/users/${user.id}/status`, { status: newStatus });
+      const userRef = doc(db, 'users', user.id);
+      await updateDoc(userRef, {
+        status: newStatus,
+        updatedAt: serverTimestamp()
+      });
       fetchUsers();
       alert(`User ${newStatus === 'active' ? 'enabled' : 'disabled'} successfully`);
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to update status');
+      handleFirestoreError(err, OperationType.UPDATE, `users/${user.id}`);
     }
   };
 
   const handleResetPassword = async (id: string) => {
-    if (!window.confirm('Reset password to a temporary one?')) return;
-    try {
-      const res = await api.post(`/users/${id}/reset-password`);
-      alert(`Password reset! Temp Password: ${res.data.tempPassword}`);
-    } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to reset password');
-    }
+    alert('Password reset requires Firebase Auth Admin SDK (Cloud Functions) or the user using "Forgot Password".');
   };
 
   const handleDelete = (id: string) => {
     setConfirmDialog({
       isOpen: true,
       title: 'Delete User',
-      message: 'Are you sure you want to move this user to the Recycle Bin?',
+      message: 'Are you sure you want to PERMANENTLY delete this user? This action cannot be undone.',
       onConfirm: async () => {
         try {
-          await api.delete(`/users/${id}`);
+          await deleteDoc(doc(db, 'users', id));
           fetchUsers();
-          alert('User moved to Recycle Bin');
+          alert('User deleted successfully');
         } catch (err: any) {
-          alert(err.response?.data?.error || 'Failed to delete user');
+          handleFirestoreError(err, OperationType.DELETE, `users/${id}`);
         }
         setConfirmDialog(prev => ({ ...prev, isOpen: false }));
       }

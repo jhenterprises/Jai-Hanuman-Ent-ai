@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import api from '../services/api';
+import { collection, getDocs, query, where, addDoc, serverTimestamp, deleteDoc, doc } from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
-import { Plus, Download, Search, Filter, Trash2 } from 'lucide-react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { Plus, Search, Trash2 } from 'lucide-react';
 
 const Ledger = () => {
   const [ledger, setLedger] = useState<any[]>([]);
@@ -25,73 +24,70 @@ const Ledger = () => {
 
   const fetchLedger = async () => {
     try {
-      const res = await api.get('/ledger');
-      setLedger(res.data);
-    } catch (err: any) {
-      console.error('Error fetching ledger from API:', err);
+      console.log('Fetching ledger from Firestore...');
+      let q = query(collection(db, 'ledger'));
       
-      // Fallback to Firestore if API fails (e.g. server restarting)
-      if (err.message?.includes('HTML') || !err.response || err.code === 'ECONNABORTED' || err.response?.status >= 500) {
-        try {
-          console.log('Attempting to fetch ledger from Firestore fallback...');
-          let q = query(collection(db, 'ledger'));
-          
-          if (user?.role === 'staff') {
-            q = query(collection(db, 'ledger'), where('staff_id', '==', user.uid));
-          }
-          
-          const snapshot = await getDocs(q);
-          const ledgerList = snapshot.docs
-            .map(doc => ({
-              id: doc.id,
-              ...doc.data()
-            }))
-            .filter((item: any) => !item.deleted_at)
-            .sort((a: any, b: any) => {
-              const dateA = a.created_at?.toDate ? a.created_at.toDate() : new Date(a.created_at || 0);
-              const dateB = b.created_at?.toDate ? b.created_at.toDate() : new Date(b.created_at || 0);
-              return dateB.getTime() - dateA.getTime();
-            });
-          
-          console.log('Ledger fetched from Firestore successfully');
-          setLedger(ledgerList);
-        } catch (fsErr) {
-          console.error('Firestore fallback failed:', fsErr);
-          setLedger([]);
-        }
-      } else {
-        setLedger([]);
+      if (user?.role === 'staff') {
+        q = query(collection(db, 'ledger'), where('staff_id', '==', user.uid));
       }
+      
+      const snapshot = await getDocs(q);
+      const ledgerList = snapshot.docs
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }))
+        .sort((a: any, b: any) => {
+          const dateA = a.created_at?.toDate ? a.created_at.toDate() : new Date(a.date || 0);
+          const dateB = b.created_at?.toDate ? b.created_at.toDate() : new Date(b.date || 0);
+          return dateB.getTime() - dateA.getTime();
+        });
+      
+      setLedger(ledgerList);
+    } catch (err: any) {
+      console.error('Error fetching ledger:', err);
+      handleFirestoreError(err, OperationType.LIST, 'ledger');
     }
   };
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
-    await api.post('/ledger', newEntry);
-    setShowAdd(false);
-    setNewEntry({ 
-      customer_name: '', 
-      service_name: '', 
-      principle_amount: '', 
-      profit_amount: '', 
-      date: new Date().toISOString().split('T')[0] 
-    });
-    fetchLedger();
+    try {
+      const principle = parseFloat(newEntry.principle_amount) || 0;
+      const profit = parseFloat(newEntry.profit_amount) || 0;
+      
+      await addDoc(collection(db, 'ledger'), {
+        ...newEntry,
+        principle_amount: principle,
+        profit_amount: profit,
+        amount: principle + profit,
+        staff_id: user?.uid,
+        staff_name: user?.name,
+        created_at: serverTimestamp()
+      });
+      
+      setShowAdd(false);
+      setNewEntry({ 
+        customer_name: '', 
+        service_name: '', 
+        principle_amount: '', 
+        profit_amount: '', 
+        date: new Date().toISOString().split('T')[0] 
+      });
+      fetchLedger();
+    } catch (err: any) {
+      handleFirestoreError(err, OperationType.CREATE, 'ledger');
+    }
   };
 
   const handleDelete = async (id: string) => {
-    if (!id) {
-      alert('Error: Invalid entry ID');
-      return;
-    }
+    if (!id) return;
     if (!window.confirm('Are you sure you want to delete this entry?')) return;
     try {
-      await api.delete(`/ledger/${id}`);
+      await deleteDoc(doc(db, 'ledger', id));
       fetchLedger();
     } catch (err: any) {
-      console.error('Delete error:', err);
-      const errorMessage = err.response?.data?.error || err.message || 'Unknown error';
-      alert(`Failed to delete entry: ${errorMessage}`);
+      handleFirestoreError(err, OperationType.DELETE, `ledger/${id}`);
     }
   };
 

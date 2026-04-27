@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import api from '../services/api';
+import { collection, getDocs, updateDoc, doc, query, where, orderBy } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 import { CheckCircle, XCircle, Eye, Clock, User, FileText } from 'lucide-react';
 import { safeFormat } from '../utils/dateUtils';
 
@@ -15,19 +16,27 @@ const StaffDashboard = () => {
   const fetchApplications = async () => {
     setLoading(true);
     try {
-      const res = await api.get('/applications');
-      setApplications(res.data);
+      const q = query(collection(db, 'applications'), orderBy('created_at', 'desc'));
+      const snapshot = await getDocs(q);
+      const apps = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setApplications(apps);
+    } catch (err) {
+      console.error('Error fetching applications:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const updateStatus = async (id: number, status: string) => {
+  const updateStatus = async (id: string, status: string) => {
     try {
-      await api.patch(`/applications/${id}/status`, { status });
+      const appRef = doc(db, 'applications', id);
+      await updateDoc(appRef, { status, updated_at: new Date().toISOString() });
       fetchApplications();
     } catch (err) {
-      console.error(err);
+      console.error('Error updating status:', err);
     }
   };
 

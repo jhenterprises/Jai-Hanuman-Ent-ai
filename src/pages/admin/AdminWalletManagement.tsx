@@ -1,5 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import api from '../../services/api';
+import { db, handleFirestoreError, OperationType } from '../../lib/firebase';
+import { 
+  collection, getDocs, query, where, doc, 
+  addDoc, updateDoc, serverTimestamp, getDoc,
+  orderBy, limit
+} from 'firebase/firestore';
 import { 
   Wallet, 
   ArrowUpRight, 
@@ -45,17 +50,65 @@ const AdminWalletManagement = () => {
     setLoading(true);
     try {
       if (activeTab === 'wallets') {
-        const res = await api.get('/admin/wallets');
-        setWallets(res.data);
+        const walletsSnap = await getDocs(collection(db, 'wallets'));
+        const usersSnap = await getDocs(collection(db, 'users'));
+        const usersMap = new Map();
+        usersSnap.docs.forEach(d => usersMap.set(d.id, d.data()));
+
+        const walletsList = walletsSnap.docs.map(doc => {
+          const data = doc.data();
+          const userData = usersMap.get(data.user_id) || {};
+          return {
+            wallet_id: doc.id,
+            ...data,
+            name: userData.name || 'Unknown',
+            email: userData.email || 'No Email',
+            role: userData.role || 'user'
+          };
+        });
+        setWallets(walletsList);
       } else if (activeTab === 'transactions') {
-        const res = await api.get('/admin/wallet/transactions');
-        setTransactions(res.data);
+        const transSnap = await getDocs(query(collection(db, 'ledger'), orderBy('created_at', 'desc'), limit(100)));
+        const usersSnap = await getDocs(collection(db, 'users'));
+        const usersMap = new Map();
+        usersSnap.docs.forEach(d => usersMap.set(d.id, d.data()));
+
+        const transList = transSnap.docs.map(doc => {
+          const data = doc.data();
+          const userData = usersMap.get(data.user_id) || {};
+          return {
+            transaction_id: doc.id,
+            ...data,
+            name: userData.name || 'Unknown',
+            email: userData.email || 'No Email'
+          };
+        });
+        setTransactions(transList);
       } else if (activeTab === 'analytics') {
-        const res = await api.get('/admin/wallet/analytics');
-        setAnalytics(res.data);
+        // Simple client-side analytics since we're serverless
+        const transSnap = await getDocs(collection(db, 'ledger'));
+        const transactions = transSnap.docs.map(d => d.data());
+        
+        const totalRevenue = transactions
+          .filter(t => t.type === 'debit' && t.status === 'completed')
+          .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+          
+        const walletsSnap = await getDocs(collection(db, 'wallets'));
+        const totalWalletBalance = walletsSnap.docs.reduce((sum, d) => sum + (d.data().balance || 0), 0);
+        
+        setAnalytics({
+          totalRevenue,
+          totalWalletBalance,
+          dailyTransactions: transactions.filter(t => {
+            const date = t.created_at?.toDate ? t.created_at.toDate() : new Date(t.created_at);
+            return date.toDateString() === new Date().toDateString();
+          }).length,
+          topPayingUsers: [] // Would need more complex grouping
+        });
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error fetching admin wallet data:', err);
+      handleFirestoreError(err, OperationType.LIST, activeTab);
     } finally {
       setLoading(false);
     }
@@ -67,17 +120,35 @@ const AdminWalletManagement = () => {
 
     setIsAdjusting(true);
     try {
-      await api.post('/admin/wallets/adjust-balance', {
-        walletId: selectedWallet.wallet_id,
-        amount: parseFloat(adjustAmount),
-        type: adjustType === 'add' ? 'credit' : 'debit',
-        reason: adjustDescription || `Admin manual ${adjustType}`
+      const amount = parseFloat(adjustAmount);
+      const type = adjustType === 'add' ? 'credit' : 'debit';
+      
+      // 1. Log in ledger
+      await addDoc(collection(db, 'ledger'), {
+        user_id: selectedWallet.user_id,
+        amount: type === 'credit' ? amount : -amount,
+        type,
+        description: adjustDescription || `Admin manual ${adjustType}`,
+        status: 'completed',
+        created_at: serverTimestamp()
       });
+
+      // 2. Update wallet
+      const walletRef = doc(db, 'wallets', selectedWallet.wallet_id);
+      const newBalance = type === 'credit' 
+        ? (selectedWallet.balance || 0) + amount 
+        : (selectedWallet.balance || 0) - amount;
+        
+      await updateDoc(walletRef, {
+        balance: newBalance,
+        updated_at: serverTimestamp()
+      });
+
       setMessage({ type: 'success', text: 'Balance adjusted successfully' });
       setShowAdjustModal(false);
       fetchData();
     } catch (err: any) {
-      setMessage({ type: 'error', text: err.response?.data?.error || 'Failed to adjust balance' });
+      handleFirestoreError(err, OperationType.UPDATE, `wallets/${selectedWallet.wallet_id}`);
     } finally {
       setIsAdjusting(false);
     }

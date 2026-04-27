@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import api from '../services/api';
+import { collection, getDocs, addDoc, updateDoc, doc, query, where, serverTimestamp } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import { 
   Search, Plus, Trash2, Shield, User, Edit2, X, 
@@ -51,41 +52,21 @@ const StaffManagement = () => {
   const fetchStaff = async () => {
     setLoading(true);
     try {
-      console.log('Fetching staff members from API...');
-      const res = await api.get('/users?role=staff');
-      console.log('Staff received from API:', res.data);
-      if (Array.isArray(res.data)) {
-        setStaff(res.data);
-      } else {
-        throw new Error('Invalid API response');
-      }
-    } catch (err: any) {
-      console.error('Error fetching staff from API, trying Firestore fallback:', err);
-      try {
-        const { getDocs, collection, query, where } = await import('firebase/firestore');
-        const { db } = await import('../lib/firebase');
-        
-        const q = query(collection(db, 'users'), where('role', '==', 'staff'));
-        const snapshot = await getDocs(q);
-        const staffList = snapshot.docs
-          .map(doc => {
-            const data = doc.data();
-            return {
-              id: doc.id,
-              ...data,
-              role: data.role || 'staff',
-              status: data.status || 'active'
-            };
-          })
-          .filter((u: any) => !u.deleted_at);
-        
-        console.log('Staff fetched from Firestore fallback:', staffList);
-        setStaff(staffList);
-      } catch (fsErr: any) {
-        console.error('Firestore fallback failed:', fsErr);
-        const msg = fsErr.message || 'Failed to fetch staff from all sources';
-        alert('Error: ' + msg);
-      }
+      const q = query(collection(db, 'users'), where('role', 'in', ['staff', 'admin']));
+      const snapshot = await getDocs(q);
+      const staffList = snapshot.docs
+        .map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            ...data
+          };
+        })
+        .filter((u: any) => !u.is_deleted);
+      
+      setStaff(staffList);
+    } catch (fsErr: any) {
+      console.error('Error fetching staff:', fsErr);
     } finally {
       setLoading(false);
     }
@@ -94,13 +75,20 @@ const StaffManagement = () => {
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await api.post('/users', { ...formData, role: 'staff' });
+      // In serverless client-side, we can only create the firestore record.
+      // The user would need to sign up themselves or use a Cloud Function.
+      await addDoc(collection(db, 'users'), {
+        ...formData,
+        role: 'staff',
+        status: 'active',
+        created_at: serverTimestamp()
+      });
       setShowAddModal(false);
       resetForm();
       fetchStaff();
-      alert('Staff member created successfully');
+      alert('Staff record created in Firestore. The user must now register with this email to access the system.');
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to create staff member');
+      alert('Failed to create staff member: ' + err.message);
     }
   };
 
@@ -108,40 +96,36 @@ const StaffManagement = () => {
     e.preventDefault();
     if (!selectedStaff) return;
     try {
-      await api.put(`/users/${selectedStaff.id}`, {
+      const staffRef = doc(db, 'users', selectedStaff.id);
+      await updateDoc(staffRef, {
         name: formData.name,
         email: formData.email,
         phone: formData.phone,
-        role: 'staff'
+        updated_at: serverTimestamp()
       });
       setShowEditModal(false);
       resetForm();
       fetchStaff();
       alert('Staff member updated successfully');
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to update staff member');
+      alert('Failed to update staff member: ' + err.message);
     }
   };
 
   const handleToggleStatus = async (member: any) => {
     const newStatus = member.status === 'active' ? 'disabled' : 'active';
     try {
-      await api.patch(`/users/${member.id}/status`, { status: newStatus });
+      const staffRef = doc(db, 'users', member.id);
+      await updateDoc(staffRef, { status: newStatus, updated_at: serverTimestamp() });
       fetchStaff();
       alert(`Staff member ${newStatus === 'active' ? 'enabled' : 'disabled'} successfully`);
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to update status');
+      alert('Failed to update status: ' + err.message);
     }
   };
 
   const handleResetPassword = async (id: string) => {
-    if (!window.confirm('Reset password to a temporary one?')) return;
-    try {
-      const res = await api.post(`/users/${id}/reset-password`);
-      alert(`Password reset! Temp Password: ${res.data.tempPassword}`);
-    } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to reset password');
-    }
+    alert('Please use the regular "Forgot Password" flow on the login page. As an admin, you cannot directly set passwords in Firebase client-side.');
   };
 
   const handleDelete = (id: string) => {
@@ -151,11 +135,22 @@ const StaffManagement = () => {
       message: 'Are you sure you want to remove this staff member? This will move them to the Recycle Bin.',
       onConfirm: async () => {
         try {
-          await api.delete(`/users/${id}`);
+          const staffRef = doc(db, 'users', id);
+          await updateDoc(staffRef, { is_deleted: true, updated_at: serverTimestamp() });
+          
+          // Optionally add to recycle_bin collection
+          await addDoc(collection(db, 'recycle_bin'), {
+            original_id: id,
+            type: 'user',
+            name: staff.find(s => s.id === id)?.name || 'Unknown',
+            deleted_at: serverTimestamp(),
+            data: staff.find(s => s.id === id) || {}
+          });
+
           fetchStaff();
-          alert('Staff member removed');
+          alert('Staff member moved to Recycle Bin');
         } catch (err: any) {
-          alert(err.response?.data?.error || 'Failed to remove staff member');
+          alert('Failed to remove staff member: ' + err.message);
         }
         setConfirmDialog(prev => ({ ...prev, isOpen: false }));
       }

@@ -2,10 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { IndianRupee, Search, Calendar, Filter, CheckCircle, XCircle, Clock, Download, ArrowLeft, Wallet, CreditCard } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import api from '../../services/api';
 import { safeFormat } from '../../utils/dateUtils';
 import { db } from '../../lib/firebase';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, where } from 'firebase/firestore';
 
 const AdminPayments = () => {
   const [payments, setPayments] = useState<any[]>([]);
@@ -20,33 +19,15 @@ const AdminPayments = () => {
 
   const fetchPayments = async () => {
     try {
-      const res = await api.get('/admin/payments');
-      setPayments(res.data);
+      const q = query(collection(db, 'ledger'), orderBy('created_at', 'desc'));
+      const snapshot = await getDocs(q);
+      const paymentsList = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setPayments(paymentsList);
     } catch (err: any) {
-      console.error('Error fetching payments from API:', err);
-      
-      // Fallback to Firestore if API fails (e.g. server restarting)
-      if (err.message?.includes('HTML') || !err.response || err.code === 'ECONNABORTED' || err.response?.status >= 500) {
-        try {
-          console.log('Attempting to fetch payments from Firestore fallback...');
-          const snapshot = await getDocs(collection(db, 'service_payments'));
-          const paymentsList = snapshot.docs
-            .map(doc => ({
-              id: doc.id,
-              ...doc.data()
-            }))
-            .sort((a: any, b: any) => {
-              const dateA = a.created_at?.toDate ? a.created_at.toDate() : new Date(a.created_at || 0);
-              const dateB = b.created_at?.toDate ? b.created_at.toDate() : new Date(b.created_at || 0);
-              return dateB.getTime() - dateA.getTime();
-            });
-          
-          console.log('Payments fetched from Firestore successfully');
-          setPayments(paymentsList);
-        } catch (fsErr) {
-          console.error('Firestore fallback failed:', fsErr);
-        }
-      }
+      console.error('Error fetching payments from Firestore:', err);
     } finally {
       setLoading(false);
     }
@@ -54,32 +35,22 @@ const AdminPayments = () => {
 
   const fetchRevenue = async () => {
     try {
-      const res = await api.get('/admin/revenue');
-      setRevenueStats(res.data);
-    } catch (err: any) {
-      console.error('Error fetching revenue stats from API:', err);
+      const q = query(collection(db, 'ledger'), where('status', '==', 'completed'));
+      const snapshot = await getDocs(q);
+      const successfulPayments = snapshot.docs.map(doc => doc.data());
       
-      // Fallback to Firestore if API fails
-      if (err.message?.includes('HTML') || !err.response || err.code === 'ECONNABORTED' || err.response?.status >= 500) {
-        try {
-          console.log('Attempting to calculate revenue from Firestore fallback...');
-          const snapshot = await getDocs(collection(db, 'service_payments'));
-          const successfulPayments = snapshot.docs
-            .map(doc => doc.data())
-            .filter(p => p.status === 'success');
-          
-          const totalRevenue = successfulPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-          const totalTransactions = successfulPayments.length;
-          
-          setRevenueStats({
-            totalRevenue,
-            totalTransactions,
-            averageTransaction: totalTransactions > 0 ? totalRevenue / totalTransactions : 0
-          });
-        } catch (fsErr) {
-          console.error('Firestore revenue fallback failed:', fsErr);
-        }
-      }
+      const totalRevenue = successfulPayments
+        .filter(p => p.type === 'debit') // In this context, debit from user to system = revenue
+        .reduce((sum, p) => sum + Math.abs(Number(p.amount) || 0), 0);
+      const totalTransactions = successfulPayments.length;
+      
+      setRevenueStats({
+        total_revenue: totalRevenue,
+        total_payments: totalTransactions,
+        averageTransaction: totalTransactions > 0 ? totalRevenue / totalTransactions : 0
+      });
+    } catch (err: any) {
+      console.error('Error fetching revenue stats from Firestore:', err);
     }
   };
 

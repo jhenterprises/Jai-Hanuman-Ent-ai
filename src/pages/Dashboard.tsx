@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
-import api from '../services/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   FileText, ArrowRight, Plus, Download, Calendar, 
@@ -45,19 +44,12 @@ const Dashboard = () => {
           }
         }
 
-        try {
-          const draftRes = await api.get('/application-drafts');
-          setDrafts(draftRes.data);
-        } catch (draftErr: any) {
-          console.error('Error fetching drafts:', draftErr);
-          if (user?.uid) {
-            const draftSnap = await getDocs(query(
-              collection(db, 'application_drafts'),
-              where('user_id', '==', user.uid)
-            ));
-            setDrafts(draftSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-          }
-        }
+        // Fetch drafts from Firestore
+        const draftSnap = await getDocs(query(
+          collection(db, 'application_drafts'),
+          where('user_id', '==', user.uid)
+        ));
+        setDrafts(draftSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       } catch (err) {
         console.error('Error fetching dashboard data:', err);
       } finally {

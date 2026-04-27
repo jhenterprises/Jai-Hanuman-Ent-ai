@@ -1,26 +1,31 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
+    
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Default deny
     match /{allPaths=**} {
-      // Allow read access to all users (publicly viewable files if needed)
-      // Or restrict to authenticated users
-      allow read: if true;
-      
-      // Allow write access only to authenticated users
-      // You can further restrict this to specific folders per user
-      allow write: if request.auth != null;
+      allow read, write: if false;
     }
     
-    // Example of user-specific folder restriction
-    match /users/{userId}/{allPaths=**} {
+    // User profile photos
+    match /users/{userId}/{fileName} {
       allow read: if true;
-      allow write: if request.auth != null && request.auth.uid == userId;
+      allow write: if isSignedIn() && request.auth.uid == userId && 
+                     request.resource.size < 5 * 1024 * 1024 &&
+                     request.resource.contentType.matches('image/.*');
     }
     
-    // Example of application-specific folder restriction
-    match /applications/{appId}/{allPaths=**} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+    // Application documents
+    match /applications/{userId}/{fileName} {
+      allow read: if isSignedIn() && (request.auth.uid == userId || 
+                    firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ['admin', 'staff']);
+      allow write: if isSignedIn() && request.auth.uid == userId &&
+                      request.resource.size < 10 * 1024 * 1024 &&
+                      (request.resource.contentType.matches('image/.*') || request.resource.contentType == 'application/pdf');
     }
   }
 }

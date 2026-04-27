@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import api from '../../services/api';
+import { collection, getDocs, updateDoc, doc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../../lib/firebase';
 import { ArrowLeft, Plus, Trash2, Save, Eye, GripVertical, Settings, Type, Hash, Calendar, List, AlignLeft, Upload, CheckSquare, CircleDot, Minus, Heading } from 'lucide-react';
 import ModernButton from '../../components/ModernButton';
 
@@ -69,24 +70,21 @@ const ServiceFormBuilder = () => {
   }, [id]);
 
   const fetchData = async () => {
+    if (!id) return;
     try {
       setIsLoading(true);
-      const [serviceRes, schemaRes] = await Promise.all([
-        api.get('/services'),
-        api.get(`/services/${id}/form-schema`)
-      ]);
+      const serviceRef = doc(db, 'services', id);
+      const serviceSnap = await getDoc(serviceRef);
       
-      const currentService = serviceRes.data.find((s: any) => s.id === Number(id) || s.service_id === Number(id));
-      setService(currentService);
-      
-      if (schemaRes.data && schemaRes.data.sections) {
-        setSchema(schemaRes.data);
-      } else {
-        // Fallback to old form-fields if schema doesn't exist
-        const fieldsRes = await api.get(`/services/${id}/form-fields`);
-        if (fieldsRes.data && fieldsRes.data.length > 0) {
+      if (serviceSnap.exists()) {
+        const data = serviceSnap.data();
+        setService({ id: serviceSnap.id, ...data });
+        if (data.form_schema) {
+          setSchema(data.form_schema);
+        } else if (data.form_fields) {
+          // Fallback if they were stored in form_fields array
           const sectionsMap: Record<string, Field[]> = {};
-          fieldsRes.data.forEach((f: any) => {
+          data.form_fields.forEach((f: any) => {
             const secName = f.section_name || 'General Details';
             if (!sectionsMap[secName]) sectionsMap[secName] = [];
             sectionsMap[secName].push({
@@ -116,9 +114,14 @@ const ServiceFormBuilder = () => {
   };
 
   const handleSave = async () => {
+    if (!id) return;
     try {
       setIsSaving(true);
-      await api.post(`/services/${id}/form-schema`, { schema });
+      const serviceRef = doc(db, 'services', id);
+      await updateDoc(serviceRef, { 
+        form_schema: schema,
+        updated_at: serverTimestamp()
+      });
       alert('Form configuration saved successfully!');
     } catch (err) {
       console.error('Error saving:', err);

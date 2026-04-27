@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import api from '../services/api';
+import { confirmPasswordReset } from 'firebase/auth';
+import { auth } from '../lib/firebase';
 import { motion } from 'framer-motion';
 import { Lock, AlertCircle, ArrowLeft, CheckCircle2, ShieldCheck, Eye, EyeOff } from 'lucide-react';
 
 const ResetPassword = () => {
   const [searchParams] = useSearchParams();
-  const token = searchParams.get('token');
+  const oobCode = searchParams.get('oobCode');
   const navigate = useNavigate();
   
   const [password, setPassword] = useState('');
@@ -16,11 +17,11 @@ const ResetPassword = () => {
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    if (!token) {
+    if (!oobCode) {
       setStatus('error');
-      setMessage('Invalid or missing reset token.');
+      setMessage('Invalid or missing reset link.');
     }
-  }, [token]);
+  }, [oobCode]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,16 +40,21 @@ const ResetPassword = () => {
 
     setStatus('loading');
     try {
-      await api.post('/auth/reset-password', { token, password });
+      if (!oobCode) throw new Error('Missing code');
+      await confirmPasswordReset(auth, oobCode, password);
       setStatus('success');
       setMessage('Your password has been successfully reset.');
     } catch (err: any) {
+      console.error('Reset error:', err);
       setStatus('error');
-      setMessage(err.response?.data?.error || 'Failed to reset password. The link may be expired.');
+      let errMsg = 'Failed to reset password. The link may be expired or used.';
+      if (err.code === 'auth/expired-action-code') errMsg = 'The reset link has expired.';
+      if (err.code === 'auth/invalid-action-code') errMsg = 'The reset link is invalid.';
+      setMessage(errMsg);
     }
   };
 
-  if (!token && status !== 'success') {
+  if (!oobCode && status !== 'success') {
     return (
       <div className="max-w-md mx-auto mt-12 px-4">
         <div className="glass rounded-[2.5rem] p-10 text-center space-y-6">

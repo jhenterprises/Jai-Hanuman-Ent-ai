@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Trash2, RefreshCcw, Search, Filter, AlertCircle, CheckCircle2, Loader2, Database } from 'lucide-react';
-import api from '../services/api';
+import { collection, getDocs, deleteDoc, doc, addDoc, query, orderBy, getDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { safeFormat } from '../utils/dateUtils';
 
@@ -31,8 +32,13 @@ const RecycleBin = () => {
 
   const fetchDeletedItems = async () => {
     try {
-      const res = await api.get('/recycle-bin');
-      setItems(res.data);
+      const q = query(collection(db, 'recycle_bin'), orderBy('deleted_at', 'desc'));
+      const snapshot = await getDocs(q);
+      const deletedItems = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setItems(deletedItems);
     } catch (err) {
       console.error('Error fetching recycle bin:', err);
     } finally {
@@ -40,19 +46,44 @@ const RecycleBin = () => {
     }
   };
 
-  const handleRestore = async (id: number, type: string) => {
+  const handleRestore = async (id: string, type: string) => {
     setActionLoading(`restore-${type}-${id}`);
     try {
-      await api.post('/recycle-bin/restore', { id, type });
-      setItems(items.filter(item => !(item.id === id && item.type === type)));
+      const binRef = doc(db, 'recycle_bin', id);
+      const binSnap = await getDoc(binRef);
+      
+      if (binSnap.exists()) {
+        const item = binSnap.data();
+        const collectionName = type === 'service' ? 'services' : (type === 'user' ? 'users' : 'applications');
+        
+        // Restore to original collection
+        if (item.data) {
+          const restoredData = { ...item.data };
+          // Remove deletion markers
+          delete restoredData.is_deleted;
+          delete restoredData.deleted_at;
+          
+          if (item.original_id) {
+            await updateDoc(doc(db, collectionName, item.original_id), restoredData);
+          } else {
+            await addDoc(collection(db, collectionName), restoredData);
+          }
+        }
+        
+        // Delete from bin
+        await deleteDoc(binRef);
+        setItems(items.filter(item => item.id !== id));
+        alert('Item restored successfully');
+      }
     } catch (err) {
       console.error('Error restoring item:', err);
+      alert('Failed to restore item');
     } finally {
       setActionLoading(null);
     }
   };
 
-  const handlePermanentDelete = (id: number, type: string) => {
+  const handlePermanentDelete = (id: string, type: string) => {
     setConfirmDialog({
       isOpen: true,
       title: 'Permanently Delete',
@@ -60,10 +91,12 @@ const RecycleBin = () => {
       onConfirm: async () => {
         setActionLoading(`delete-${type}-${id}`);
         try {
-          await api.delete(`/recycle-bin/permanent/${type}/${id}`);
-          setItems(items.filter(item => !(item.id === id && item.type === type)));
+          await deleteDoc(doc(db, 'recycle_bin', id));
+          setItems(items.filter(item => item.id !== id));
+          alert('Item permanently deleted');
         } catch (err) {
           console.error('Error deleting item:', err);
+          alert('Failed to delete item');
         } finally {
           setActionLoading(null);
         }

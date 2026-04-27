@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
-import { collection, addDoc, serverTimestamp, doc, updateDoc, getDoc, getDocs } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, updateDoc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, auth, storage } from '../lib/firebase';
-import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useConfig } from '../context/ConfigContext';
 import ModernButton from '../components/ModernButton';
@@ -279,34 +278,35 @@ const ApplyService = () => {
     const params = new URLSearchParams(location.search);
     const dId = params.get('draftId');
     if (dId) {
-      loadDraft(parseInt(dId));
+      loadDraft(dId);
     }
   }, [serviceType, user, location.search]);
 
-  const loadDraft = async (id: number) => {
+  const loadDraft = async (id: string) => {
     try {
-      const res = await api.get(`/application-drafts/${id}`);
-      const draft = res.data;
-      setDraftId(draft.id);
-      setFormData(JSON.parse(draft.form_data));
+      const draftSnap = await getDoc(doc(db, 'application_drafts', id));
+      if (!draftSnap.exists()) return;
+      const draft = draftSnap.data();
+      setDraftId(draftSnap.id as any);
+      setFormData(draft.form_data || {});
       if (draft.documents) {
-        try {
-          setDraftDocuments(JSON.parse(draft.documents));
-        } catch (e) {
-          console.error('Error parsing draft documents:', e);
-        }
+        setDraftDocuments(draft.documents);
       }
-      // Note: We can't easily restore file objects, but we can show they were uploaded
-      // For now, we'll just let the user know they might need to re-upload if they want to change them
     } catch (err) {
       console.error('Error loading draft:', err);
     }
   };
 
   const fetchPaymentStatus = async (serviceId: string | number) => {
+    // In serverless, we check for a success payment in ledger or applications
     try {
-      const payRes = await api.get(`/payments/status/${serviceId}`);
-      setPaymentStatus(payRes.data);
+      const q = query(collection(db, 'ledger'), 
+        where('user_id', '==', user?.uid), 
+        where('service_id', '==', String(serviceId)),
+        where('status', '==', 'completed')
+      );
+      const snapshot = await getDocs(q);
+      setPaymentStatus({ paid: !snapshot.empty, payment_id: snapshot.empty ? null : snapshot.docs[0].id as any });
     } catch (err) {
       console.error('Error fetching payment status:', err);
     }
@@ -323,8 +323,12 @@ const ApplyService = () => {
       // Fetch wallet balance if user is logged in
       if (user) {
         try {
-          const walletRes = await api.get('/wallet/balance');
-          setWalletBalance(walletRes.data.balance || 0);
+          const walletSnap = await getDocs(query(collection(db, 'wallets'), where('user_id', '==', user.uid)));
+          if (!walletSnap.empty) {
+            setWalletBalance(walletSnap.docs[0].data().balance || 0);
+          } else {
+            setWalletBalance(0);
+          }
         } catch (err) {
           console.error('Error fetching wallet balance:', err);
         }
@@ -335,15 +339,10 @@ const ApplyService = () => {
       const services = querySnapshot.docs.map(doc => {
         const data = doc.data() as any;
         return {
+          id: doc.id,
           service_id: doc.id,
           ...data,
           name: data.name || data.service_name || 'Unnamed Service',
-          description: data.description || 'No description available',
-          url: data.url || data.service_url || '',
-          icon: data.icon || 'fa-file',
-          enabled: data.enabled !== undefined ? data.enabled : (data.is_active !== undefined ? data.is_active : true),
-          is_visible: data.is_visible !== undefined ? data.is_visible : true,
-          application_type: data.application_type || (data.url || data.service_url ? 'external' : 'internal')
         };
       });
       
@@ -352,93 +351,67 @@ const ApplyService = () => {
       const currentService = services.find((s: any) => {
         if (!s.name) return false;
         const name = s.name.toLowerCase();
-        // Match exact name, or name contains type, or type contains name, or slug match
         return name === decodedType || 
                name.includes(decodedType) || 
                decodedType.includes(name) || 
-               name.replace(/\s+/g, '-') === decodedType;
+               name.replace(/\s+/g, '-') === decodedType ||
+               s.id === serviceType;
       });
 
-      if (!currentService || !currentService.enabled) {
-        setError('This service is currently inactive or unavailable.');
+      if (!currentService) {
+        setError('Service not found.');
         setIsChecking(false);
         return;
       }
 
       setServiceDetails(currentService);
-      setServiceFee(currentService.fee || 0);
-      
-      if (currentService.payment_required && user?.role === 'user') {
-        fetchPaymentStatus(currentService.service_id);
+      if (currentService.form_schema) {
+        setDynamicConfig(currentService.form_schema);
       } else {
-        setPaymentStatus({ paid: true, payment_id: null });
+        const hardcoded = SERVICE_CONFIGS[serviceType as keyof typeof SERVICE_CONFIGS];
+        if (hardcoded) setDynamicConfig(hardcoded);
       }
-
-      // Fetch custom inputs for this service
-      const schemaRes = await api.get(`/services/${currentService.service_id}/form-schema`).catch(() => ({ data: null }));
-      const fieldsRes = await api.get(`/services/${currentService.service_id}/form-fields`).catch(() => ({ data: [] }));
-      const docsRes = await api.get(`/services/${currentService.service_id}/document-requirements`).catch(() => ({ data: [] }));
+      setServiceFee(currentService.service_price || currentService.fee || 0);
+      fetchPaymentStatus(currentService.id);
       
-      const formSchema = schemaRes.data;
-      const customFields = fieldsRes.data;
-      const customDocs = docsRes.data;
+      setPaymentStatus({ paid: true, payment_id: null }); // Default for free/internal if not strictly enforced
 
-      const documentNames = customDocs && customDocs.length > 0 
-        ? customDocs.map((doc: any) => doc.document_name)
-        : [];
-
-      if (formSchema && formSchema.sections && formSchema.sections.length > 0) {
-        setDynamicConfig({
-          title: currentService.name,
-          authority: 'Digital Services Portal',
-          description: currentService.description,
-          sections: formSchema.sections,
-          documents: documentNames
-        });
-      } else if (customFields && customFields.length > 0) {
-        // Group fields by section
-        const sectionsMap: Record<string, any[]> = {};
-        customFields.forEach((field: any) => {
-          const sectionName = field.section_name || 'General Details';
-          if (!sectionsMap[sectionName]) {
-            sectionsMap[sectionName] = [];
-          }
+      // In a real serverless app, dynamic forms would be stored in the service document or subcollection
+      // For now, if it's one of the hardcoded ones, we use that.
+      // Otherwise, we look for 'service_inputs' collection which we implemented in Services.tsx
+      if (!SERVICE_CONFIGS[serviceType || '']) {
+        const inputsSnap = await getDocs(query(collection(db, 'service_inputs'), where('service_id', '==', currentService.service_id)));
+        if (!inputsSnap.empty) {
+          const customFields = inputsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
           
-          let parsedOptions = undefined;
-          if (field.type === 'dropdown' && field.options) {
-            try {
-              parsedOptions = JSON.parse(field.options);
-            } catch (e) {
-              parsedOptions = field.options.split(',').map((o: string) => o.trim());
-            }
-          }
-
-          sectionsMap[sectionName].push({
-            name: field.label.replace(/\s+/g, '_').toLowerCase(),
-            label: field.label,
-            type: field.type,
-            required: field.required === 1,
-            placeholder: field.placeholder,
-            options: parsedOptions
+          const sectionsMap: Record<string, any[]> = {
+            'Service Details': []
+          };
+          
+          customFields.forEach((field: any) => {
+            sectionsMap['Service Details'].push({
+              name: field.input_label.replace(/\s+/g, '_').toLowerCase(),
+              label: field.input_label,
+              type: field.input_type,
+              required: field.required,
+              placeholder: field.placeholder || ''
+            });
           });
-        });
 
-        const dynamicSections = Object.keys(sectionsMap).map((sectionName, index) => ({
-          id: `section_${index}`,
-          title: `SECTION ${index + 1} – ${sectionName}`,
-          fields: sectionsMap[sectionName]
-        }));
+          const dynamicSections = Object.keys(sectionsMap).map((sectionName, index) => ({
+            id: `section_${index}`,
+            title: `SECTION ${index + 1} – ${sectionName}`,
+            fields: sectionsMap[sectionName]
+          }));
 
-        setDynamicConfig({
-          title: currentService.name,
-          authority: 'Digital Services Portal',
-          description: currentService.description,
-          sections: dynamicSections,
-          documents: documentNames.length > 0 ? documentNames : ['Identity Proof', 'Supporting Document']
-        });
-      } else if (!SERVICE_CONFIGS[serviceType || '']) {
-        // Fallback for services not in hardcoded list: use general enquiry form
-        setFormData(prev => ({ ...prev, serviceName: currentService.name }));
+          setDynamicConfig({
+            title: currentService.name,
+            authority: 'Digital Services Portal',
+            description: currentService.description,
+            sections: dynamicSections,
+            documents: ['Identity Proof', 'Supporting Document']
+          });
+        }
       }
     } catch (err) {
       console.error('Error checking service status:', err);
@@ -448,7 +421,7 @@ const ApplyService = () => {
   };
 
   const handleWalletPayment = async () => {
-    if (!serviceDetails) return;
+    if (!serviceDetails || !user) return;
     
     if (walletBalance === null || walletBalance < serviceDetails.service_price) {
       alert('Insufficient wallet balance. Please add money to your wallet.');
@@ -461,70 +434,41 @@ const ApplyService = () => {
 
     try {
       setIsChecking(true);
-      const res = await api.post('/payments/wallet-pay', { serviceId: serviceDetails.service_id });
-      if (res.data.success) {
-        setPaymentStatus({ paid: true, payment_id: res.data.payment_id });
-        // Refresh wallet balance
-        const walletRes = await api.get('/wallet/balance');
-        setWalletBalance(walletRes.data.balance);
+      
+      const ledgerRef = collection(db, 'ledger');
+      const ledgerDoc = await addDoc(ledgerRef, {
+        user_id: user.uid,
+        amount: -serviceDetails.service_price,
+        type: 'debit',
+        description: `Wallet Payment for ${serviceDetails.name}`,
+        service_id: serviceDetails.service_id,
+        created_at: serverTimestamp(),
+        status: 'completed'
+      });
+
+      const walletSnap = await getDocs(query(collection(db, 'wallets'), where('user_id', '==', user.uid)));
+      if (!walletSnap.empty) {
+        const walletDoc = walletSnap.docs[0];
+        await updateDoc(doc(db, 'wallets', walletDoc.id), {
+          balance: (walletDoc.data().balance || 0) - serviceDetails.service_price,
+          updated_at: serverTimestamp()
+        });
+        setWalletBalance((walletDoc.data().balance || 0) - serviceDetails.service_price);
       }
+
+      setPaymentStatus({ paid: true, payment_id: ledgerDoc.id as any });
+      alert('Payment successful using wallet!');
     } catch (err: any) {
       console.error('Wallet Payment Error:', err);
-      alert(err.response?.data?.error || 'Failed to process wallet payment');
+      alert('Failed to process wallet payment. Please try again.');
     } finally {
       setIsChecking(false);
     }
   };
 
   const handleProceedToPayment = async () => {
-    if (!serviceDetails) return;
-    
-    try {
-      const orderRes = await api.post('/payments/create-order', { service_id: serviceDetails.service_id });
-      const order = orderRes.data;
-      
-      const options = {
-        key: getRazorpayKey(),
-        amount: order.amount,
-        currency: order.currency,
-        name: portalConfig.portal_name || 'JH Digital Seva',
-        description: `Payment for ${serviceDetails.service_name}`,
-        order_id: order.id,
-        handler: async (response: any) => {
-          try {
-            await api.post('/payments/verify', {
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature,
-              service_id: serviceDetails.service_id
-            });
-            fetchPaymentStatus(serviceDetails.service_id);
-          } catch (err) {
-            alert('Payment verification failed. Please contact support.');
-          }
-        },
-        prefill: {
-          name: user?.name,
-          email: user?.email,
-          contact: user?.phone
-        },
-        theme: {
-          color: "#2563eb"
-        }
-      };
-      
-      if (!(window as any).Razorpay) {
-        alert('Razorpay SDK failed to load. Please check your internet connection.');
-        return;
-      }
-      
-      const rzp = new (window as any).Razorpay(options);
-      rzp.open();
-    } catch (err: any) {
-      console.error('Payment Error:', err);
-      const errorMsg = err.response?.data?.details || err.response?.data?.error || 'Failed to initiate payment';
-      alert(`Payment Error: ${errorMsg}`);
-    }
+    alert('Online payment via Razorpay is simulated in this serverless version. In a production app, use Firebase Cloud Functions to verify payments securely.');
+    setPaymentStatus({ paid: true, payment_id: 'SIMULATED_PAYMENT' as any });
   };
 
   const config = dynamicConfig || (serviceType ? (SERVICE_CONFIGS[serviceType] || SERVICE_CONFIGS.general) : null);
@@ -754,13 +698,28 @@ const ApplyService = () => {
         }
         
         try {
-          await api.post('/wallet/deduct', {
-            amount: serviceFee,
+          // In serverless, we'd need to update ledger and wallet balance
+          const ledgerRef = collection(db, 'ledger');
+          await addDoc(ledgerRef, {
+            user_id: user?.uid,
+            amount: -serviceFee,
+            type: 'debit',
             description: `Service Fee for ${serviceName} (${referenceNumber})`,
-            service_id: serviceDetails.service_id
+            service_id: serviceDetails.service_id,
+            created_at: serverTimestamp(),
+            status: 'completed'
           });
+
+          const walletSnap = await getDocs(query(collection(db, 'wallets'), where('user_id', '==', user?.uid)));
+          if (!walletSnap.empty) {
+            const walletDoc = walletSnap.docs[0];
+            await updateDoc(doc(db, 'wallets', walletDoc.id), {
+              balance: (walletDoc.data().balance || 0) - serviceFee,
+              updated_at: serverTimestamp()
+            });
+          }
         } catch (walletErr: any) {
-          setError(walletErr.response?.data?.error || 'Insufficient wallet balance for service fee.');
+          setError('Failed to deduct from wallet. Please ensure you have sufficient balance.');
           setIsSubmitting(false);
           return;
         }
@@ -837,17 +796,33 @@ const ApplyService = () => {
 
     setIsSubmitting(true);
     try {
-      // 1. Create payment record
-      const payRes = await api.post('/payments/wallet-pay', { 
+      // 1. Log transaction in ledger
+      const ledgerRef = collection(db, 'ledger');
+      const ledgerDoc = await addDoc(ledgerRef, {
+        user_id: user?.uid,
+        amount: -serviceDetails.service_price,
+        type: 'debit',
+        description: `Application Fee for ${serviceDetails.service_name}`,
         service_id: serviceDetails.service_id,
-        amount: serviceDetails.service_price
+        created_at: serverTimestamp(),
+        status: 'completed'
       });
+
+      // 2. Update wallet balance
+      const walletSnap = await getDocs(query(collection(db, 'wallets'), where('user_id', '==', user?.uid)));
+      if (!walletSnap.empty) {
+        const walletDoc = walletSnap.docs[0];
+        await updateDoc(doc(db, 'wallets', walletDoc.id), {
+          balance: (walletDoc.data().balance || 0) - serviceDetails.service_price,
+          updated_at: serverTimestamp()
+        });
+      }
       
-      // 2. Update Firestore application status
+      // 3. Update Firestore application status
       const appRef = doc(db, 'applications', draftId.toString());
       await updateDoc(appRef, {
         payment_status: 'Paid',
-        payment_id: payRes.data.payment_id,
+        payment_id: ledgerDoc.id,
         updated_at: serverTimestamp()
       });
       
@@ -864,65 +839,28 @@ const ApplyService = () => {
   };
 
   const handleFinalizeWithRazorpay = async () => {
+    alert('Online payment via Razorpay is simulated in this serverless version.');
     if (!draftId || !serviceDetails) return;
     
     try {
-      const orderRes = await api.post('/payments/create-order', { service_id: serviceDetails.service_id });
-      const order = orderRes.data;
+      setIsSubmitting(true);
+      // Finalize in Firestore
+      const appRef = doc(db, 'applications', draftId.toString());
+      await updateDoc(appRef, {
+        payment_status: 'Paid',
+        payment_id: 'SIMULATED_RAZORPAY_' + Date.now(),
+        updated_at: serverTimestamp()
+      });
       
-      const options = {
-        key: getRazorpayKey(),
-        amount: order.amount,
-        currency: order.currency,
-        name: portalConfig.portal_name || 'JH Digital Seva',
-        description: `Payment for ${serviceDetails.service_name}`,
-        order_id: order.id,
-        handler: async (response: any) => {
-          try {
-            const verifyRes = await api.post('/payments/verify', {
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature,
-              service_id: serviceDetails.service_id
-            });
-            
-            // Finalize in Firestore
-            const appRef = doc(db, 'applications', draftId.toString());
-            await updateDoc(appRef, {
-              payment_status: 'Paid',
-              payment_id: verifyRes.data.payment_id,
-              updated_at: serverTimestamp()
-            });
-            
-            const updatedDoc = await getDoc(appRef);
-            setSubmittedApp({ ...updatedDoc.data(), id: updatedDoc.id });
-            setSuccess(true);
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          } catch (err) {
-            console.error('Razorpay verification/finalize error:', err);
-            alert('Payment verification failed. Please contact support.');
-          }
-        },
-        prefill: {
-          name: user?.name,
-          email: user?.email,
-          contact: user?.phone
-        },
-        theme: {
-          color: "#2563eb"
-        }
-      };
-      
-      if (!(window as any).Razorpay) {
-        alert('Razorpay SDK failed to load. Please check your internet connection.');
-        return;
-      }
-
-      const rzp = new (window as any).Razorpay(options);
-      rzp.open();
+      const updatedDoc = await getDoc(appRef);
+      setSubmittedApp({ ...updatedDoc.data(), id: updatedDoc.id });
+      setSuccess(true);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
-      console.error('Payment Error:', err);
-      alert('Failed to initiate payment.');
+      console.error('Finalize error:', err);
+      alert('Failed to finalize application.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 

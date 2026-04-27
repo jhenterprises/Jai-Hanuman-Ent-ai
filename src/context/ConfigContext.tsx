@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { doc, getDoc, getDocFromServer } from 'firebase/firestore';
+import { doc, onSnapshot, enableNetwork } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
 interface ConfigContextType {
@@ -15,82 +15,62 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchConfig = async () => {
-    let attempts = 0;
-    const maxAttempts = 5;
+  useEffect(() => {
+    let isMounted = true;
+    const docRef = doc(db, 'settings', 'portal');
     
-    const tryFetch = async (): Promise<void> => {
-      try {
-        setLoading(true);
-        const docRef = doc(db, 'settings', 'portal');
-        console.log(`Config attempt ${attempts + 1} - navigator.onLine: ${navigator.onLine}`);
-        
-        let docSnap;
-        try {
-          // Standard getDoc handles connectivity better than getDocFromServer which is aggressive
-          console.log('Fetching config via standard getDoc...');
-          docSnap = await getDoc(docRef);
-        } catch (initialErr: any) {
-          console.warn('Initial getDoc failed, trying getDocFromServer as fallback...', initialErr.message);
-          docSnap = await getDocFromServer(docRef);
-        }
-        
-        if (docSnap && docSnap.exists()) {
-          setConfig(docSnap.data());
-        } else {
-          console.log('Config document does not exist, using defaults');
-          // Default config if not found
-          setConfig({ 
-            portal_name: 'JH Digital Seva Kendra',
-            theme_color: '#3b82f6',
-            secondary_color: '#64748b',
-            header_bg_color: '#1e293b'
-          });
-        }
-        setError(null);
-        setLoading(false);
-      } catch (err: any) {
-        console.error(`Error on config attempt ${attempts + 1}:`, err);
-        const isOffline = err.message?.includes('offline') || err.code === 'unavailable';
-        
-        if (isOffline && attempts < maxAttempts - 1) {
-          attempts++;
-          const delay = Math.min(Math.pow(2, attempts) * 1000 + 500, 10000);
-          console.log(`Retrying config fetch in ${delay}ms...`);
-          setTimeout(tryFetch, delay);
-          return;
-        }
-
-        if (isOffline) {
-          console.warn('Config fetch failed eventually due to offline status, using defaults');
-          setConfig({ 
-            portal_name: 'JH Digital Seva Kendra (Offline Mode)',
-            theme_color: '#3b82f6',
-            secondary_color: '#64748b',
-            header_bg_color: '#1e293b'
-          });
-          setError(null);
-        } else {
-          setConfig({ 
-            portal_name: 'JH Digital Seva Kendra',
-            theme_color: '#3b82f6',
-            secondary_color: '#64748b',
-            header_bg_color: '#1e293b'
-          });
-          if (err.message?.includes('permission') || err.message?.includes('API key')) {
-             setError('Configuration or permission error detected.');
-          }
-        }
+    console.log('Starting config listener...');
+    
+    const unsubscribe = onSnapshot(docRef, (docSnap) => {
+      if (!isMounted) return;
+      
+      if (docSnap.exists()) {
+        console.log('Config received via snapshot');
+        setConfig(docSnap.data());
+      } else {
+        console.log('Config document does not exist, using defaults');
+        setConfig({ 
+          portal_name: 'JH Digital Seva Kendra',
+          theme_color: '#3b82f6',
+          secondary_color: '#64748b',
+          header_bg_color: '#1e293b'
+        });
+      }
+      setLoading(false);
+      setError(null);
+    }, (err) => {
+      if (!isMounted) return;
+      console.error('Config listener error:', err);
+      
+      // If it's a permission error, we should show it
+      if (err.message?.includes('permission')) {
+        setError('Configuration permission error: Please check Firestore Rules.');
+      }
+      
+      // If offline, we just use defaults and stay in loading or silent
+      if (err.message?.includes('offline') || err.code === 'unavailable') {
+        console.warn('Config listener is offline, using defaults');
+        setConfig({ 
+          portal_name: 'JH Digital Seva Kendra (Offline Mode)',
+          theme_color: '#3b82f6',
+          secondary_color: '#64748b',
+          header_bg_color: '#1e293b'
+        });
         setLoading(false);
       }
+    });
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
     };
-
-    await tryFetch();
-  };
-
-  useEffect(() => {
-    fetchConfig();
   }, []);
+
+  const refreshConfig = async () => {
+    // onSnapshot handles refreshes automatically, but we can poke it if needed
+    setLoading(true);
+    setTimeout(() => setLoading(false), 500);
+  };
 
   useEffect(() => {
     if (config && Object.keys(config).length > 0) {
@@ -111,27 +91,29 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return (
       <div className="min-h-screen flex items-center justify-center bg-red-50 p-4">
         <div className="max-w-md w-full bg-white p-8 rounded-lg shadow-lg border border-red-200">
-          <h2 className="text-2xl font-bold text-red-600 mb-4">Setup Required</h2>
+          <h2 className="text-2xl font-bold text-red-600 mb-4">Connection Error</h2>
           <p className="text-gray-700 mb-4">{error}</p>
           <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
-            <p className="text-sm text-yellow-800 font-bold">Common Mistake:</p>
-            <p className="text-sm text-yellow-800">Do not paste your Web API Key (which is ~40 characters long and starts with AIzaSy). You must download a JSON file and copy the massive block of text that starts with "-----BEGIN PRIVATE KEY-----".</p>
+            <p className="text-sm text-yellow-800 font-bold">Troubleshooting:</p>
+            <ul className="text-sm text-yellow-800 list-disc ml-4 mt-2">
+              <li>Check your internet connection.</li>
+              <li>Wait 30 seconds and refresh the page.</li>
+              <li>Ensure your Firebase project is correctly configured in the settings.</li>
+            </ul>
           </div>
-          <div className="bg-gray-100 p-4 rounded text-sm font-mono text-gray-800 overflow-x-auto whitespace-pre-wrap break-all">
-            1. Go to Firebase Console<br/>
-            2. Open Project Settings &gt; Service Accounts<br/>
-            3. Click "Generate new private key" (downloads a JSON file)<br/>
-            4. Open the JSON file in a text editor<br/>
-            5. Copy the ENTIRE private_key string (including BEGIN/END lines)<br/>
-            6. Paste into AI Studio Settings &gt; FIREBASE_PRIVATE_KEY
-          </div>
+          <button 
+            onClick={() => window.location.reload()}
+            className="w-full bg-blue-600 text-white font-bold py-2 rounded hover:bg-blue-700 transition"
+          >
+            Retry Now
+          </button>
         </div>
       </div>
     );
   }
 
   return (
-    <ConfigContext.Provider value={{ config, refreshConfig: fetchConfig, loading }}>
+    <ConfigContext.Provider value={{ config, refreshConfig: async () => {}, loading }}>
       {children}
     </ConfigContext.Provider>
   );

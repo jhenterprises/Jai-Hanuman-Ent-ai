@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import api from '../services/api';
+import { sendPasswordResetEmail } from 'firebase/auth';
+import { auth } from '../lib/firebase';
 import { motion } from 'framer-motion';
 import { Mail, AlertCircle, ArrowLeft, CheckCircle2, KeyRound } from 'lucide-react';
 
@@ -14,15 +15,16 @@ const ForgotPassword = () => {
     e.preventDefault();
     setStatus('loading');
     try {
-      const res = await api.post('/auth/forgot-password', { email });
+      await sendPasswordResetEmail(auth, email);
       setStatus('success');
-      setMessage(res.data.message);
-      if (res.data.debug_link) {
-        setDebugLink(res.data.debug_link);
-      }
+      setMessage('Password reset email sent! Please check your inbox.');
     } catch (err: any) {
+      console.error('Reset error:', err);
       setStatus('error');
-      setMessage(err.response?.data?.error || 'Something went wrong. Please try again.');
+      let errMsg = 'Failed to send reset link.';
+      if (err.code === 'auth/user-not-found') errMsg = 'No user found with this email.';
+      if (err.code === 'auth/invalid-email') errMsg = 'Please enter a valid email address.';
+      setMessage(errMsg);
     }
   };
 

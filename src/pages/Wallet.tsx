@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Wallet as WalletIcon, Plus, ArrowUpRight, ArrowDownLeft, History, CreditCard, IndianRupee, TrendingUp, TrendingDown, AlertCircle, CheckCircle2 } from 'lucide-react';
-import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { safeFormat } from '../utils/dateUtils';
 import { getRazorpayKey } from '../utils/razorpayUtils';
 import { db } from '../lib/firebase';
-import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, limit, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
 
 interface Transaction {
   id: string;
@@ -38,23 +37,34 @@ const Wallet = () => {
 
   const fetchWalletData = async () => {
     try {
-      // Fetch balance from Firestore
       if (user?.uid) {
+        // Fetch balance from Firestore
         const walletSnap = await getDocs(query(collection(db, 'wallets'), where('user_id', '==', user.uid)));
         if (!walletSnap.empty) {
           setWallet({ balance: walletSnap.docs[0].data().balance || 0 });
+        } else {
+          setWallet({ balance: 0 });
         }
-      }
 
-      // Fetch transactions from API
-      try {
-        const transRes = await api.get('/wallet/transactions');
-        setTransactions(transRes.data);
-      } catch (transErr: any) {
-        console.error('Failed to fetch transactions:', transErr);
-        if (transErr.message?.includes('HTML')) {
-          // Silent fail
-        }
+        // Fetch transactions from Firestore (ledger)
+        const transSnap = await getDocs(query(
+          collection(db, 'ledger'), 
+          where('user_id', '==', user.uid)
+        ));
+        
+        const transList = transSnap.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as any[];
+        
+        // Sort manually by date desc (Firestore needs index for orderBy)
+        transList.sort((a, b) => {
+          const dateA = a.created_at?.toDate ? a.created_at.toDate() : new Date(a.created_at);
+          const dateB = b.created_at?.toDate ? b.created_at.toDate() : new Date(b.created_at);
+          return dateB - dateA;
+        });
+
+        setTransactions(transList);
       }
     } catch (err) {
       console.error('Failed to fetch wallet data:', err);
@@ -70,28 +80,54 @@ const Wallet = () => {
 
     setProcessing(true);
     try {
-      const res = await api.post('/wallet/add-money', { amount: numAmount });
-      const order = res.data;
-
-      const options = {
+      // In serverless, we'd traditionally use a server to create the Razorpay order
+      // For this demo, let's assume we can complete the payment and update the ledger.
+      // NOTE: Real production apps MUST use Cloud Functions for order creation and verification.
+      
+      const rzpOptions = {
         key: getRazorpayKey(),
-        amount: order.amount,
-        currency: order.currency,
+        amount: numAmount * 100,
+        currency: 'INR',
         name: 'Digital Services Portal',
         description: 'Add money to wallet',
-        order_id: order.id,
         handler: async (response: any) => {
           try {
-            await api.post('/wallet/verify-payment', {
-              ...response,
-              amount: numAmount
+            // Log successful payment in ledger
+            const ledgerRef = collection(db, 'ledger');
+            await addDoc(ledgerRef, {
+              user_id: user?.uid,
+              amount: numAmount,
+              type: 'credit',
+              description: 'Wallet top-up (Razorpay)',
+              payment_id: response.razorpay_payment_id,
+              status: 'success',
+              created_at: serverTimestamp()
             });
+
+            // Update wallet balance
+            const walletSnap = await getDocs(query(collection(db, 'wallets'), where('user_id', '==', user?.uid)));
+            if (!walletSnap.empty) {
+              const walletDoc = walletSnap.docs[0];
+              await updateDoc(doc(db, 'wallets', walletDoc.id), {
+                balance: (walletDoc.data().balance || 0) + numAmount,
+                updated_at: serverTimestamp()
+              });
+            } else {
+              await addDoc(collection(db, 'wallets'), {
+                user_id: user?.uid,
+                balance: numAmount,
+                updated_at: serverTimestamp(),
+                created_at: serverTimestamp()
+              });
+            }
+
             setMessage({ type: 'success', text: 'Money added successfully!' });
             setShowAddMoney(false);
             setAmount('');
             fetchWalletData();
           } catch (err) {
-            setMessage({ type: 'error', text: 'Payment verification failed' });
+            console.error('Finalization error:', err);
+            setMessage({ type: 'error', text: 'Failed to update wallet after payment' });
           }
         },
         prefill: {
@@ -108,12 +144,11 @@ const Wallet = () => {
         return;
       }
 
-      const rzp = new (window as any).Razorpay(options);
+      const rzp = new (window as any).Razorpay(rzpOptions);
       rzp.open();
     } catch (err: any) {
       console.error('Add money failed:', err);
-      const errorMsg = err.response?.data?.details || err.response?.data?.error || 'Failed to initiate payment';
-      setMessage({ type: 'error', text: errorMsg });
+      setMessage({ type: 'error', text: 'Failed to initiate payment' });
     } finally {
       setProcessing(false);
     }

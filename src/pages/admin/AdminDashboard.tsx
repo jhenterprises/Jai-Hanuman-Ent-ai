@@ -11,11 +11,10 @@ import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, 
   Tooltip, ResponsiveContainer, Legend
 } from 'recharts';
-import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { safeFormat } from '../../utils/dateUtils';
 import { db } from '../../lib/firebase';
-import { collection, query, where, getDocs, orderBy, limit, Timestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
 
 const COLORS = ['#3b82f6', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6'];
 
@@ -32,14 +31,13 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     fetchStats();
-    // Poll every 30 seconds for real-time feel
+    // Poll every 60 seconds for real-time feel
     const interval = setInterval(fetchStats, 60000);
     
     const handleClickOutside = (event: MouseEvent) => {
       if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
         setShowProfileMenu(false);
       }
-      // Close action menus if clicking outside
       if (!(event.target as Element).closest('.action-menu-container')) {
         setOpenActionMenuId(null);
       }
@@ -55,115 +53,133 @@ const AdminDashboard = () => {
   const fetchStats = async () => {
     setError(null);
     try {
-      // Try API first
-      const res = await api.get('/admin/dashboard-overview');
-      setStats(res.data);
+      console.log('Fetching dashboard stats from Firestore...');
+      
+      const usersSnap = await getDocs(collection(db, 'users'));
+      const appsSnap = await getDocs(collection(db, 'applications'));
+      const ledgerSnap = await getDocs(collection(db, 'ledger'));
+      const logsSnap = await getDocs(query(collection(db, 'activity_logs'), orderBy('timestamp', 'desc'), limit(10)));
+      
+      // Filter non-deleted items in memory
+      const activeUsers = usersSnap.docs.filter((doc: any) => !doc.data().deleted_at);
+      const activeApps = appsSnap.docs.filter((doc: any) => !doc.data().deleted_at);
+      const activeLedger = ledgerSnap.docs.filter((doc: any) => !doc.data().deleted_at);
+
+      const totalUsers = activeUsers.filter((doc: any) => doc.data().role === 'user').length;
+      const totalStaff = activeUsers.filter((doc: any) => doc.data().role === 'staff').length;
+      const totalApplications = activeApps.length;
+      
+      const pendingStatuses = ['Submitted', 'Under Review', 'Processing', 'Documents Required', 'Pending'];
+      const approvedStatuses = ['Approved', 'Completed'];
+      
+      let pendingApplications = 0;
+      let approvedApplications = 0;
+      let rejectedApplications = 0;
+      const statusMap = new Map();
+      const dailyAppsMap = new Map();
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+      activeApps.forEach((doc: any) => {
+        const data = doc.data();
+        const status = data.status || 'Unknown';
+        statusMap.set(status, (statusMap.get(status) || 0) + 1);
+        
+        if (pendingStatuses.includes(status)) pendingApplications++;
+        if (approvedStatuses.includes(status)) approvedApplications++;
+        if (status === 'Rejected') rejectedApplications++;
+        
+        const createdAt = data.created_at?.toDate?.() || (data.created_at ? new Date(data.created_at) : null);
+        if (createdAt && createdAt >= sevenDaysAgo) {
+          const date = createdAt.toISOString().split('T')[0];
+          dailyAppsMap.set(date, (dailyAppsMap.get(date) || 0) + 1);
+        }
+      });
+
+      let totalRevenue = 0;
+      activeLedger.forEach((doc: any) => {
+        totalRevenue += (doc.data().amount || 0);
+      });
+
+      const recentApplications = activeApps
+        .sort((a: any, b: any) => {
+          const timeA = a.data().created_at?.toDate?.()?.getTime() || new Date(a.data().created_at || 0).getTime();
+          const timeB = b.data().created_at?.toDate?.()?.getTime() || new Date(b.data().created_at || 0).getTime();
+          return timeB - timeA;
+        })
+        .slice(0, 5)
+        .map((doc: any) => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+
+      // Top Services
+      const servicesMap = new Map();
+      activeApps.forEach((doc: any) => {
+        const name = doc.data().service_name || 'General';
+        servicesMap.set(name, (servicesMap.get(name) || 0) + 1);
+      });
+      const topServices = Array.from(servicesMap.entries())
+        .map(([name, value]) => ({ name, value }))
+        .sort((a: any, b: any) => b.value - a.value)
+        .slice(0, 5);
+
+      // Staff Performance
+      const staffPerfMap = new Map();
+      activeApps.forEach((doc: any) => {
+        const data = doc.data();
+        if (data.assignedTo) {
+          const staffId = data.assignedTo;
+          const staffName = data.assignedToName || 'Unknown';
+          if (!staffPerfMap.has(staffId)) {
+            staffPerfMap.set(staffId, { staff_name: staffName, assigned: 0, completed: 0, pending: 0 });
+          }
+          const perf = staffPerfMap.get(staffId);
+          perf.assigned++;
+          if (data.status === 'Completed' || data.status === 'Approved') {
+            perf.completed++;
+          } else {
+            perf.pending++;
+          }
+        }
+      });
+      const staffPerformance = Array.from(staffPerfMap.values());
+
+      const systemNotifications: any[] = [];
+      if (pendingApplications > 0) {
+        systemNotifications.push({
+          message: `There are ${pendingApplications} pending applications waiting for review.`,
+          created_at: new Date().toISOString(),
+          is_read: false
+        });
+      }
+
+      const dashboardStats = {
+        overview: {
+          totalUsers,
+          totalStaff,
+          totalApplications,
+          pendingApplications,
+          approvedApplications,
+          rejectedApplications,
+          totalRevenue,
+          serviceRevenue: totalRevenue // Simplified for now
+        },
+        appsByStatus: Array.from(statusMap.entries()).map(([name, value]) => ({ name, value })),
+        dailyApps: Array.from(dailyAppsMap.entries()).map(([date, count]) => ({ date, count })).sort((a: any, b: any) => a.date.localeCompare(b.date)),
+        recentApplications,
+        topServices,
+        staffPerformance,
+        adminLogs: logsSnap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() })),
+        systemNotifications
+      };
+      
+      setStats(dashboardStats);
       setLoading(false);
     } catch (err: any) {
-      console.error('Error fetching admin stats from API:', err);
-      
-      // If API fails (e.g. server restarting or Vercel function timeout), try to fetch basic stats from Firestore
-      if (err.message?.includes('HTML') || !err.response || err.code === 'ECONNABORTED' || err.response?.status >= 500) {
-        try {
-          console.log('Attempting to fetch stats from Firestore fallback...');
-          
-          // Add a timeout to Firestore calls as well
-          const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Firestore request timed out')), 10000)
-          );
-
-          const fetchDataPromise = (async () => {
-            const usersSnap = await getDocs(collection(db, 'users'));
-            const appsSnap = await getDocs(collection(db, 'applications'));
-            const ledgerSnap = await getDocs(collection(db, 'ledger'));
-            const logsSnap = await getDocs(query(collection(db, 'activity_logs'), orderBy('timestamp', 'desc'), limit(10)));
-            return { usersSnap, appsSnap, ledgerSnap, logsSnap };
-          })();
-
-          const { usersSnap, appsSnap, ledgerSnap, logsSnap } = await Promise.race([fetchDataPromise, timeoutPromise]) as any;
-          
-          console.log('Firestore data fetched successfully for fallback');
-          
-          // Filter non-deleted items in memory
-          const activeUsers = usersSnap.docs.filter((doc: any) => !doc.data().deleted_at);
-          const activeApps = appsSnap.docs.filter((doc: any) => !doc.data().deleted_at);
-          const activeLedger = ledgerSnap.docs.filter((doc: any) => !doc.data().deleted_at);
-
-          const totalUsers = activeUsers.filter((doc: any) => doc.data().role === 'user').length;
-          const totalStaff = activeUsers.filter((doc: any) => doc.data().role === 'staff').length;
-          const totalApplications = activeApps.length;
-          
-          const pendingStatuses = ['Submitted', 'Under Review', 'Processing', 'Documents Required'];
-          const approvedStatuses = ['Approved', 'Completed'];
-          
-          let pendingApplications = 0;
-          let approvedApplications = 0;
-          let rejectedApplications = 0;
-          const statusMap = new Map();
-          const dailyAppsMap = new Map();
-          const sevenDaysAgo = new Date();
-          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-          activeApps.forEach((doc: any) => {
-            const data = doc.data();
-            const status = data.status || 'Unknown';
-            statusMap.set(status, (statusMap.get(status) || 0) + 1);
-            
-            if (pendingStatuses.includes(status)) pendingApplications++;
-            if (approvedStatuses.includes(status)) approvedApplications++;
-            if (status === 'Rejected') rejectedApplications++;
-            
-            const createdAt = data.created_at?.toDate?.() || (data.created_at ? new Date(data.created_at) : null);
-            if (createdAt && createdAt >= sevenDaysAgo) {
-              const date = createdAt.toISOString().split('T')[0];
-              dailyAppsMap.set(date, (dailyAppsMap.get(date) || 0) + 1);
-            }
-          });
-
-          let totalRevenue = 0;
-          activeLedger.forEach((doc: any) => {
-            totalRevenue += (doc.data().amount || 0);
-          });
-
-          const recentApplications = activeApps
-            .sort((a: any, b: any) => (b.data().created_at?.toDate?.() || 0) - (a.data().created_at?.toDate?.() || 0))
-            .slice(0, 5)
-            .map((doc: any) => ({
-              id: doc.id,
-              ...doc.data()
-            }));
-
-          const fallbackStats = {
-            overview: {
-              totalUsers,
-              totalStaff,
-              totalApplications,
-              pendingApplications,
-              approvedApplications,
-              rejectedApplications,
-              totalRevenue,
-              serviceRevenue: 0
-            },
-            appsByStatus: Array.from(statusMap.entries()).map(([name, value]) => ({ name, value })),
-            dailyApps: Array.from(dailyAppsMap.entries()).map(([date, count]) => ({ date, count })).sort((a: any, b: any) => a.date.localeCompare(b.date)),
-            recentApplications,
-            topServices: [],
-            staffPerformance: [],
-            adminLogs: logsSnap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() })),
-            systemNotifications: []
-          };
-          
-          setStats(fallbackStats);
-          setLoading(false);
-        } catch (fsErr) {
-          console.error('Firestore fallback failed:', fsErr);
-          setError('Failed to load dashboard data. The server may be restarting. Please try again in a few seconds.');
-          setLoading(false);
-        }
-      } else {
-        setError('Failed to load dashboard data from server.');
-        setLoading(false);
-      }
+      console.error('Error fetching dashboard stats from Firestore:', err);
+      setError('Failed to load dashboard data. Please check your connection.');
+      setLoading(false);
     }
   };
 

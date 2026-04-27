@@ -72,8 +72,8 @@ import { ThemeProvider } from './context/ThemeContext';
 export default function App() {
   return (
     <ThemeProvider>
-      <AuthProvider>
-        <ConfigProvider>
+      <ConfigProvider>
+        <AuthProvider>
           <Router>
         <Routes>
           <Route element={<PublicLayout />}>
@@ -130,8 +130,8 @@ export default function App() {
           </Route>
         </Routes>
           </Router>
-        </ConfigProvider>
-      </AuthProvider>
+        </AuthProvider>
+      </ConfigProvider>
     </ThemeProvider>
   );
 }

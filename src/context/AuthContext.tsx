@@ -8,7 +8,7 @@ import {
   signInWithEmailAndPassword,
   User as FirebaseUser
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp, getDocFromServer } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, getDocFromServer, enableNetwork, onSnapshot } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 
 interface User {
@@ -51,33 +51,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return;
         }
 
-        // Fetch user role from Firestore with retry
         const userPath = `users/${firebaseUser.uid}`;
-        console.log('Fetching user document:', userPath);
+        console.log('Setting up user document listener:', userPath);
         
-        let attempts = 0;
-        const maxAttempts = 5;
-        let success = false;
-
-        async function fetchUserDoc() {
+        let isMounted = true;
+        const unsubscribeUser = onSnapshot(doc(db, 'users', firebaseUser.uid), async (userDoc) => {
+          if (!isMounted) return;
+          
           try {
-            console.log(`Attempt ${attempts + 1} to fetch user document...`);
-            
-            // Check network status
-            if (!navigator.onLine) {
-              console.warn('Browser reports navigator.onLine is false');
-            }
-
-            // Use getDocFromServer for the first few attempts to bypass any "offline" cache state
-            let userDoc;
-            if (attempts < 2) {
-              console.log('Attempting getDocFromServer...');
-              userDoc = await getDocFromServer(doc(db, 'users', firebaseUser.uid));
-            } else {
-              console.log('Attempting standard getDoc...');
-              userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-            }
-            console.log('User document fetched:', userDoc.exists());
+            console.log('User document update received:', userDoc.exists() ? 'Found' : 'Not Found');
             
             if (userDoc.exists()) {
               const userData = userDoc.data() as User;
@@ -87,14 +69,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 userData.role = 'admin';
               }
               
-              // Update photoURL if it changed or is missing
-              if (firebaseUser.photoURL && userData.photoURL !== firebaseUser.photoURL) {
-                await setDoc(doc(db, 'users', firebaseUser.uid), {
-                  photoURL: firebaseUser.photoURL
-                }, { merge: true });
-                userData.photoURL = firebaseUser.photoURL;
-              }
               setUser(userData);
+              setLoading(false);
             } else {
               // This case handles Google login where doc might not exist yet
               const adminEmails = ['pancardjhc2018@gmail.com', 'pavan.tr16@gmail.com', 'admin@jh.com'];
@@ -105,30 +81,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 photoURL: firebaseUser.photoURL || undefined,
                 role: (firebaseUser.email && adminEmails.includes(firebaseUser.email)) ? 'admin' : 'user'
               };
+              
               console.log('Creating new user document:', newUser);
-              await setDoc(doc(db, 'users', firebaseUser.uid), {
-                ...newUser,
-                createdAt: serverTimestamp()
-              });
+              try {
+                await setDoc(doc(db, 'users', firebaseUser.uid), {
+                  ...newUser,
+                  createdAt: serverTimestamp()
+                }, { merge: true });
+              } catch (e) {
+                console.warn('Could not create user doc yet, listener will pick it up when online');
+              }
               setUser(newUser);
+              setLoading(false);
             }
-            success = true;
-          } catch (error: any) {
-            console.error(`Error on attempt ${attempts + 1}:`, error);
-            if (attempts < maxAttempts - 1 && (error.message?.includes('offline') || error.code === 'unavailable')) {
-              attempts++;
-              const delay = Math.min(Math.pow(2, attempts) * 1000 + 500, 10000);
-              console.log(`Retrying in ${delay}ms...`);
-              setTimeout(fetchUserDoc, delay);
-            } else {
-              handleFirestoreError(error, OperationType.GET, userPath);
-            }
-          } finally {
-            if (success) setLoading(false);
+          } catch (err) {
+            console.error('Error processing user document snapshot:', err);
           }
-        }
+        }, (err) => {
+          if (!isMounted) return;
+          console.error('User listener error:', err);
+          
+          if (err.message?.includes('permissions')) {
+            console.error('Permission denied for user doc. Check Firestore Rules.');
+          }
+          
+          // Fallback for admins if offline or permission error during bootstrap
+          const adminEmails = ['pancardjhc2018@gmail.com', 'pavan.tr16@gmail.com', 'admin@jh.com'];
+          if (firebaseUser.email && adminEmails.includes(firebaseUser.email)) {
+            console.warn('Using admin fallback due to error:', err.message);
+            setUser({
+              uid: firebaseUser.uid,
+              name: firebaseUser.displayName || 'Admin (Emergency)',
+              email: firebaseUser.email,
+              role: 'admin'
+            });
+            setLoading(false);
+          }
+        });
 
-        fetchUserDoc();
+        return () => {
+          isMounted = false;
+          unsubscribeUser();
+        };
       } else {
         console.log('User is not authenticated');
         setUser(null);

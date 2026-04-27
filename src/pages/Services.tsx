@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import * as LucideIcons from 'lucide-react';
 import { Search, Plus, Trash2, ExternalLink, ArrowRight, X, Check, Eye, EyeOff, Power, Edit2, Rocket, Settings } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import ConfirmDialog from '../components/ConfirmDialog';
 import ModernButton from '../components/ModernButton';
-import { collection, getDocs, doc, updateDoc, serverTimestamp, addDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, serverTimestamp, addDoc, query, where, deleteDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 
 import { useConfig } from '../context/ConfigContext';
@@ -92,8 +91,8 @@ const Services = () => {
 
   const fetchServiceInputs = async (serviceId: string) => {
     try {
-      const res = await api.get(`/service-inputs/${serviceId}`);
-      setServiceInputs(res.data);
+      const snapshot = await getDocs(query(collection(db, 'service_inputs'), where('service_id', '==', serviceId)));
+      setServiceInputs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     } catch (err) {
       console.error('Error fetching service inputs:', err);
     }
@@ -102,9 +101,10 @@ const Services = () => {
   const handleAddInput = async () => {
     if (!editingService || !newInput.input_label) return;
     try {
-      await api.post('/service-inputs', {
+      await addDoc(collection(db, 'service_inputs'), {
         service_id: editingService.service_id,
-        ...newInput
+        ...newInput,
+        created_at: serverTimestamp()
       });
       setNewInput({ input_label: '', input_type: 'text', required: true });
       fetchServiceInputs(editingService.service_id);
@@ -121,7 +121,7 @@ const Services = () => {
       message: 'Are you sure you want to delete this input field?',
       onConfirm: async () => {
         try {
-          await api.delete(`/service-inputs/${inputId}`);
+          await deleteDoc(doc(db, 'service_inputs', inputId));
           if (editingService) {
             fetchServiceInputs(editingService.service_id);
           }
@@ -225,37 +225,39 @@ const Services = () => {
   const handleDelete = (id: string) => {
     setConfirmDialog({
       isOpen: true,
-      title: 'Move to Recycle Bin',
-      message: 'Are you sure you want to move this service to the Recycle Bin? You can restore it later if needed.',
+      title: 'Delete Service',
+      message: 'Are you sure you want to permanently delete this service? This action cannot be undone.',
       onConfirm: async () => {
         try {
-          await api.delete(`/services/${id}`);
+          await deleteDoc(doc(db, 'services', id));
           fetchServices();
         } catch (err: any) {
-          if (err.response && err.response.status === 400) {
-            alert(err.response.data.error);
-          } else {
-            console.error('Error deleting service:', err);
-            alert('Failed to delete service. Please try again.');
-          }
+          console.error('Error deleting service:', err);
+          alert('Failed to delete service. Please try again.');
         }
         setConfirmDialog(prev => ({ ...prev, isOpen: false }));
       }
     });
   };
 
-  const toggleVisibility = async (id: string) => {
+  const toggleVisibility = async (service: any) => {
     try {
-      await api.patch(`/services/${id}/visibility`);
+      await updateDoc(doc(db, 'services', service.service_id), {
+        is_visible: !service.is_visible,
+        updated_at: serverTimestamp()
+      });
       fetchServices();
     } catch (err) {
       console.error('Error toggling visibility:', err);
     }
   };
 
-  const toggleStatus = async (id: string) => {
+  const toggleStatus = async (service: any) => {
     try {
-      await api.patch(`/services/${id}/status`);
+      await updateDoc(doc(db, 'services', service.service_id), {
+        enabled: !service.enabled,
+        updated_at: serverTimestamp()
+      });
       fetchServices();
     } catch (err) {
       console.error('Error toggling status:', err);
@@ -278,13 +280,6 @@ const Services = () => {
   };
 
   const handleApply = async (service: any) => {
-    // Track visit
-    try {
-      await api.post(`/services/${service.service_id}/visit`);
-    } catch (err) {
-      console.error('Failed to track visit:', err);
-    }
-
     const key = getServiceKey(service.name);
     // If it's a hardcoded one, use that key. 
     // Otherwise, use the service name itself so ApplyService can find it.
@@ -293,19 +288,7 @@ const Services = () => {
   };
 
   const handleOpenUrl = async (service: any) => {
-    // Track visit
-    try {
-      await api.post(`/services/${service.service_id}/visit`);
-    } catch (err) {
-      console.error('Failed to track visit:', err);
-    }
-
     if (service.url) {
-      try {
-        await api.post(`/services/${service.service_id}/log-access`, { action: 'Opened Service URL' });
-      } catch (err) {
-        console.error('Failed to log service access', err);
-      }
       window.open(service.url, '_blank');
     } else {
       alert("Service URL not configured.");
@@ -593,10 +576,10 @@ const Services = () => {
             <div key={service.service_id} className="group bg-slate-800/60 backdrop-blur-xl rounded-3xl p-6 border border-slate-700/50 shadow-lg hover:border-blue-500/50 transition-all hover:-translate-y-1 relative flex flex-col">
               {isAdmin && (
                 <div className="absolute top-4 right-4 flex gap-2 opacity-100 transition-opacity">
-                  <button onClick={() => toggleVisibility(service.service_id)} className={`p-1.5 rounded-lg ${service.is_visible ? 'text-blue-400' : 'text-slate-500'}`} title={service.is_visible ? 'Visible' : 'Hidden'}>
+                  <button onClick={() => toggleVisibility(service)} className={`p-1.5 rounded-lg ${service.is_visible ? 'text-blue-400' : 'text-slate-500'}`} title={service.is_visible ? 'Visible' : 'Hidden'}>
                     {service.is_visible ? <Eye size={16} /> : <EyeOff size={16} />}
                   </button>
-                  <button onClick={() => toggleStatus(service.service_id)} className={`p-1.5 rounded-lg ${service.enabled ? 'text-green-400' : 'text-slate-500'}`} title={service.enabled ? 'Deactivate' : 'Activate'}>
+                  <button onClick={() => toggleStatus(service)} className={`p-1.5 rounded-lg ${service.enabled ? 'text-green-400' : 'text-slate-500'}`} title={service.enabled ? 'Deactivate' : 'Activate'}>
                     <Power size={16} />
                   </button>
                   <button onClick={() => handleEdit(service)} className="p-1.5 rounded-lg text-slate-400 hover:text-white" title="Edit">

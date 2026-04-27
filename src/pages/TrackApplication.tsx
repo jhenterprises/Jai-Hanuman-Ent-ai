@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
-import api from '../services/api';
+import { collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 import { useConfig } from '../context/ConfigContext';
 import ModernButton from '../components/ModernButton';
 import { downloadPDF } from '../utils/pdfGenerator';
 import AcknowledgementReceipt from '../components/AcknowledgementReceipt';
 import { safeFormat } from '../utils/dateUtils';
-import { Search, FileText, CheckCircle, Clock, XCircle, ArrowRight, Download, Calendar, User, Activity, Loader2, AlertTriangle, Printer } from 'lucide-react';
+import { Search, FileText, CheckCircle, Clock, XCircle, Download, Calendar, User, Activity, AlertTriangle } from 'lucide-react';
 
 const TrackApplication = () => {
   const location = useLocation();
@@ -37,10 +38,32 @@ const TrackApplication = () => {
     setApplication(null);
 
     try {
-      const res = await api.get(`/applications/track/${ref}`);
-      setApplication(res.data);
+      // First try by reference_number
+      const q1 = query(collection(db, 'applications'), where('reference_number', '==', ref), limit(1));
+      let querySnapshot = await getDocs(q1);
+
+      // If not found, try by mobile number (user_phone)
+      if (querySnapshot.empty) {
+        const q2 = query(collection(db, 'applications'), where('user_phone', '==', ref), limit(5));
+        querySnapshot = await getDocs(q2);
+      }
+
+      if (querySnapshot.empty) {
+        setError('Application not found. Please check your Reference Number or Mobile Number.');
+        setLoading(false);
+        return;
+      }
+
+      const appData = {
+        id: querySnapshot.docs[0].id,
+        ...querySnapshot.docs[0].data(),
+        updates: querySnapshot.docs[0].data().updates || []
+      };
+      
+      setApplication(appData);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Application not found. Please check your Reference Number or Mobile Number.');
+      console.error('Tracking error:', err);
+      setError('An error occurred while tracking. Please try again.');
     } finally {
       setLoading(false);
     }

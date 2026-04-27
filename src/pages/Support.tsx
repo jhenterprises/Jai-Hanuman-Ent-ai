@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import api from '../services/api';
+import { collection, addDoc, getDocs, updateDoc, doc, query, where, serverTimestamp, orderBy } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import { MessageSquare, Plus, CheckCircle, Clock, XCircle, User } from 'lucide-react';
 import { safeFormat } from '../utils/dateUtils';
@@ -16,9 +17,21 @@ const Support = () => {
   }, [user]);
 
   const fetchTickets = async () => {
+    if (!user) return;
     try {
-      const res = await api.get('/support');
-      setTickets(res.data);
+      let q;
+      if (user.role === 'admin' || user.role === 'staff') {
+        q = query(collection(db, 'support_tickets'), orderBy('created_at', 'desc'));
+      } else {
+        q = query(collection(db, 'support_tickets'), where('user_id', '==', user.uid), orderBy('created_at', 'desc'));
+      }
+      
+      const snapshot = await getDocs(q);
+      const ticketList = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...(doc.data() as any)
+      }));
+      setTickets(ticketList);
     } catch (error) {
       console.error('Failed to fetch support tickets', error);
     }
@@ -26,8 +39,16 @@ const Support = () => {
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) return;
     try {
-      await api.post('/support', newTicket);
+      await addDoc(collection(db, 'support_tickets'), {
+        ...newTicket,
+        user_id: user.uid,
+        user_name: user.name || 'Anonymous',
+        user_email: user.email || 'No email',
+        status: 'Open',
+        created_at: serverTimestamp()
+      });
       setShowAdd(false);
       setNewTicket({ subject: '', message: '' });
       fetchTickets();
@@ -36,9 +57,10 @@ const Support = () => {
     }
   };
 
-  const handleStatusUpdate = async (id: number, status: string) => {
+  const handleStatusUpdate = async (id: string, status: string) => {
     try {
-      await api.put(`/support/${id}/status`, { status });
+      const ticketRef = doc(db, 'support_tickets', id);
+      await updateDoc(ticketRef, { status, updated_at: serverTimestamp() });
       fetchTickets();
       if (selectedTicket && selectedTicket.id === id) {
         setSelectedTicket({ ...selectedTicket, status });

@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { collection, query, where, getDocs, orderBy, limit, doc, updateDoc, getDoc } from 'firebase/firestore';
-import { db, auth } from '../lib/firebase';
-import api from '../services/api';
+import { 
+  collection, query, where, getDocs, orderBy, limit, 
+  doc, updateDoc, getDoc, addDoc, serverTimestamp 
+} from 'firebase/firestore';
+import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import { Search, FileText, CheckCircle, XCircle, Clock, Eye, Download, User, ExternalLink, Activity, Upload, MessageSquare, Filter, Shield, Loader2 } from 'lucide-react';
 import { downloadPDF } from '../utils/pdfGenerator';
@@ -31,22 +33,6 @@ const Applications = () => {
   const [isUpdating, setIsUpdating] = useState(false);
   const { user } = useAuth();
   const location = useLocation();
-
-  const [authToken, setAuthToken] = useState<string>('');
-  
-  useEffect(() => {
-    const getToken = async () => {
-      if (auth.currentUser) {
-        try {
-          const token = await auth.currentUser.getIdToken();
-          setAuthToken(token);
-        } catch (err) {
-          console.error('Failed to get auth token:', err);
-        }
-      }
-    };
-    getToken();
-  }, [auth.currentUser]);
 
   useEffect(() => {
     fetchApplications();
@@ -146,44 +132,24 @@ const Applications = () => {
 
   const fetchStaffMembers = async () => {
     try {
-      const res = await api.get('/users');
-      setStaffMembers(res.data.filter((u: any) => u.role === 'staff' || u.role === 'admin'));
-    } catch (err: any) {
-      console.error('Error fetching staff members from API:', err);
-      
-      // Fallback to Firestore
-      if (err.message?.includes('HTML') || !err.response || err.code === 'ECONNABORTED' || err.response?.status >= 500) {
-        try {
-          console.log('Attempting to fetch staff from Firestore fallback for Applications...');
-          const snapshot = await getDocs(collection(db, 'users'));
-          const staffList = snapshot.docs
-            .map(doc => ({ id: doc.id, ...doc.data() }))
-            .filter((u: any) => (u.role === 'staff' || u.role === 'admin') && !u.deleted_at);
-          setStaffMembers(staffList);
-        } catch (fsErr) {
-          console.error('Firestore staff fallback failed:', fsErr);
-        }
-      }
+      console.log('Fetching staff from Firestore for Applications...');
+      const snapshot = await getDocs(collection(db, 'users'));
+      const staffList = snapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .filter((u: any) => (u.role === 'staff' || u.role === 'admin') && !u.deleted_at);
+      setStaffMembers(staffList);
+    } catch (fsErr) {
+      console.error('Firestore staff fetch failed:', fsErr);
     }
   };
 
   const fetchServiceLinks = async () => {
     try {
-      const res = await api.get('/service-links');
-      setServiceLinks(res.data);
-    } catch (err: any) {
-      console.error('Error fetching service links from API:', err);
-      
-      // Fallback to Firestore
-      if (err.message?.includes('HTML') || !err.response || err.code === 'ECONNABORTED' || err.response?.status >= 500) {
-        try {
-          console.log('Attempting to fetch service links from Firestore fallback...');
-          const snapshot = await getDocs(collection(db, 'service_links'));
-          setServiceLinks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        } catch (fsErr) {
-          console.error('Firestore service links fallback failed:', fsErr);
-        }
-      }
+      console.log('Fetching service links from Firestore...');
+      const snapshot = await getDocs(collection(db, 'service_links'));
+      setServiceLinks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    } catch (fsErr) {
+      console.error('Firestore service links fetch failed:', fsErr);
     }
   };
 
@@ -197,24 +163,34 @@ const Applications = () => {
     
     setIsUpdating(true);
     try {
-      const formData = new FormData();
-      formData.append('status', updateData.status);
-      formData.append('comment', updateData.comment);
-      formData.append('service_type', selectedApp.service_type);
-      updateFiles.forEach(file => {
-        formData.append('documents', file);
-      });
+      const appRef = doc(db, 'applications', selectedApp.id);
+      
+      // Since we don't have a backend to handle multipart/form-data, 
+      // we'd need to upload files to Firebase Storage first.
+      // For now, let's just update the status and comment.
+      const currentUpdates = selectedApp.updates || [];
+      const newUpdate = {
+        id: Date.now().toString(),
+        status: updateData.status,
+        comment: updateData.comment,
+        updated_at: new Date().toISOString(),
+        updated_by: user?.uid
+      };
 
-      await api.patch(`/applications/${selectedApp.id}/status`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+      await updateDoc(appRef, {
+        status: updateData.status,
+        updates: [...currentUpdates, newUpdate],
+        updated_at: serverTimestamp()
       });
       
       fetchApplications();
       setSelectedApp(null);
       setUpdateData({ status: '', comment: '' });
       setUpdateFiles([]);
+      alert('Status updated successfully');
     } catch (err) {
       console.error('Error updating status:', err);
+      handleFirestoreError(err, OperationType.UPDATE, `applications/${selectedApp.id}`);
     } finally {
       setIsUpdating(false);
     }
@@ -226,12 +202,22 @@ const Applications = () => {
 
     setIsUpdating(true);
     try {
-      await api.patch(`/applications/${selectedApp.id}/assign`, { staff_id: assignStaffId });
+      const appRef = doc(db, 'applications', selectedApp.id);
+      const staffMember = staffMembers.find(s => s.id === assignStaffId);
+      
+      await updateDoc(appRef, {
+        assigned_to: assignStaffId,
+        staff_name: staffMember?.name || '',
+        updated_at: serverTimestamp()
+      });
+      
       fetchApplications();
       setSelectedApp(null);
       setAssignStaffId('');
+      alert('Staff assigned successfully');
     } catch (err) {
       console.error('Error assigning staff:', err);
+      handleFirestoreError(err, OperationType.UPDATE, `applications/${selectedApp.id}`);
     } finally {
       setIsUpdating(false);
     }
@@ -517,13 +503,14 @@ const Applications = () => {
                               <div className="text-[9px] text-slate-400 uppercase tracking-widest mt-0.5">Uploaded {safeFormat(doc.uploaded_at, 'dd/MM/yyyy')}</div>
                             </div>
                             <a 
-                              href={`/api/admin/documents/${doc.id}?token=${authToken}`}
-                              download={doc.file_name}
+                              href={doc.url || '#'}
+                              target="_blank"
+                              rel="noopener noreferrer"
                               onClick={(e) => e.stopPropagation()}
                               className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-100 rounded-md transition-colors"
-                              title="Download"
+                              title="Download/Open"
                             >
-                              <Download size={14} />
+                              <ExternalLink size={14} />
                             </a>
                           </div>
                         ))
@@ -618,10 +605,11 @@ const Applications = () => {
               </div>
               <div className="flex items-center gap-2">
                 <a 
-                  href={`/api/admin/documents/${previewDoc.id}?token=${authToken}`}
-                  download={previewDoc.file_name}
+                  href={previewDoc.url || '#'}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors"
-                  title="Download"
+                  title="Download/Open"
                 >
                   <Download size={20} />
                 </a>
@@ -631,15 +619,15 @@ const Applications = () => {
               </div>
             </div>
             <div className="flex-1 bg-slate-950 p-4 overflow-hidden flex items-center justify-center">
-              {previewDoc.file_name.toLowerCase().endsWith('.pdf') ? (
+              {previewDoc.file_name?.toLowerCase().endsWith('.pdf') ? (
                 <iframe 
-                  src={`/api/admin/documents/${previewDoc.id}?token=${authToken}`} 
+                  src={previewDoc.url} 
                   className="w-full h-full rounded-xl bg-white"
                   title="PDF Preview"
                 />
               ) : (
                 <img 
-                  src={`/api/admin/documents/${previewDoc.id}?token=${authToken}`} 
+                  src={previewDoc.url} 
                   alt="Document Preview" 
                   className="max-w-full max-h-full object-contain rounded-xl"
                 />
