@@ -130,7 +130,7 @@ service cloud.firestore {
 
     match /wallets/{walletId} {
       allow get: if isSignedIn() && (isStaff() || resource.data.user_id == request.auth.uid);
-      allow list: if isStaff();
+      allow list: if isStaff() || (isSignedIn() && resource.data.user_id == request.auth.uid);
       allow create, update: if isSignedIn(); 
       allow delete: if isAdmin();
     }
