@@ -394,7 +394,7 @@ const Applications = () => {
                     )}
                     <td className="p-5 text-right flex items-center justify-end gap-2">
                       {downloadingId === item.id && (
-                        <div className="fixed top-[-9999px] left-[-9999px] opacity-0 pointer-events-none">
+                        <div className="absolute left-[-9999px] top-0 overflow-hidden" style={{ width: '800px' }}>
                           <AcknowledgementReceipt application={item} id={`receipt-row-${item.id}`} />
                         </div>
                       )}

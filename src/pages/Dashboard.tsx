@@ -231,7 +231,7 @@ const Dashboard = () => {
                 {applications.map((app, i) => (
                   <GlassCard key={app.id} className="p-8 space-y-8 flex flex-col h-full group">
                     {downloadingId === app.id && (
-                      <div className="fixed top-[-9999px] left-[-9999px] opacity-0 pointer-events-none">
+                      <div className="absolute left-[-9999px] top-0 overflow-hidden" style={{ width: '800px' }}>
                         <AcknowledgementReceipt application={app} id={`receipt-dash-${app.id}`} />
                       </div>
                     )}

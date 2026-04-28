@@ -10,7 +10,7 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { loginWithGoogle, loginWithEmail } = useAuth();
+  const { loginWithGoogle, loginWithGoogleRedirect, loginWithEmail } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   
@@ -31,7 +31,7 @@ const Login = () => {
       } else if (err.code === 'auth/cancelled-popup-request') {
         setError('A login popup was already open. Please complete that one or wait a moment.');
       } else if (err.code === 'auth/popup-closed-by-user') {
-        setError('Login popup was closed before completion. Please try again.');
+        setError('Login popup was closed. If this happened automatically, your browser is blocking it inside the preview. Please open the app in a new tab to login.');
       } else if (err.code === 'auth/unauthorized-domain') {
         setError('This domain is not authorized for Google login. Please add it to your Firebase Console.');
       } else if (err.code === 'auth/operation-not-allowed') {
@@ -42,6 +42,19 @@ const Login = () => {
         setError(err.message || 'Google login failed');
       }
     } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleRedirectLogin = async () => {
+    if (loading) return;
+    try {
+      setLoading(true);
+      setError('');
+      await loginWithGoogleRedirect();
+    } catch (err: any) {
+      console.error('Google redirect login error:', err);
+      setError(err.message || 'Google redirect login failed');
       setLoading(false);
     }
   };
@@ -165,6 +178,17 @@ const Login = () => {
             <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-6 h-6" />
             {loading ? 'Connecting...' : 'Sign in with Google'}
           </button>
+          
+          <div className="text-center mt-2">
+            <button
+              type="button"
+              onClick={handleGoogleRedirectLogin}
+              disabled={loading}
+              className="text-xs text-slate-500 hover:text-blue-500 underline"
+            >
+              Having popup issues? Login with Google (Redirect)
+            </button>
+          </div>
         </form>
 
         <div className="text-center pt-4 space-y-4">

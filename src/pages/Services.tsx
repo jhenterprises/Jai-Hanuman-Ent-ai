@@ -484,7 +484,7 @@ const Services = () => {
                 <div className="flex gap-2">
                   <input 
                     type="text" placeholder="e.g. fa-fingerprint, fa-id-card" 
-                    value={formData.icon} onChange={e => setFormData({...formData, icon: e.target.value})}
+                    value={formData.icon || ''} onChange={e => setFormData({...formData, icon: e.target.value})}
                     className="flex-1 px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 focus:border-blue-500 outline-none"
                   />
                   <div className="w-10 h-10 rounded-xl bg-slate-900/50 border border-slate-700 flex items-center justify-center text-blue-400">
@@ -497,7 +497,7 @@ const Services = () => {
               <label className="text-xs text-slate-400 font-medium">Description</label>
               <textarea 
                 placeholder="Brief description of the service..." required
-                value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})}
+                value={formData.description || ''} onChange={e => setFormData({...formData, description: e.target.value})}
                 className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 focus:border-blue-500 outline-none h-24 resize-none"
               />
             </div>

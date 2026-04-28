@@ -2,6 +2,8 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { 
   onAuthStateChanged, 
   signInWithPopup, 
+  signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider, 
   signOut,
   createUserWithEmailAndPassword,
@@ -23,6 +25,7 @@ interface User {
 interface AuthContextType {
   user: User | null;
   loginWithGoogle: () => Promise<void>;
+  loginWithGoogleRedirect: () => Promise<void>;
   loginWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string, name: string, phone?: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -36,6 +39,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Check for redirect error on load
+    getRedirectResult(auth).catch((error) => {
+      console.error('Redirect sign in error:', error);
+    });
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       console.log('Auth state changed:', firebaseUser);
       if (firebaseUser) {
@@ -145,8 +153,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await signOut(auth);
         throw new Error('Your Google account email is not verified. Please verify it or use another account.');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Login failed:', error);
+      throw error;
+    }
+  };
+
+  const loginWithGoogleRedirect = async () => {
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    try {
+      await signInWithRedirect(auth, provider);
+    } catch (error) {
+      console.error('Login redirect failed:', error);
       throw error;
     }
   };
@@ -210,7 +229,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, loginWithGoogle, loginWithEmail, signUpWithEmail, logout, loading }}>
+    <AuthContext.Provider value={{ user, loginWithGoogle, loginWithGoogleRedirect, loginWithEmail, signUpWithEmail, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );

@@ -587,7 +587,7 @@ const ServiceFormBuilder = () => {
                     <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Field Label</label>
                     <input 
                       type="text" 
-                      value={selectedFieldData.label}
+                      value={selectedFieldData.label || ''}
                       onChange={(e) => updateField(selectedField.sectionId, selectedField.fieldId, { label: e.target.value })}
                       className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-xl text-sm text-white focus:border-blue-500 outline-none"
                     />
@@ -598,7 +598,7 @@ const ServiceFormBuilder = () => {
                       <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Field Name (Key)</label>
                       <input 
                         type="text" 
-                        value={selectedFieldData.name}
+                        value={selectedFieldData.name || ''}
                         onChange={(e) => updateField(selectedField.sectionId, selectedField.fieldId, { name: e.target.value.replace(/[^a-zA-Z0-9_]/g, '') })}
                         className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-xl text-sm text-white focus:border-blue-500 outline-none font-mono"
                       />
@@ -672,7 +672,7 @@ const ServiceFormBuilder = () => {
                       <label className="flex items-center gap-3 cursor-pointer">
                         <input 
                           type="checkbox" 
-                          checked={selectedFieldData.required}
+                          checked={!!selectedFieldData.required}
                           onChange={(e) => updateField(selectedField.sectionId, selectedField.fieldId, { required: e.target.checked })}
                           className="w-4 h-4 rounded border-white/10 bg-black/20 text-blue-500 focus:ring-blue-500 focus:ring-offset-slate-900"
                         />

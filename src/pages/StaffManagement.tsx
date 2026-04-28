@@ -434,7 +434,7 @@ const StaffManagement = () => {
                       <label className="text-[10px] text-slate-500 uppercase font-bold tracking-widest ml-1">Full Name</label>
                       <input 
                         type="text" required
-                        value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})}
+                        value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})}
                         className="w-full px-5 py-3 bg-slate-800/50 border border-slate-700 rounded-2xl text-white focus:border-blue-500 outline-none transition-all"
                         placeholder="Staff Name"
                       />
@@ -443,7 +443,7 @@ const StaffManagement = () => {
                       <label className="text-[10px] text-slate-500 uppercase font-bold tracking-widest ml-1">Email Address</label>
                       <input 
                         type="email" required
-                        value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})}
+                        value={formData.email || ''} onChange={e => setFormData({...formData, email: e.target.value})}
                         className="w-full px-5 py-3 bg-slate-800/50 border border-slate-700 rounded-2xl text-white focus:border-blue-500 outline-none transition-all"
                         placeholder="staff@example.com"
                       />
@@ -452,7 +452,7 @@ const StaffManagement = () => {
                       <label className="text-[10px] text-slate-500 uppercase font-bold tracking-widest ml-1">Phone Number</label>
                       <input 
                         type="tel" required
-                        value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})}
+                        value={formData.phone || ''} onChange={e => setFormData({...formData, phone: e.target.value})}
                         className="w-full px-5 py-3 bg-slate-800/50 border border-slate-700 rounded-2xl text-white focus:border-blue-500 outline-none transition-all"
                         placeholder="+91 9876543210"
                       />
@@ -462,7 +462,7 @@ const StaffManagement = () => {
                         <label className="text-[10px] text-slate-500 uppercase font-bold tracking-widest ml-1">Initial Password</label>
                         <input 
                           type="password" required
-                          value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})}
+                          value={formData.password || ''} onChange={e => setFormData({...formData, password: e.target.value})}
                           className="w-full px-5 py-3 bg-slate-800/50 border border-slate-700 rounded-2xl text-white focus:border-blue-500 outline-none transition-all"
                           placeholder="••••••••"
                         />

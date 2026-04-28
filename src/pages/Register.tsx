@@ -8,11 +8,14 @@ const Register = () => {
   const [formData, setFormData] = useState({ name: '', email: '', phone: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
-  const { signUpWithEmail, loginWithGoogle } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const { signUpWithEmail, loginWithGoogle, loginWithGoogleRedirect } = useAuth();
   const navigate = useNavigate();
 
   const handleGoogleLogin = async () => {
+    if (loading) return;
     try {
+      setLoading(true);
       setError('');
       await loginWithGoogle();
       navigate('/app');
@@ -20,6 +23,10 @@ const Register = () => {
       console.error('Google registration error:', err);
       if (err.code === 'auth/popup-blocked') {
         setError('Popup was blocked by your browser. Please allow popups for this site.');
+      } else if (err.code === 'auth/popup-closed-by-user') {
+        setError('Login popup was closed. If this happened automatically, your browser is blocking it inside the preview. Please open the app in a new tab to login.');
+      } else if (err.code === 'auth/cancelled-popup-request') {
+        setError('A login popup was already open. Please complete that one or wait a moment.');
       } else if (err.code === 'auth/unauthorized-domain') {
         setError('This domain is not authorized for Google login. Please add it to your Firebase Console.');
       } else if (err.code === 'auth/operation-not-allowed') {
@@ -27,6 +34,21 @@ const Register = () => {
       } else {
         setError(err.message || 'Google registration failed');
       }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleRedirectLogin = async () => {
+    if (loading) return;
+    try {
+      setLoading(true);
+      setError('');
+      await loginWithGoogleRedirect();
+    } catch (err: any) {
+      console.error('Google redirect login error:', err);
+      setError(err.message || 'Google redirect login failed');
+      setLoading(false);
     }
   };
 
@@ -147,11 +169,23 @@ const Register = () => {
           <button 
             type="button"
             onClick={handleGoogleLogin}
-            className="w-full py-4 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-black rounded-2xl shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 border border-slate-200 dark:border-white/5"
+            disabled={loading}
+            className={`w-full py-4 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-black rounded-2xl shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 border border-slate-200 dark:border-white/5 ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
           >
             <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-6 h-6" />
-            Sign in with Google
+            {loading ? 'Connecting...' : 'Sign in with Google'}
           </button>
+          
+          <div className="text-center mt-2">
+            <button
+              type="button"
+              onClick={handleGoogleRedirectLogin}
+              disabled={loading}
+              className="text-xs text-slate-500 hover:text-blue-500 underline"
+            >
+              Having popup issues? Login with Google (Redirect)
+            </button>
+          </div>
         </form>
 
         <div className="text-center">
