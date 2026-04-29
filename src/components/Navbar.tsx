@@ -1,11 +1,13 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useConfig } from '../context/ConfigContext';
 import { Shield, LogOut, User, Menu, ArrowRight } from 'lucide-react';
 import ModernButton from './ModernButton';
 
 const Navbar = () => {
   const { user, logout } = useAuth();
+  const { config } = useConfig();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -17,8 +19,8 @@ const Navbar = () => {
     <nav className="sticky top-0 z-50 glass border-b border-white/10 px-6 py-4">
       <div className="container mx-auto flex justify-between items-center">
         <Link to="/" className="flex items-center gap-3 group">
-          <div className="w-10 h-10 gold-gradient rounded-xl flex items-center justify-center shadow-lg shadow-amber-500/20 group-hover:scale-110 transition-transform">
-            <Shield className="text-slate-900" size={24} />
+          <div className="w-10 h-10 bg-white p-1 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/10 group-hover:scale-110 transition-transform overflow-hidden">
+            <img src={config.logo_url || "https://firebasestorage.googleapis.com/v0/b/ais-dev-nkao4wgl3qoklcmykae3vf.appspot.com/o/artifacts%2Finput_file_1.png?alt=media"} alt="JH Logo" className="w-full h-full object-contain" />
           </div>
           <div>
             <h1 className="text-xl font-bold tracking-tight text-white">JH Digital <span className="text-accent">Seva Kendra</span></h1>

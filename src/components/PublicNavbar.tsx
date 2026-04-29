@@ -38,13 +38,9 @@ const PublicNavbar = () => {
     <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${scrolled ? 'bg-white/60 dark:bg-slate-950/60 backdrop-blur-xl border-b border-black/5 dark:border-white/5 py-3' : 'bg-transparent py-6'}`}>
       <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2 group">
-          {config.logo ? (
-            <img src={config.logo} alt={config.portal_name} className="w-10 h-10 object-contain group-hover:rotate-12 transition-transform" />
-          ) : (
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 via-cyan-400 to-purple-500 flex items-center justify-center font-black text-white shadow-2xl shadow-blue-600/20 group-hover:scale-110 transition-all duration-500">
-              {config.portal_name ? config.portal_name.substring(0, 2).toUpperCase() : 'JH'}
-            </div>
-          )}
+          <div className="w-12 h-12 bg-white p-1 rounded-2xl flex items-center justify-center shadow-2xl shadow-blue-600/10 group-hover:scale-110 transition-all duration-500 overflow-hidden">
+            <img src={config.logo_url || "https://firebasestorage.googleapis.com/v0/b/ais-dev-nkao4wgl3qoklcmykae3vf.appspot.com/o/artifacts%2Finput_file_1.png?alt=media"} alt="JH Logo" className="w-full h-full object-contain" />
+          </div>
           <div className="flex flex-col">
             <span className="font-black text-xl leading-tight tracking-tighter text-slate-900 dark:text-white group-hover:text-blue-400 transition-colors">
               {config.portal_name ? config.portal_name.split(' ')[0] : 'Digital'} {config.portal_name ? config.portal_name.split(' ')[1] : 'Seva'}

@@ -32,6 +32,7 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminWalletManagement from './pages/admin/AdminWalletManagement';
 import AdminPayments from './pages/admin/AdminPayments';
 import ServiceFormBuilder from './pages/admin/ServiceFormBuilder';
+import LedgerAnalytics from './pages/admin/LedgerAnalytics';
 
 const ProtectedRoute = ({ children, roles }: { children: React.ReactNode, roles?: string[] }) => {
   const { user, loading } = useAuth();
@@ -100,6 +101,7 @@ export default function App() {
             <Route path="admin-dashboard" element={<ProtectedRoute roles={['admin']}><AdminDashboard /></ProtectedRoute>} />
             <Route path="admin/wallets" element={<ProtectedRoute roles={['admin']}><AdminWalletManagement /></ProtectedRoute>} />
             <Route path="admin/payments" element={<ProtectedRoute roles={['admin']}><AdminPayments /></ProtectedRoute>} />
+            <Route path="admin/ledger-analytics" element={<ProtectedRoute roles={['admin']}><LedgerAnalytics /></ProtectedRoute>} />
             <Route path="services" element={<Services />} />
             <Route path="services/:id/builder" element={<ProtectedRoute roles={['admin']}><ServiceFormBuilder /></ProtectedRoute>} />
             <Route path="ledger" element={<ProtectedRoute roles={['admin', 'staff']}><Ledger /></ProtectedRoute>} />

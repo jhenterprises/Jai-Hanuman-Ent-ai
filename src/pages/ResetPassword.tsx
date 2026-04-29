@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { confirmPasswordReset } from 'firebase/auth';
 import { auth } from '../lib/firebase';
+import { useConfig } from '../context/ConfigContext';
 import { motion } from 'framer-motion';
 import { Lock, AlertCircle, ArrowLeft, CheckCircle2, ShieldCheck, Eye, EyeOff } from 'lucide-react';
 
 const ResetPassword = () => {
+  const { config } = useConfig();
   const [searchParams] = useSearchParams();
   const oobCode = searchParams.get('oobCode');
   const navigate = useNavigate();
@@ -77,8 +79,8 @@ const ResetPassword = () => {
         className="glass rounded-[2.5rem] p-8 md:p-10 space-y-8 relative"
       >
         <div className="text-center space-y-2">
-          <div className="w-16 h-16 blue-gradient rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl shadow-blue-500/20">
-            <ShieldCheck className="text-white" size={32} />
+          <div className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl shadow-blue-500/10 overflow-hidden border border-slate-200 dark:border-white/10">
+            <img src={config.logo_url || "https://firebasestorage.googleapis.com/v0/b/ais-dev-nkao4wgl3qoklcmykae3vf.appspot.com/o/artifacts%2Finput_file_1.png?alt=media"} alt="JH Logo" className="w-full h-full object-contain p-2" />
           </div>
           <h2 className="text-3xl font-black text-slate-900 dark:text-white">New Password</h2>
           <p className="text-slate-600 dark:text-slate-500">Set a strong password for your account</p>

@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { collection, getDocs, updateDoc, doc, query, where, orderBy } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { useConfig } from '../context/ConfigContext';
 import { CheckCircle, XCircle, Eye, Clock, User, FileText } from 'lucide-react';
 import { safeFormat } from '../utils/dateUtils';
 
 const StaffDashboard = () => {
+  const { config } = useConfig();
   const [applications, setApplications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('Pending');
@@ -44,10 +46,15 @@ const StaffDashboard = () => {
 
   return (
     <div className="space-y-8">
-      <header className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-black text-white">Staff Portal</h1>
-          <p className="text-slate-500">Review and process citizen applications.</p>
+      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
+        <div className="flex items-center gap-4">
+          <div className="w-16 h-16 bg-white p-1 rounded-2xl flex items-center justify-center shadow-xl border border-slate-200">
+            <img src={config.logo_url || "https://firebasestorage.googleapis.com/v0/b/ais-dev-nkao4wgl3qoklcmykae3vf.appspot.com/o/artifacts%2Finput_file_1.png?alt=media"} alt="JH Logo" className="w-full h-full object-contain" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-black text-white">Staff Portal</h1>
+            <p className="text-slate-500">Review and process citizen applications.</p>
+          </div>
         </div>
         <div className="flex glass p-1 rounded-2xl">
           {['Pending', 'Processing', 'Approved', 'Rejected'].map(s => (

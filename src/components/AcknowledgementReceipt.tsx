@@ -1,5 +1,6 @@
 import React from 'react';
 import { CheckCircle2, Shield, FileText, User, MapPin, Activity } from 'lucide-react';
+import { useConfig } from '../context/ConfigContext';
 import { safeFormat } from '../utils/dateUtils';
 
 interface AcknowledgementReceiptProps {
@@ -8,6 +9,7 @@ interface AcknowledgementReceiptProps {
 }
 
 const AcknowledgementReceipt: React.FC<AcknowledgementReceiptProps> = ({ application, id }) => {
+  const { config } = useConfig();
   if (!application) return null;
 
   const formData = application.form_data || {};
@@ -64,11 +66,11 @@ const AcknowledgementReceipt: React.FC<AcknowledgementReceiptProps> = ({ applica
         style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #2563eb', padding: '16pt' }}
         className="flex flex-col items-center text-center space-y-2"
       >
-        <div style={{ backgroundColor: '#ffffff', width: '40pt', height: '40pt' }} className="rounded-lg shadow-sm flex items-center justify-center p-1 border border-slate-200">
+        <div style={{ backgroundColor: '#ffffff', width: '60pt', height: '60pt' }} className="rounded-2xl shadow-sm flex items-center justify-center p-1 border border-slate-200 overflow-hidden">
           <img 
-            src="https://upload.wikimedia.org/wikipedia/commons/5/55/Emblem_of_India.svg" 
-            alt="Emblem" 
-            style={{ width: '24pt', height: '24pt' }}
+            src={config.logo_url || "https://firebasestorage.googleapis.com/v0/b/ais-dev-nkao4wgl3qoklcmykae3vf.appspot.com/o/artifacts%2Finput_file_1.png?alt=media"} 
+            alt="JH Logo" 
+            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
             crossOrigin="anonymous" 
           />
         </div>

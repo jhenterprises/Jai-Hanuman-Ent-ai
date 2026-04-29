@@ -1011,8 +1011,8 @@ const ApplyService = () => {
     <div className="max-w-5xl mx-auto space-y-8 pb-20 px-4 sm:px-6 lg:px-8 overflow-x-hidden">
       {/* Header */}
       <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-200 flex flex-col md:flex-row items-center gap-6">
-        <div className="w-20 h-20 bg-slate-50 rounded-2xl flex items-center justify-center border border-slate-100">
-          <img src="https://upload.wikimedia.org/wikipedia/commons/5/55/Emblem_of_India.svg" alt="Emblem" className="w-12 h-12" />
+        <div className="w-20 h-20 bg-white p-1 rounded-2xl flex items-center justify-center border border-slate-200 shadow-sm overflow-hidden">
+          <img src={config.logo_url || "https://firebasestorage.googleapis.com/v0/b/ais-dev-nkao4wgl3qoklcmykae3vf.appspot.com/o/artifacts%2Finput_file_1.png?alt=media"} alt="JH Logo" className="w-full h-full object-contain" />
         </div>
         <div className="text-center md:text-left">
           <h1 className="text-3xl font-bold text-slate-900">{config.title}</h1>

@@ -2,11 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { useConfig } from '../context/ConfigContext';
 import { motion } from 'framer-motion';
 import { CheckCircle, Clock, ArrowLeft, Shield, Download } from 'lucide-react';
 import { safeFormat } from '../utils/dateUtils';
 
 const ApplicationTrack = () => {
+  const { config } = useConfig();
   const { id } = useParams();
   const [app, setApp] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -49,9 +51,14 @@ const ApplicationTrack = () => {
 
       <div className="glass rounded-[3rem] p-12 space-y-12">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-          <div className="space-y-2">
-            <h1 className="text-3xl font-black text-white capitalize">{app.service_type}</h1>
-            <p className="text-slate-500 font-mono">Reference ID: {app.reference_number}</p>
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 bg-white p-1 rounded-2xl flex items-center justify-center shadow-xl border border-slate-200">
+              <img src={config.logo_url || "https://firebasestorage.googleapis.com/v0/b/ais-dev-nkao4wgl3qoklcmykae3vf.appspot.com/o/artifacts%2Finput_file_1.png?alt=media"} alt="JH Logo" className="w-full h-full object-contain" />
+            </div>
+            <div className="space-y-1">
+              <h1 className="text-3xl font-black text-white capitalize">{app.service_type}</h1>
+              <p className="text-slate-500 font-mono text-sm tracking-tight">Reference ID: {app.reference_number}</p>
+            </div>
           </div>
           <div className={`px-6 py-2 rounded-2xl text-sm font-black uppercase tracking-widest border ${
             app.status === 'Approved' ? 'text-emerald-400 border-emerald-400/20 bg-emerald-400/5' :

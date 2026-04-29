@@ -58,12 +58,56 @@ const PortalConfig = () => {
         <section className="space-y-4">
           <h2 className="text-xl font-bold text-white border-b border-slate-700 pb-2">Portal Basic Information</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <input type="text" placeholder="Portal Name" value={config.portal_name || ''} onChange={e => setConfig({...config, portal_name: e.target.value})} className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-white" />
-            <input type="text" placeholder="Organization Name" value={config.organization_name || ''} onChange={e => setConfig({...config, organization_name: e.target.value})} className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-white" />
-            <input type="email" placeholder="Contact Email" value={config.contact_email || ''} onChange={e => setConfig({...config, contact_email: e.target.value})} className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-white" />
-            <input type="text" placeholder="Contact Phone" value={config.contact_phone || ''} onChange={e => setConfig({...config, contact_phone: e.target.value})} className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-white" />
-            <input type="text" placeholder="Tagline" value={config.tagline || ''} onChange={e => setConfig({...config, tagline: e.target.value})} className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-white" />
-            <input type="text" placeholder="Office Address" value={config.office_address || ''} onChange={e => setConfig({...config, office_address: e.target.value})} className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-white" />
+            <div className="space-y-1">
+              <label className="text-sm text-slate-400">Portal Name</label>
+              <input type="text" placeholder="Portal Name" value={config.portal_name || ''} onChange={e => setConfig({...config, portal_name: e.target.value})} className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-white" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm text-slate-400">Organization Name</label>
+              <input type="text" placeholder="Organization Name" value={config.organization_name || ''} onChange={e => setConfig({...config, organization_name: e.target.value})} className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-white" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm text-slate-400">Contact Email</label>
+              <input type="email" placeholder="Contact Email" value={config.contact_email || ''} onChange={e => setConfig({...config, contact_email: e.target.value})} className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-white" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm text-slate-400">Contact Phone</label>
+              <input type="text" placeholder="Contact Phone" value={config.contact_phone || ''} onChange={e => setConfig({...config, contact_phone: e.target.value})} className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-white" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm text-slate-400">Tagline</label>
+              <input type="text" placeholder="Tagline" value={config.tagline || ''} onChange={e => setConfig({...config, tagline: e.target.value})} className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-white" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm text-slate-400">Office Address</label>
+              <input type="text" placeholder="Office Address" value={config.office_address || ''} onChange={e => setConfig({...config, office_address: e.target.value})} className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-white" />
+            </div>
+          </div>
+        </section>
+
+        {/* Logo Configuration */}
+        <section className="space-y-4">
+          <h2 className="text-xl font-bold text-white border-b border-slate-700 pb-2">Logo Configuration</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+            <div className="space-y-2">
+              <label className="text-sm text-slate-400">Portal Logo URL</label>
+              <input 
+                type="text" 
+                placeholder="https://example.com/logo.png" 
+                value={config.logo_url || ''} 
+                onChange={e => setConfig({...config, logo_url: e.target.value})} 
+                className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-white" 
+              />
+              <p className="text-xs text-slate-500">Provide a direct link to a PNG or JPEG logo file. This logo will appear across the portal and in receipts.</p>
+            </div>
+            {config.logo_url && (
+              <div className="space-y-2">
+                <label className="text-sm text-slate-400">Logo Preview</label>
+                <div className="w-32 h-32 bg-white rounded-2xl flex items-center justify-center p-2 border border-slate-700 overflow-hidden shadow-2xl">
+                  <img src={config.logo_url} alt="Logo Preview" className="max-w-full max-h-full object-contain" />
+                </div>
+              </div>
+            )}
           </div>
         </section>
 

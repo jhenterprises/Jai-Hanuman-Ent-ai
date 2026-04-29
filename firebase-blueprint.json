@@ -63,19 +63,45 @@
     },
     "ledger": {
       "title": "Ledger Entry",
-      "description": "Transaction and balance history",
+      "description": "Financial transaction entries",
       "type": "object",
       "properties": {
-        "userId": { "type": "string" },
+        "serial_number": { "type": "number" },
+        "customer_name": { "type": "string" },
+        "phone_number": { "type": "string" },
+        "service_name": { "type": "string" },
+        "principle_amount": { "type": "number" },
+        "profit_amount": { "type": "number" },
+        "total_amount": { "type": "number" },
+        "payment_mode": { "type": "string", "enum": ["Cash", "PhonePe", "UPI"] },
+        "service_type": { "type": "string", "enum": ["Service", "Money Transfer", "Cash Withdrawal", "Other"] },
         "type": { "type": "string", "enum": ["credit", "debit"] },
-        "amount": { "type": "number" },
-        "description": { "type": "string" },
-        "referenceId": { "type": "string" },
-        "status": { "type": "string", "enum": ["pending", "success", "failed"] },
-        "payment_mode": { "type": "string" },
-        "razorpay_payment_id": { "type": "string" },
-        "razorpay_order_id": { "type": "string" },
+        "date_string": { "type": "string" },
+        "staff_id": { "type": "string" },
+        "staff_name": { "type": "string" },
         "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["serial_number", "customer_name", "principle_amount", "created_at"]
+    },
+    "withdrawals": {
+      "title": "Withdrawal",
+      "description": "Cash withdrawal requests",
+      "type": "object",
+      "properties": {
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "staff_id": { "type": "string" },
+        "staff_name": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "approved_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "counters": {
+      "title": "Counter",
+      "description": "Auto incrementing counters",
+      "type": "object",
+      "properties": {
+        "value": { "type": "number" }
       }
     },
     "wallets": {
@@ -140,7 +166,15 @@
     },
     "/ledger/{ledgerId}": {
       "schema": "ledger",
-      "description": "Financial ledger documents"
+      "description": "Financial transaction entries"
+    },
+    "/withdrawals/{withdrawalId}": {
+      "schema": "withdrawals",
+      "description": "Cash withdrawal requests"
+    },
+    "/counters/{counterId}": {
+      "schema": "counters",
+      "description": "System counters"
     },
     "/wallets/{walletId}": {
       "schema": "wallets",

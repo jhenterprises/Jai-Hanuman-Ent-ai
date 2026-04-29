@@ -33,7 +33,8 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           portal_name: 'JH Digital Seva Kendra',
           theme_color: '#3b82f6',
           secondary_color: '#64748b',
-          header_bg_color: '#1e293b'
+          header_bg_color: '#1e293b',
+          logo_url: 'https://firebasestorage.googleapis.com/v0/b/ais-dev-nkao4wgl3qoklcmykae3vf.appspot.com/o/artifacts%2Finput_file_1.png?alt=media'
         });
       }
       setLoading(false);
@@ -54,7 +55,8 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           portal_name: 'JH Digital Seva Kendra (Offline Mode)',
           theme_color: '#3b82f6',
           secondary_color: '#64748b',
-          header_bg_color: '#1e293b'
+          header_bg_color: '#1e293b',
+          logo_url: 'https://firebasestorage.googleapis.com/v0/b/ais-dev-nkao4wgl3qoklcmykae3vf.appspot.com/o/artifacts%2Finput_file_1.png?alt=media'
         });
         setLoading(false);
       }

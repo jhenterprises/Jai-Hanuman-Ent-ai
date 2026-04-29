@@ -58,7 +58,7 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow get: if isSignedIn() && (request.auth.uid == userId || isStaff());
+      allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       allow list: if isStaff();
       
       allow create: if isSignedIn() && (request.auth.uid == userId || isBootstrapAdmin());
@@ -121,11 +121,25 @@ service cloud.firestore {
     // -------------------------------------------------------------------------
     
     match /ledger/{ledgerId} {
-      allow list: if isStaff() || (isSignedIn() && resource.data.user_id == request.auth.uid);
-      allow get: if isStaff() || (isSignedIn() && resource.data.user_id == request.auth.uid);
-      
-      allow create: if isSignedIn(); 
+      function isValidLedgerEntry(data) {
+        return data.customer_name is string && data.customer_name.size() > 0 &&
+               data.principle_amount is number &&
+               data.created_at is timestamp;
+      }
+      allow list, get: if isStaff();
+      allow create: if isStaff() && isValidLedgerEntry(incoming());
       allow update, delete: if isAdmin();
+    }
+
+    match /withdrawals/{withdrawalId} {
+       allow list, get: if isStaff();
+       allow create: if isStaff();
+       allow update, delete: if isAdmin();
+    }
+
+    match /counters/{counterId} {
+        allow read: if isStaff();
+        allow write: if isStaff();
     }
 
     match /wallets/{walletId} {

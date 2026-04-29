@@ -175,13 +175,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await signInWithEmailAndPassword(auth, email, password);
     } catch (error: any) {
       console.error('Email login failed:', error);
-      console.log('Error code:', error?.code);
-      if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
-        throw new Error('Invalid email or password. Please check your credentials and try again.');
-      } else if (error.code === 'auth/too-many-requests') {
-        throw new Error('Too many failed attempts. Please try again later.');
+      const errorCode = error?.code || '';
+      console.log('Error code detected:', errorCode);
+      
+      if (errorCode === 'auth/invalid-credential' || 
+          errorCode === 'auth/wrong-password' || 
+          errorCode === 'auth/user-not-found' ||
+          error.message?.includes('invalid-credential')) {
+        throw new Error('Invalid email or password. If you signed up with Google, please use the "Sign in with Google" button instead.');
+      } else if (errorCode === 'auth/too-many-requests') {
+        throw new Error('Too many failed attempts. Please try again later or reset your password.');
+      } else if (errorCode === 'auth/user-disabled') {
+        throw new Error('This account has been disabled. Please contact support.');
+      } else if (errorCode === 'auth/visibility-check-was-unavailable' || error.message?.includes('visibility-check-was-unavailable')) {
+        throw new Error('Login failed due to a temporary browser restriction. Please try refreshing the page or using a different browser.');
       }
-      throw new Error('Login failed. Please check your credentials.');
+      
+      throw new Error(error.message || 'Login failed. Please check your credentials.');
     }
   };
 

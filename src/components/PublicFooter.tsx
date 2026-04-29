@@ -11,13 +11,9 @@ const PublicFooter = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
           <div className="col-span-1 md:col-span-2">
             <div className="flex items-center gap-2 mb-6">
-              {config.logo ? (
-                <img src={config.logo} alt={config.portal_name} className="w-10 h-10 object-contain" />
-              ) : (
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-gold-500 flex items-center justify-center font-bold text-white shadow-lg shadow-blue-600/20">
-                  {config.portal_name ? config.portal_name.substring(0, 2).toUpperCase() : 'JH'}
-                </div>
-              )}
+              <div className="w-10 h-10 bg-white p-1 rounded-xl flex items-center justify-center shadow-lg overflow-hidden border border-slate-200 dark:border-white/5">
+                <img src={config.logo_url || "https://firebasestorage.googleapis.com/v0/b/ais-dev-nkao4wgl3qoklcmykae3vf.appspot.com/o/artifacts%2Finput_file_1.png?alt=media"} alt="JH Logo" className="w-full h-full object-contain" />
+              </div>
               <div className="flex flex-col">
                 <span className="font-bold text-lg leading-tight tracking-tight text-slate-900 dark:text-white">
                   {config.portal_name ? config.portal_name.split(' ')[0] : 'Digital'} {config.portal_name ? config.portal_name.split(' ')[1] : 'Seva'}

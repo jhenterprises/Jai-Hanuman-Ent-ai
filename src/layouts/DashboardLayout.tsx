@@ -24,7 +24,8 @@ import {
   Link as LinkIcon,
   CheckCircle2,
   Clock,
-  Trash2
+  Trash2,
+  TrendingUp
 } from 'lucide-react';
 
 const DashboardLayout = () => {
@@ -105,6 +106,7 @@ const DashboardLayout = () => {
     { path: user?.role === 'user' ? '/app/user/applications' : (user?.role === 'staff' ? '/app/staff/applications' : '/app/applications'), label: user?.role === 'user' ? 'My Applications' : 'User Applications', icon: <FileText size={20} />, roles: ['admin', 'staff', 'user'] },
     { path: user?.role === 'admin' ? '/app/services' : (user?.role === 'staff' ? '/app/staff/apply-service' : '/app/services'), label: 'Apply for Services', icon: <Briefcase size={20} />, roles: ['admin', 'staff', 'user'] },
     { path: '/app/ledger', label: 'Ledger', icon: <FileText size={20} />, roles: ['admin', 'staff'] },
+    { path: '/app/admin/ledger-analytics', label: 'Ledger Analytics', icon: <TrendingUp size={20} />, roles: ['admin'] },
     { path: '/app/users', label: 'Users List', icon: <Users size={20} />, roles: ['admin', 'staff'] },
     { path: '/app/staff-management', label: 'Staff Management', icon: <Users size={20} />, roles: ['admin'] },
     { path: '/app/admin/wallets', label: 'Wallet Management', icon: <WalletIcon size={20} />, roles: ['admin'] },
@@ -135,13 +137,9 @@ const DashboardLayout = () => {
       `}>
         <div className="flex items-center justify-between h-16 px-6 border-b border-slate-700/50">
           <Link to="/app" className="flex items-center gap-2">
-            {config.logo ? (
-              <img src={config.logo} alt="Logo" className="w-8 h-8 object-contain" />
-            ) : (
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-gold-500 flex items-center justify-center font-bold text-white shadow-lg shadow-gold-500/20">
-                {config.portal_name ? config.portal_name.substring(0, 2).toUpperCase() : 'JH'}
-              </div>
-            )}
+            <div className="w-8 h-8 bg-white p-0.5 rounded-lg flex items-center justify-center shadow-lg overflow-hidden">
+              <img src={config.logo_url || "https://firebasestorage.googleapis.com/v0/b/ais-dev-nkao4wgl3qoklcmykae3vf.appspot.com/o/artifacts%2Finput_file_1.png?alt=media"} alt="JH Logo" className="w-full h-full object-contain" />
+            </div>
             <div className="flex flex-col">
               <span className="font-bold text-sm leading-tight tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-gold-400">
                 {config.portal_name ? config.portal_name.split(' ')[0] : 'Digital'} {config.portal_name ? config.portal_name.split(' ')[1] : 'Seva'}

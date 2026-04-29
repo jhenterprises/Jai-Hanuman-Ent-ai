@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useConfig } from '../context/ConfigContext';
 import { motion } from 'framer-motion';
 import { LogIn, Mail, Lock, AlertCircle, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 
 const Login = () => {
+  const { config } = useConfig();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -69,6 +71,7 @@ const Login = () => {
       const from = location.state?.from?.pathname || '/app';
       navigate(from, { replace: true });
     } catch (err: any) {
+      console.error('Email login error:', err);
       setError(err.message || 'Login failed. Please check your credentials.');
     } finally {
       setLoading(false);
@@ -83,8 +86,8 @@ const Login = () => {
         className="glass rounded-[2.5rem] p-10 space-y-8 relative"
       >
         <div className="text-center space-y-2">
-          <div className="w-16 h-16 blue-gradient rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl shadow-blue-500/20">
-            <LogIn className="text-white" size={32} />
+          <div className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl shadow-blue-500/10 overflow-hidden border border-slate-200 dark:border-white/10">
+            <img src={config.logo_url || "https://firebasestorage.googleapis.com/v0/b/ais-dev-nkao4wgl3qoklcmykae3vf.appspot.com/o/artifacts%2Finput_file_1.png?alt=media"} alt="JH Logo" className="w-full h-full object-contain p-2" />
           </div>
           <h2 className="text-3xl font-black text-slate-900 dark:text-white">Welcome Back</h2>
           <p className="text-slate-600 dark:text-slate-500">Sign in to your digital citizen account</p>
