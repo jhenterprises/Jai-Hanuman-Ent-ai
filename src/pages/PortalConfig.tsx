@@ -1,28 +1,89 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useConfig } from '../context/ConfigContext';
 import { useAuth } from '../context/AuthContext';
 import { motion } from 'framer-motion';
-import { Settings, Palette, Layout, Type, Image as ImageIcon, Globe, Save, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Settings, Palette, Layout, Type, Image as ImageIcon, Globe, Save, Loader2, CheckCircle2, AlertCircle, Upload, Trash2 } from 'lucide-react';
 import { doc, setDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '../lib/firebase';
 
 const PortalConfig = () => {
   const { config, refreshConfig } = useConfig();
   const { user } = useAuth();
   const [formData, setFormData] = useState(config);
   const [isSaving, setIsSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState('general');
+  const [activeTab, setActiveTab] = useState('branding');
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
+    // @ts-ignore
     const val = type === 'number' ? parseInt(value) : value;
     setFormData({ ...formData, [name]: val });
   };
 
   const handleToggle = (name: string) => {
     setFormData({ ...formData, [name]: formData[name] === 1 ? 0 : 1 });
+  };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!['image/png', 'image/jpeg', 'image/svg+xml'].includes(file.type)) {
+      setError('Invalid file type. Only PNG, JPG, and SVG are allowed.');
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      setError('File size exceeds 2MB limit.');
+      return;
+    }
+
+    setIsUploadingLogo(true);
+    setError(null);
+    try {
+      const storageRef = ref(storage, 'branding/logo.png');
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      
+      const newConfig = { ...formData, logo_url: url };
+      setFormData(newConfig);
+      
+      // Auto-save the new logo URL to Firestore
+      await setDoc(doc(db, 'settings', 'portal'), { logo_url: url }, { merge: true });
+      await refreshConfig();
+      
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (err: any) {
+      console.error('Logo upload error:', err);
+      setError('Failed to upload logo: ' + err.message);
+    } finally {
+      setIsUploadingLogo(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleRemoveLogo = async () => {
+    if (!window.confirm('Remove current logo?')) return;
+    try {
+      setIsSaving(true);
+      const newConfig = { ...formData, logo_url: '' };
+      setFormData(newConfig);
+      await setDoc(doc(db, 'settings', 'portal'), { logo_url: '' }, { merge: true });
+      await refreshConfig();
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (err: any) {
+      setError('Failed to remove logo: ' + err.message);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -48,10 +109,11 @@ const PortalConfig = () => {
   };
 
   const tabs = [
-    { id: 'general', label: 'General', icon: Settings },
-    { id: 'theme', label: 'Theme', icon: Palette },
-    { id: 'layout', label: 'Layout', icon: Layout },
-    { id: 'features', label: 'Features', icon: Globe },
+    { id: 'branding', label: 'Company Branding', icon: ImageIcon },
+    { id: 'general', label: 'General Info', icon: Settings },
+    { id: 'theme', label: 'Theme & Colors', icon: Palette },
+    { id: 'layout', label: 'Layout Elements', icon: Layout },
+    { id: 'features', label: 'System Features', icon: Globe },
   ];
 
   return (
@@ -65,10 +127,10 @@ const PortalConfig = () => {
         </div>
         <button 
           onClick={handleSubmit}
-          disabled={isSaving}
+          disabled={isSaving || isUploadingLogo}
           className="px-8 py-4 gold-gradient text-slate-900 font-black rounded-2xl flex items-center gap-2 shadow-xl shadow-amber-500/20 disabled:opacity-50"
         >
-          {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
+          {(isSaving || isUploadingLogo) ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
           {saveSuccess ? 'Settings Saved!' : 'Save Changes'}
         </button>
       </header>
@@ -78,6 +140,13 @@ const PortalConfig = () => {
           <AlertCircle size={18} />
           {error}
         </div>
+      )}
+
+      {saveSuccess && (
+         <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-2xl flex items-center gap-3 text-green-400 text-sm">
+         <CheckCircle2 size={18} />
+         ✅ Settings updated successfully
+       </div>
       )}
 
       <div className="flex flex-col lg:flex-row gap-8">
@@ -102,6 +171,62 @@ const PortalConfig = () => {
         {/* Content Area */}
         <div className="flex-1 glass rounded-[2.5rem] p-10">
           <form onSubmit={handleSubmit} className="space-y-10">
+            {activeTab === 'branding' && (
+              <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="text-xl font-bold text-white mb-2 border-b border-slate-700 pb-2">Logo Upload</h3>
+                    <p className="text-sm text-slate-400 mb-6">Upload your company logo. Displayed on Navbar, Invoices, and Login page. (Max 2MB. PNG, JPG, SVG allowed)</p>
+                    
+                    <div className="flex flex-col md:flex-row gap-8 items-start">
+                      <div className="w-48 h-48 rounded-2xl bg-slate-900 border-2 border-dashed border-slate-700 flex flex-col items-center justify-center p-4 relative overflow-hidden">
+                        {formData.logo_url ? (
+                          <img src={formData.logo_url} alt="Logo Preview" className="max-w-full max-h-full object-contain" />
+                        ) : (
+                          <div className="text-slate-500 flex flex-col items-center gap-2">
+                            <ImageIcon size={48} />
+                            <span className="text-xs font-medium">No Logo</span>
+                          </div>
+                        )}
+                        {isUploadingLogo && (
+                          <div className="absolute inset-0 bg-slate-900/80 flex items-center justify-center">
+                            <Loader2 className="animate-spin text-blue-500" size={32} />
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="flex flex-col gap-4">
+                        <input 
+                          type="file" 
+                          accept="image/png, image/jpeg, image/svg+xml"
+                          onChange={handleLogoUpload}
+                          ref={fileInputRef}
+                          className="hidden" 
+                          id="logo-upload"
+                        />
+                        <label 
+                          htmlFor="logo-upload"
+                          className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow-lg cursor-pointer transition-all"
+                        >
+                          <Upload size={18} /> Upload New Logo
+                        </label>
+                        
+                        {formData.logo_url && (
+                          <button
+                            type="button"
+                            onClick={handleRemoveLogo}
+                            className="flex items-center justify-center gap-2 px-6 py-3 bg-red-500/10 hover:bg-red-500/20 text-red-500 font-bold rounded-xl transition-all border border-red-500/20"
+                          >
+                            <Trash2 size={18} /> Remove Logo
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {activeTab === 'general' && (
               <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
                 <div className="grid md:grid-cols-2 gap-8">

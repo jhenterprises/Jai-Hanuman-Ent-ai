@@ -7,7 +7,7 @@ service cloud.firestore {
     }
     
     function getEmail() {
-      return (request.auth != null && request.auth.token != null && 'email' in request.auth.token) ? request.auth.token.email.toLowerCase() : '';
+      return (request.auth != null && request.auth.token != null && 'email' in request.auth.token && request.auth.token.email != null) ? request.auth.token.email.toLowerCase() : '';
     }
 
     function isBootstrapAdmin() {
@@ -18,14 +18,15 @@ service cloud.firestore {
       );
     }
 
-    function getUserData() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    function getUserDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
     }
 
     function hasRole(role) {
       return isSignedIn() && 
              exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-             getUserData().role == role;
+             getUserDoc() != null &&
+             getUserDoc().data.get('role', '') == role;
     }
 
     function isAdmin() {
@@ -58,8 +59,7 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      allow list: if isStaff();
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin() || isStaff());
       
       allow create: if isSignedIn() && (request.auth.uid == userId || isBootstrapAdmin());
       allow update: if isSignedIn() && (request.auth.uid == userId || isStaff());

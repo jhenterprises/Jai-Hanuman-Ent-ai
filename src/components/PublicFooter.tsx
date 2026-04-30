@@ -12,7 +12,7 @@ const PublicFooter = () => {
           <div className="col-span-1 md:col-span-2">
             <div className="flex items-center gap-2 mb-6">
               <div className="w-10 h-10 bg-white p-1 rounded-xl flex items-center justify-center shadow-lg overflow-hidden border border-slate-200 dark:border-white/5">
-                <img src={config.logo_url || "https://firebasestorage.googleapis.com/v0/b/ais-dev-nkao4wgl3qoklcmykae3vf.appspot.com/o/artifacts%2Finput_file_1.png?alt=media"} alt="JH Logo" className="w-full h-full object-contain" />
+                <img src={config.logo_url || "/regenerated_image_1777541195995.png"} alt="JH Logo" className="w-full h-full object-contain" />
               </div>
               <div className="flex flex-col">
                 <span className="font-bold text-lg leading-tight tracking-tight text-slate-900 dark:text-white">

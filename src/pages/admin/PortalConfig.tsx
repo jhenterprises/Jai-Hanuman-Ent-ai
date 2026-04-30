@@ -4,6 +4,7 @@ import { db } from '../../lib/firebase';
 import { Save } from 'lucide-react';
 import { useConfig } from '../../context/ConfigContext';
 import { useAuth } from '../../context/AuthContext';
+import toast from 'react-hot-toast';
 
 const PortalConfig = () => {
   const { refreshConfig } = useConfig();
@@ -33,17 +34,17 @@ const PortalConfig = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) {
-      alert('You must be logged in to save configuration.');
+      toast.error('You must be logged in to save configuration.');
       return;
     }
     
     try {
       await setDoc(doc(db, 'settings', 'portal'), config, { merge: true });
       await refreshConfig();
-      alert('Configuration updated successfully');
+      toast.success('Configuration updated successfully');
     } catch (err: any) {
       console.error('Error updating portal config:', err);
-      alert(err.message || 'Failed to update configuration');
+      toast.error(err.message || 'Failed to update configuration');
     }
   };
 

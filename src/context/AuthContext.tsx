@@ -119,15 +119,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // Fallback for admins if offline or permission error during bootstrap
           const adminEmails = ['pancardjhc2018@gmail.com', 'pavan.tr16@gmail.com', 'admin@jh.com'];
           if (firebaseUser.email && adminEmails.includes(firebaseUser.email)) {
-            console.warn('Using admin fallback due to error:', err.message);
-            setUser({
-              uid: firebaseUser.uid,
-              name: firebaseUser.displayName || 'Admin (Emergency)',
-              email: firebaseUser.email,
-              role: 'admin'
-            });
-            setLoading(false);
+             console.warn('Using admin fallback due to error:', err.message);
+             setUser({
+               uid: firebaseUser.uid,
+               name: firebaseUser.displayName || 'Admin (Emergency)',
+               email: firebaseUser.email,
+               role: 'admin'
+             });
           }
+           
+          setLoading(false);
         });
 
         return () => {

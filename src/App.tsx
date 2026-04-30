@@ -122,13 +122,14 @@ export default function App() {
             <Route path="user/applications" element={<ProtectedRoute roles={['user']}><Applications /></ProtectedRoute>} />
             <Route path="user/apply/:serviceType" element={<ProtectedRoute roles={['user', 'staff', 'admin']}><ApplyService /></ProtectedRoute>} />
             <Route path="user/support" element={<ProtectedRoute roles={['user']}><Support /></ProtectedRoute>} />
-            <Route path="settings" element={<Settings />} />
-            <Route path="settings/services" element={<ProtectedRoute roles={['admin']}><Services /></ProtectedRoute>} />
-            <Route path="settings/users" element={<ProtectedRoute roles={['admin']}><Users /></ProtectedRoute>} />
-            <Route path="settings/staff" element={<ProtectedRoute roles={['admin']}><Users /></ProtectedRoute>} />
-            <Route path="settings/permissions" element={<ProtectedRoute roles={['admin']}><SystemPermissions /></ProtectedRoute>} />
-            <Route path="settings/security" element={<ProtectedRoute roles={['admin']}><SecurityControls /></ProtectedRoute>} />
-            <Route path="settings/portal" element={<ProtectedRoute roles={['admin']}><PortalConfig /></ProtectedRoute>} />
+            <Route path="settings" element={<ProtectedRoute roles={['admin']}><Settings /></ProtectedRoute>}>
+              <Route path="services" element={<Services />} />
+              <Route path="users" element={<Users />} />
+              <Route path="staff" element={<Users />} />
+              <Route path="permissions" element={<SystemPermissions />} />
+              <Route path="security" element={<SecurityControls />} />
+              <Route path="portal" element={<PortalConfig />} />
+            </Route>
           </Route>
         </Routes>
           </Router>

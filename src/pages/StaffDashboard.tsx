@@ -49,7 +49,7 @@ const StaffDashboard = () => {
       <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
         <div className="flex items-center gap-4">
           <div className="w-16 h-16 bg-white p-1 rounded-2xl flex items-center justify-center shadow-xl border border-slate-200">
-            <img src={config.logo_url || "https://firebasestorage.googleapis.com/v0/b/ais-dev-nkao4wgl3qoklcmykae3vf.appspot.com/o/artifacts%2Finput_file_1.png?alt=media"} alt="JH Logo" className="w-full h-full object-contain" />
+            <img src={config.logo_url || "/regenerated_image_1777541195995.png"} alt="JH Logo" className="w-full h-full object-contain" />
           </div>
           <div>
             <h1 className="text-3xl font-black text-white">Staff Portal</h1>

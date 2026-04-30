@@ -39,7 +39,7 @@ const PublicNavbar = () => {
       <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2 group">
           <div className="w-12 h-12 bg-white p-1 rounded-2xl flex items-center justify-center shadow-2xl shadow-blue-600/10 group-hover:scale-110 transition-all duration-500 overflow-hidden">
-            <img src={config.logo_url || "https://firebasestorage.googleapis.com/v0/b/ais-dev-nkao4wgl3qoklcmykae3vf.appspot.com/o/artifacts%2Finput_file_1.png?alt=media"} alt="JH Logo" className="w-full h-full object-contain" />
+            <img src={config.logo_url || "/regenerated_image_1777541195995.png"} alt="JH Logo" className="w-full h-full object-contain" />
           </div>
           <div className="flex flex-col">
             <span className="font-black text-xl leading-tight tracking-tighter text-slate-900 dark:text-white group-hover:text-blue-400 transition-colors">

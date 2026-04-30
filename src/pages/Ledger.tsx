@@ -282,14 +282,16 @@ const Ledger = () => {
     const loadImage = (url: string): Promise<HTMLImageElement> => {
       return new Promise((resolve, reject) => {
         const img = new Image();
-        img.crossOrigin = "anonymous";
+        if (url.startsWith('http')) {
+          img.crossOrigin = "anonymous";
+        }
         img.onload = () => resolve(img);
         img.onerror = (e) => reject(e);
         img.src = url;
       });
     };
 
-    const logoUrl = config.logo_url || "https://firebasestorage.googleapis.com/v0/b/ais-dev-nkao4wgl3qoklcmykae3vf.appspot.com/o/artifacts%2Finput_file_1.png?alt=media";
+    const logoUrl = config.logo_url || "/regenerated_image_1777541195995.png";
     
     try {
       const img = await loadImage(logoUrl);

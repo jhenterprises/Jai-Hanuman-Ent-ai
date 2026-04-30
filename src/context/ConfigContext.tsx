@@ -26,7 +26,15 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       
       if (docSnap.exists()) {
         console.log('Config received via snapshot');
-        setConfig(docSnap.data());
+        let data = docSnap.data();
+        if (data.logo_url && (
+          data.logo_url.includes('regenerated_image_1777540244913') || 
+          data.logo_url.includes('regenerated_image_1777540525067') ||
+          data.logo_url.includes('input_file_1.png')
+        )) {
+          data.logo_url = '/regenerated_image_1777541195995.png';
+        }
+        setConfig(data);
       } else {
         console.log('Config document does not exist, using defaults');
         setConfig({ 
@@ -34,7 +42,7 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           theme_color: '#3b82f6',
           secondary_color: '#64748b',
           header_bg_color: '#1e293b',
-          logo_url: 'https://firebasestorage.googleapis.com/v0/b/ais-dev-nkao4wgl3qoklcmykae3vf.appspot.com/o/artifacts%2Finput_file_1.png?alt=media'
+          logo_url: '/regenerated_image_1777541195995.png'
         });
       }
       setLoading(false);
@@ -56,7 +64,7 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           theme_color: '#3b82f6',
           secondary_color: '#64748b',
           header_bg_color: '#1e293b',
-          logo_url: 'https://firebasestorage.googleapis.com/v0/b/ais-dev-nkao4wgl3qoklcmykae3vf.appspot.com/o/artifacts%2Finput_file_1.png?alt=media'
+          logo_url: '/regenerated_image_1777541195995.png'
         });
         setLoading(false);
       }

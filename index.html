@@ -8,6 +8,15 @@
   </head>
   <body>
     <div id="root"></div>
+    <div id="error-display" style="color: red; position: fixed; top: 0; left: 0; background: white; z-index: 9999;"></div>
+    <script>
+      window.addEventListener('error', function(e) {
+        document.getElementById('error-display').innerText += e.message + '\n';
+      });
+      window.addEventListener('unhandledrejection', function(e) {
+        document.getElementById('error-display').innerText += e.reason + '\n';
+      });
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
