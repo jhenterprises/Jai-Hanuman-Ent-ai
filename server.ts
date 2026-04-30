@@ -23,7 +23,7 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     // In production, serve built files
-    const distPath = path.join(process.cwd(), 'build');
+    const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
     // Serve index.html for all unknown routes (SPA fallback)
     app.get('*all', (req, res) => {
