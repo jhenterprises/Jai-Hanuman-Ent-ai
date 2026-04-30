@@ -8,10 +8,48 @@
         "uid": { "type": "string", "description": "Firebase Auth UID" },
         "name": { "type": "string", "description": "Full name" },
         "email": { "type": "string", "format": "email", "description": "Email address" },
+        "phone": { "type": "string" },
         "role": { "type": "string", "enum": ["user", "staff", "admin"], "description": "User role" },
+        "staff_id": { "type": "string", "description": "Employee ID (JH-STF-001)" },
+        "salary_amount": { "type": "number", "description": "Monthly base salary" },
+        "status": { "type": "string", "enum": ["active", "disabled"] },
         "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" }
       },
       "required": ["uid", "name", "email", "role"]
+    },
+    "attendance": {
+      "title": "Attendance Record",
+      "description": "Daily staff attendance",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "staff_name": { "type": "string" },
+        "staff_id": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "loginTime": { "type": "string", "format": "date-time" },
+        "logoutTime": { "type": "string", "format": "date-time" },
+        "totalHours": { "type": "number" },
+        "status": { "type": "string", "enum": ["Present", "Absent", "On Leave"] }
+      },
+      "required": ["userId", "date", "loginTime"]
+    },
+    "salaries": {
+      "title": "Salary Record",
+      "description": "Monthly staff payroll",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "staff_name": { "type": "string" },
+        "staff_id": { "type": "string" },
+        "month": { "type": "string", "description": "Month-Year format" },
+        "base_salary": { "type": "number" },
+        "total_days": { "type": "number" },
+        "present_days": { "type": "number" },
+        "payable_salary": { "type": "number" },
+        "status": { "type": "string", "enum": ["Pending", "Paid"] },
+        "paid_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "month", "payable_salary", "status"]
     },
     "applications": {
       "title": "Application",
@@ -193,6 +231,14 @@
     "/recycle_bin/{binId}": {
       "schema": "recycle_bin",
       "description": "Deleted items archive"
+    },
+    "/attendance/{recordId}": {
+      "schema": "attendance",
+      "description": "Daily attendance records"
+    },
+    "/salaries/{salaryId}": {
+      "schema": "salaries",
+      "description": "Monthly payroll records"
     },
     "/settings/portal": {
       "schema": "portal_config",

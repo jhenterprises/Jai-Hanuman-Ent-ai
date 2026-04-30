@@ -596,7 +596,7 @@ const Ledger = () => {
                   type="number" 
                   step="0.01"
                   placeholder="0.00" 
-                  disabled={newEntry.service_type === 'Cash Withdrawal' || newEntry.service_type === 'Withdrawal'}
+                  /* disabled={newEntry.service_type === 'Cash Withdrawal' || newEntry.service_type === 'Withdrawal'} */
                   value={newEntry.profit_amount} 
                   onChange={e => setNewEntry({...newEntry, profit_amount: e.target.value})} 
                   className="w-full pl-8 pr-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-white focus:ring-2 focus:ring-blue-500 outline-none disabled:opacity-50" 
@@ -700,6 +700,16 @@ const Ledger = () => {
                   </td>
                 </tr>
               ))}
+              {filtered.length > 0 && (
+                <tr className="bg-slate-900/50 font-bold border-t-2 border-slate-700">
+                  <td colSpan={4} className="p-4 text-right text-slate-200">TOTAL</td>
+                  <td className="p-4 text-sm text-slate-200 text-right font-mono">₹{filtered.reduce((sum, item) => sum + Math.abs(item.principle_amount || 0), 0).toLocaleString()}</td>
+                  <td className="p-4 text-sm text-green-400 text-right font-mono">₹{filtered.reduce((sum, item) => sum + (item.profit_amount || 0), 0).toLocaleString()}</td>
+                  <td className="p-4 text-sm text-slate-200 text-right font-mono">₹{filtered.reduce((sum, item) => sum + (item.total_amount || 0), 0).toLocaleString()}</td>
+                  <td className="p-4 text-sm text-blue-400 text-right font-mono">₹{filtered[filtered.length - 1].runningBalance.toLocaleString()}</td>
+                  <td className="p-4"></td>
+                </tr>
+              )}
               {filtered.length === 0 && (
                 <tr>
                   <td colSpan={9} className="p-20 text-center text-slate-500">

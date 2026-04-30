@@ -23,23 +23,20 @@ service cloud.firestore {
       );
     }
 
-    function getUserDoc() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid));
-    }
-
-    function hasRole(role) {
-      return isSignedIn() && 
-             exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-             getUserDoc() != null &&
-             getUserDoc().data.get('role', '') == role;
-    }
-
     function isAdmin() {
-      return isBootstrapAdmin() || hasRole('admin');
+      return isBootstrapAdmin() || (
+        isSignedIn() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+      );
     }
 
     function isStaff() {
-      return isAdmin() || hasRole('staff');
+      return isAdmin() || (
+        isSignedIn() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'staff'
+      );
     }
 
     function isOwner(userId) {
@@ -140,7 +137,10 @@ service cloud.firestore {
       allow get: if isSignedIn() && (resource.data.user_id == request.auth.uid || isStaff());
       allow list: if isSignedIn() && (resource.data.user_id == request.auth.uid || isStaff());
       allow create: if isVerified() && isValidLedgerEntry(incoming());
-      allow update, delete: if isAdmin();
+      allow update: if isStaff() && 
+                    incoming().staff_id == existing().staff_id &&
+                    incoming().created_at == existing().created_at;
+      allow delete: if isAdmin();
     }
 
     match /withdrawals/{withdrawalId} {
@@ -185,6 +185,20 @@ service cloud.firestore {
       allow list, get: if isAdmin();
       allow create: if isStaff();
       allow update, delete: if isAdmin();
+    }
+
+    match /attendance/{recordId} {
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isStaff());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isStaff());
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && (resource.data.userId == request.auth.uid || isStaff());
+      allow delete: if isAdmin();
+    }
+
+    match /salaries/{salaryId} {
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isStaff());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isStaff());
+      allow write: if isAdmin();
     }
 
     match /notifications/{notifId} {
