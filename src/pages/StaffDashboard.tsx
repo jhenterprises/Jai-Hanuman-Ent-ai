@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { collection, getDocs, updateDoc, doc, query, where, orderBy } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useConfig } from '../context/ConfigContext';
@@ -6,6 +7,7 @@ import { CheckCircle, XCircle, Eye, Clock, User, FileText } from 'lucide-react';
 import { safeFormat } from '../utils/dateUtils';
 
 const StaffDashboard = () => {
+  const navigate = useNavigate();
   const { config } = useConfig();
   const [applications, setApplications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -120,7 +122,11 @@ const StaffDashboard = () => {
                   </td>
                   <td className="px-8 py-6 text-right">
                     <div className="flex justify-end gap-2">
-                      <button className="p-2 glass rounded-lg text-blue-400 hover:bg-blue-500/20 transition-colors" title="View Details">
+                      <button 
+                        onClick={() => navigate(`/app/applications?id=${app.id}`)}
+                        className="p-2 glass rounded-lg text-blue-400 hover:bg-blue-500/20 transition-colors" 
+                        title="View Details"
+                      >
                         <Eye size={18} />
                       </button>
                       {app.status === 'Pending' && (

@@ -503,7 +503,7 @@ const Applications = () => {
                               <div className="text-[9px] text-slate-400 uppercase tracking-widest mt-0.5">Uploaded {safeFormat(doc.uploaded_at, 'dd/MM/yyyy')}</div>
                             </div>
                             <a 
-                              href={doc.url || '#'}
+                              href={doc.file_url || doc.url || '#'}
                               target="_blank"
                               rel="noopener noreferrer"
                               onClick={(e) => e.stopPropagation()}
@@ -605,7 +605,7 @@ const Applications = () => {
               </div>
               <div className="flex items-center gap-2">
                 <a 
-                  href={previewDoc.url || '#'}
+                  href={previewDoc.file_url || previewDoc.url || '#'}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors"
@@ -621,13 +621,13 @@ const Applications = () => {
             <div className="flex-1 bg-slate-950 p-4 overflow-hidden flex items-center justify-center">
               {previewDoc.file_name?.toLowerCase().endsWith('.pdf') ? (
                 <iframe 
-                  src={previewDoc.url} 
+                  src={previewDoc.file_url || previewDoc.url} 
                   className="w-full h-full rounded-xl bg-white"
                   title="PDF Preview"
                 />
               ) : (
                 <img 
-                  src={previewDoc.url} 
+                  src={previewDoc.file_url || previewDoc.url} 
                   alt="Document Preview" 
                   className="max-w-full max-h-full object-contain rounded-xl"
                 />

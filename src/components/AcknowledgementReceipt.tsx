@@ -160,9 +160,22 @@ const AcknowledgementReceipt: React.FC<AcknowledgementReceiptProps> = ({ applica
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8pt' }}>
             {application.documents && application.documents.length > 0 ? (
               application.documents.map((doc: any) => (
-                <div key={doc.id} style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', padding: '6pt' }} className="flex items-center gap-2 rounded-lg">
-                  <CheckCircle2 size={12} className="text-emerald-500 shrink-0" />
-                  <span style={{ color: '#334155', fontSize: '8pt' }} className="font-bold truncate">{doc.file_name}</span>
+                <div key={doc.id} style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', padding: '6pt' }} className="flex items-center justify-between gap-2 rounded-lg no-print">
+                  <div className="flex items-center gap-2 overflow-hidden">
+                    <CheckCircle2 size={12} className="text-emerald-500 shrink-0" />
+                    <span style={{ color: '#334155', fontSize: '8pt' }} className="font-bold truncate">{doc.file_name}</span>
+                  </div>
+                  {(doc.file_url || doc.url) && (
+                    <a 
+                      href={doc.file_url || doc.url} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      style={{ color: '#2563eb', fontSize: '7pt' }}
+                      className="font-bold hover:underline shrink-0 flex items-center gap-1"
+                    >
+                      View
+                    </a>
+                  )}
                 </div>
               ))
             ) : (

@@ -10,7 +10,6 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react(), tailwindcss()],
-    base: './',
     server: {
       port: 3000,
       host: '0.0.0.0',
@@ -21,17 +20,7 @@ export default defineConfig(({ mode }) => {
       emptyOutDir: true,
       sourcemap: false,
       minify: true,
-      chunkSizeWarningLimit: 1200,
-      rollupOptions: {
-        output: {
-          manualChunks: {
-            'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-            'vendor-firebase': ['firebase/app', 'firebase/auth', 'firebase/firestore'],
-            'vendor-charts': ['recharts'],
-            'vendor-libs': ['jspdf', 'html2canvas', 'xlsx', 'framer-motion']
-          }
-        }
-      }
+      chunkSizeWarningLimit: 1200
     },
     define: {
       'import.meta.env.VITE_FIREBASE_API_KEY': JSON.stringify(getEnv('VITE_FIREBASE_API_KEY') || getEnv('FIREBASE_API_KEY')),
