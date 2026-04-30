@@ -10,11 +10,9 @@ import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useConfig } from '../context/ConfigContext';
 import ModernButton from '../components/ModernButton';
-import Globe from '../components/Globe';
-import Particles from '../components/Particles';
+import GlassCard from '../components/GlassCard';
 import TypingText from '../components/TypingText';
 import AnimatedCounter from '../components/AnimatedCounter';
-import GlassCard from '../components/GlassCard';
 
 const Home = () => {
   const { config } = useConfig();
@@ -68,8 +66,11 @@ const Home = () => {
   };
 
   return (
-    <div className="relative min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-white dark:from-black dark:via-blue-900/20 dark:to-black text-slate-900 dark:text-white selection:bg-blue-500/30 transition-colors duration-500">
-      <Particles />
+    <div className="relative min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white selection:bg-blue-500/30 transition-colors duration-500 overflow-hidden">
+      {/* Optimized Background Gradients instead of heavy Particles */}
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-600/10 dark:bg-blue-600/5 blur-[120px] rounded-full pointer-events-none" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-600/10 dark:bg-purple-600/5 blur-[120px] rounded-full pointer-events-none" />
+      <div className="absolute top-[30%] right-[5%] w-[20%] h-[20%] bg-cyan-400/10 dark:bg-cyan-400/5 blur-[80px] rounded-full pointer-events-none" />
       
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 md:pt-32 pb-20 space-y-32">
         
@@ -135,22 +136,31 @@ const Home = () => {
             </motion.div>
           </div>
 
-          {/* 3D GLOBE */}
+          {/* VISUAL ALTERNATIVE TO 3D GLOBE */}
           <motion.div 
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 1 }}
-            className="relative h-[400px] md:h-[600px]"
+            className="relative h-[400px] md:h-[600px] flex items-center justify-center"
           >
             <div className="absolute inset-0 bg-blue-500/10 blur-[120px] rounded-full" />
-            <Globe />
+            
+            {/* Optimized Visual placeholder for heavy 3D Globe */}
+            <div className="relative w-72 h-72 md:w-[450px] md:h-[450px] rounded-full border border-blue-500/20 flex items-center justify-center">
+              <div className="absolute inset-4 rounded-full border border-blue-500/10 animate-[spin_20s_linear_infinite]" />
+              <div className="absolute inset-12 rounded-full border border-blue-500/5 animate-[spin_15s_linear_infinite_reverse]" />
+              <div className="w-48 h-48 md:w-80 md:h-80 rounded-full bg-gradient-to-br from-blue-600/20 to-purple-600/20 backdrop-blur-3xl border border-white/10 flex items-center justify-center group overflow-hidden shadow-[0_0_50px_rgba(59,130,246,0.3)]">
+                <GlobeIcon size={120} className="text-white/80 group-hover:scale-110 transition-transform duration-700" />
+                <div className="absolute inset-0 bg-gradient-to-t from-blue-600/20 to-transparent pointer-events-none" />
+              </div>
+            </div>
             
             {/* Floating Service Icons */}
             <div className="absolute inset-0 pointer-events-none">
               {[
-                { Icon: Fingerprint, delay: 0, pos: 'top-0 left-0' },
-                { Icon: CreditCard, delay: 1, pos: 'bottom-10 right-0' },
-                { Icon: GlobeIcon, delay: 2, pos: 'top-20 right-10' },
+                { Icon: Fingerprint, delay: 0, pos: 'top-10 left-10 md:top-20 md:left-20' },
+                { Icon: CreditCard, delay: 1, pos: 'bottom-20 right-10 md:bottom-32 md:right-20' },
+                { Icon: GlobeIcon, delay: 2, pos: 'top-32 right-12 md:top-40 md:right-32' },
               ].map((item, i) => (
                 <motion.div
                   key={i}
