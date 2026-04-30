@@ -291,7 +291,7 @@ const Ledger = () => {
       });
     };
 
-    const logoUrl = config.logo_url || "/regenerated_image_1777541195995.png";
+    const logoUrl = config.logo_url || "/logo.svg";
     
     try {
       const img = await loadImage(logoUrl);

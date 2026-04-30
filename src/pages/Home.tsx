@@ -6,7 +6,7 @@ import {
   CheckCircle2, Upload, Search, Activity, Database
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useConfig } from '../context/ConfigContext';
 import ModernButton from '../components/ModernButton';
@@ -20,33 +20,33 @@ const Home = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const fetchServices = async () => {
-      try {
-        const querySnapshot = await getDocs(collection(db, 'services'));
-        let servicesData = querySnapshot.docs.map(doc => {
-          const data = doc.data() as any;
-          return {
-            service_id: doc.id,
-            ...data,
-            name: data.name || data.service_name || 'Unnamed Service',
-            description: data.description || 'No description available',
-            url: data.url || data.service_url || '',
-            icon: data.icon || 'fa-file',
-            enabled: data.enabled !== undefined ? data.enabled : (data.is_active !== undefined ? data.is_active : true),
-            is_visible: data.is_visible !== undefined ? data.is_visible : true,
-            application_type: data.application_type || (data.url || data.service_url ? 'external' : 'internal')
-          };
-        });
-        
-        servicesData = servicesData.filter((s: any) => s.enabled && s.is_visible);
-        setServices(servicesData);
-      } catch (err) {
-        console.error('Error fetching services:', err);
-        setServices([]);
-      }
-    };
-    
-    fetchServices();
+    // Real-time listener for popular services
+    const q = query(
+      collection(db, 'services'),
+      where('isPopular', '==', true),
+      where('enabled', '==', true)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const servicesData = snapshot.docs.map(doc => {
+        const data = doc.data() as any;
+        return {
+          service_id: doc.id,
+          ...data,
+          name: data.name || data.service_name || 'Unnamed Service',
+          description: data.description || 'No description available',
+          url: data.url || data.service_url || '',
+          icon: data.icon || 'fa-file',
+        };
+      }).sort((a, b) => (a.order || 0) - (b.order || 0));
+      
+      console.log('Real-time popular services:', servicesData);
+      setServices(servicesData);
+    }, (error) => {
+      console.error('Error fetching popular services:', error);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const getServiceKey = (name: string) => {
@@ -210,45 +210,65 @@ const Home = () => {
 
           <div className="grid md:grid-cols-3 gap-8">
             {services.length > 0 ? (
-              services.slice(0, 6).map((service, i) => (
+              services.map((service, i) => (
                 <GlassCard key={service.service_id} className="p-8 flex flex-col h-full group">
-                  <div className="w-14 h-14 blue-gradient rounded-2xl flex items-center justify-center mb-6 shadow-xl shadow-blue-500/20 group-hover:rotate-12 transition-transform duration-500">
-                    {service.name.includes('Aadhaar') && <Fingerprint className="text-white" size={28} />}
-                    {service.name.includes('PAN') && <CreditCard className="text-white" size={28} />}
-                    {service.name.includes('Voter') && <UserCheck className="text-white" size={28} />}
-                    {service.name.includes('Passport') && <GlobeIcon className="text-white" size={28} />}
-                    {!['Aadhaar', 'PAN', 'Voter', 'Passport'].some(k => service.name.includes(k)) && <FileText className="text-white" size={28} />}
-                  </div>
+                    <div className="w-14 h-14 blue-gradient rounded-2xl flex items-center justify-center mb-6 shadow-xl shadow-blue-500/20 group-hover:rotate-12 transition-transform duration-500">
+                      {service.icon?.startsWith('fa-') ? (
+                        <i className={`fas ${service.icon} text-white text-2xl`}></i>
+                      ) : (
+                        <>
+                          {service.name.includes('Aadhaar') && <Fingerprint className="text-white" size={28} />}
+                          {service.name.includes('PAN') && <CreditCard className="text-white" size={28} />}
+                          {service.name.includes('Voter') && <UserCheck className="text-white" size={28} />}
+                          {service.name.includes('Passport') && <GlobeIcon className="text-white" size={28} />}
+                          {!['Aadhaar', 'PAN', 'Voter', 'Passport'].some(k => service.name.includes(k)) && <FileText className="text-white" size={28} />}
+                        </>
+                      )}
+                    </div>
 
                   <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-3 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{service.name}</h3>
                   <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed mb-8 line-clamp-2 flex-grow">{service.description}</p>
                   
+                  {service.application_type === 'external' && service.url ? (
+                    <a 
+                      href={service.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full py-4 glass-dark rounded-xl text-center text-xs font-bold text-white hover:bg-blue-600 transition-all ripple-effect border-white/5"
+                    >
+                      Apply Now
+                    </a>
+                  ) : (
+                    <Link 
+                      to={getApplyUrl(service)}
+                      className="w-full py-4 glass-dark rounded-xl text-center text-xs font-bold text-white hover:bg-blue-600 transition-all ripple-effect border-white/5"
+                    >
+                      Apply Now
+                    </Link>
+                  )}
+                </GlassCard>
+              ))
+            ) : (
+              [
+                { name: "Aadhaar", icon: Fingerprint },
+                { name: "PAN Card", icon: CreditCard },
+                { name: "Passport", icon: GlobeIcon },
+                { name: "Ration Card", icon: FileText },
+                { name: "Income Tax", icon: FileText },
+                { name: "Voter ID", icon: UserCheck },
+              ].map((service, i) => (
+                <GlassCard key={i} className="p-8 flex flex-col h-full group">
+                  <div className="w-14 h-14 blue-gradient rounded-2xl flex items-center justify-center mb-6 shadow-xl shadow-blue-500/20 group-hover:rotate-12 transition-transform duration-500">
+                    <service.icon className="text-white" size={28} />
+                  </div>
+                  <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-3 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{service.name}</h3>
+                  <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed mb-8 flex-grow">Apply for {service.name} with our automated processing engine.</p>
                   <Link 
                     to={getApplyUrl(service)}
                     className="w-full py-4 glass-dark rounded-xl text-center text-xs font-bold text-white hover:bg-blue-600 transition-all ripple-effect border-white/5"
                   >
                     Apply Now
                   </Link>
-                </GlassCard>
-              ))
-            ) : (
-              [
-                "Aadhaar",
-                "PAN Card",
-                "Passport",
-                "Ration Card",
-                "Income Tax",
-                "Voter ID",
-              ].map((service, i) => (
-                <GlassCard key={i} className="p-8 flex flex-col h-full group">
-                  <div className="w-14 h-14 blue-gradient rounded-2xl flex items-center justify-center mb-6 shadow-xl shadow-blue-500/20 group-hover:rotate-12 transition-transform duration-500">
-                    <FileText className="text-white" size={28} />
-                  </div>
-                  <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-3 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{service}</h3>
-                  <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed mb-8 flex-grow">Apply for {service} with our automated processing engine.</p>
-                  <button className="w-full py-4 glass-dark rounded-xl text-center text-xs font-bold text-white hover:bg-blue-600 transition-all ripple-effect border-white/5">
-                    Apply Now
-                  </button>
                 </GlassCard>
               ))
             )}

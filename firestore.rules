@@ -5,12 +5,17 @@ service cloud.firestore {
     function isSignedIn() {
       return request.auth != null && request.auth.uid != null;
     }
+
+    function isVerified() {
+      return isSignedIn() && (request.auth.token.email_verified == true || request.auth.token.firebase.sign_in_provider == 'password');
+    }
     
     function getEmail() {
-      return (request.auth != null && request.auth.token != null && 'email' in request.auth.token && request.auth.token.email != null) ? request.auth.token.email.toLowerCase() : '';
+      return (request.auth != null && request.auth.token != null && 'email' in request.auth.token) ? request.auth.token.email.toLowerCase() : '';
     }
 
     function isBootstrapAdmin() {
+      // Current user pancardjhc2018@gmail.com is an admin
       return isSignedIn() && (
         getEmail() == "pancardjhc2018@gmail.com" || 
         getEmail() == "pavan.tr16@gmail.com" || 
@@ -58,11 +63,16 @@ service cloud.firestore {
       allow read, write: if isBootstrapAdmin();
     }
 
+    // -------------------------------------------------------------------------
+    // USERS COLLECTION
+    // -------------------------------------------------------------------------
+    
     match /users/{userId} {
-      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin() || isStaff());
+      allow get: if isSignedIn() && (request.auth.uid == userId || isStaff());
+      allow list: if isStaff();
       
-      allow create: if isSignedIn() && (request.auth.uid == userId || isBootstrapAdmin());
-      allow update: if isSignedIn() && (request.auth.uid == userId || isStaff());
+      allow create: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow update: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       allow delete: if isAdmin();
     }
 
@@ -86,7 +96,7 @@ service cloud.firestore {
     }
 
     // -------------------------------------------------------------------------
-    // APPLICATIONS COLLECTION (Pillar 1 & 8)
+    // APPLICATIONS COLLECTION
     // -------------------------------------------------------------------------
     
     match /applications/{applicationId} {
@@ -95,29 +105,30 @@ service cloud.firestore {
                data.reference_number is string && data.reference_number.size() <= 50;
       }
 
-      allow list: if isStaff() || (isSignedIn() && resource.data.userId == request.auth.uid);
-      allow get: if isStaff() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isStaff());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isStaff());
 
-      allow create: if isSignedIn() && isValidApplication(incoming());
+      allow create: if isVerified() && isValidApplication(incoming());
       
       allow update: if isStaff() || (
         isOwner(existing().userId) && 
         incoming().diff(existing()).affectedKeys().hasOnly(['form_data', 'documents', 'updated_at']) &&
-        (existing().status == 'Pending' || existing().status == 'Submitted')
+        (existing().status == 'Pending' || existing().status == 'Submitted' || existing().status == 'Documents Required')
       );
       
-      allow delete: if isAdmin();
+      allow delete: if isStaff();
     }
 
     match /application_drafts/{draftId} {
-      allow list, get: if isSignedIn() && resource.data.user_id == request.auth.uid;
+      allow get: if isSignedIn() && (resource.data.user_id == request.auth.uid || isStaff());
+      allow list: if isSignedIn() && (resource.data.user_id == request.auth.uid || isStaff());
       allow create: if isSignedIn() && incoming().user_id == request.auth.uid;
       allow update: if isSignedIn() && (existing().user_id == request.auth.uid || isAdmin());
       allow delete: if isSignedIn() && (existing().user_id == request.auth.uid || isAdmin());
     }
 
     // -------------------------------------------------------------------------
-    // LEDGER & WALLETS (Pillar 7: Atomicity)
+    // LEDGER & WALLETS
     // -------------------------------------------------------------------------
     
     match /ledger/{ledgerId} {
@@ -126,26 +137,29 @@ service cloud.firestore {
                data.principle_amount is number &&
                data.created_at is timestamp;
       }
-      allow list, get: if isStaff();
-      allow create: if isStaff() && isValidLedgerEntry(incoming());
+      allow get: if isSignedIn() && (resource.data.user_id == request.auth.uid || isStaff());
+      allow list: if isSignedIn() && (resource.data.user_id == request.auth.uid || isStaff());
+      allow create: if isVerified() && isValidLedgerEntry(incoming());
       allow update, delete: if isAdmin();
     }
 
     match /withdrawals/{withdrawalId} {
-       allow list, get: if isStaff();
-       allow create: if isStaff();
+       allow get: if isSignedIn() && (resource.data.user_id == request.auth.uid || isStaff());
+       allow list: if isSignedIn() && (resource.data.user_id == request.auth.uid || isStaff());
+       allow create: if isSignedIn();
        allow update, delete: if isAdmin();
     }
 
     match /counters/{counterId} {
         allow read: if isStaff();
-        allow write: if isStaff();
+        allow write: if isStaff() || isSignedIn();
     }
 
     match /wallets/{walletId} {
-      allow get: if isSignedIn() && (isStaff() || resource.data.user_id == request.auth.uid);
-      allow list: if isStaff() || (isSignedIn() && resource.data.user_id == request.auth.uid);
-      allow create, update: if isSignedIn(); 
+      allow get: if isSignedIn() && (resource.data.user_id == request.auth.uid || resource.data.userId == request.auth.uid || isStaff());
+      allow list: if isSignedIn() && (resource.data.user_id == request.auth.uid || resource.data.userId == request.auth.uid || isStaff());
+      allow create: if isVerified();
+      allow update: if (isSignedIn() && (resource.data.user_id == request.auth.uid || resource.data.userId == request.auth.uid)) || isAdmin();
       allow delete: if isAdmin();
     }
 
@@ -168,8 +182,8 @@ service cloud.firestore {
     }
 
     match /recycle_bin/{binId} {
-      allow list, get: if isStaff();
-      allow create: if isAdmin();
+      allow list, get: if isAdmin();
+      allow create: if isStaff();
       allow update, delete: if isAdmin();
     }
 

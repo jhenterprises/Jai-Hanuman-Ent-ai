@@ -16,11 +16,8 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       outDir: 'dist',
-      assetsDir: 'assets',
       emptyOutDir: true,
-      sourcemap: false,
-      minify: true,
-      chunkSizeWarningLimit: 1200
+      sourcemap: false
     },
     define: {
       'import.meta.env.VITE_FIREBASE_API_KEY': JSON.stringify(getEnv('VITE_FIREBASE_API_KEY') || getEnv('FIREBASE_API_KEY')),

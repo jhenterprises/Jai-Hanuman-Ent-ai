@@ -20,7 +20,7 @@ const Navbar = () => {
       <div className="container mx-auto flex justify-between items-center">
         <Link to="/" className="flex items-center gap-3 group">
           <div className="w-10 h-10 bg-white p-1 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/10 group-hover:scale-110 transition-transform overflow-hidden">
-            <img src={config.logo_url || "/regenerated_image_1777541195995.png"} alt="JH Logo" className="w-full h-full object-contain" />
+            <img src={config.logo_url || "/logo.svg"} alt="JH Logo" className="w-full h-full object-contain" />
           </div>
           <div>
             <h1 className="text-xl font-bold tracking-tight text-white">JH Digital <span className="text-accent">Seva Kendra</span></h1>

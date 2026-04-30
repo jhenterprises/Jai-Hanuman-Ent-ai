@@ -2,11 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { 
   collection, query, where, getDocs, orderBy, limit, 
-  doc, updateDoc, getDoc, addDoc, serverTimestamp 
+  doc, updateDoc, getDoc, addDoc, serverTimestamp, deleteDoc 
 } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
-import { Search, FileText, CheckCircle, XCircle, Clock, Eye, Download, User, ExternalLink, Activity, Upload, MessageSquare, Filter, Shield, Loader2 } from 'lucide-react';
+import { Search, FileText, CheckCircle, XCircle, Clock, Eye, Download, User, ExternalLink, Activity, Upload, MessageSquare, Filter, Shield, Loader2, Trash2 } from 'lucide-react';
 import { downloadPDF } from '../utils/pdfGenerator';
 import AcknowledgementReceipt from '../components/AcknowledgementReceipt';
 import { safeFormat } from '../utils/dateUtils';
@@ -223,6 +223,38 @@ const Applications = () => {
     }
   };
 
+  const handleSoftDelete = async (app: any) => {
+    if (!window.confirm('Are you sure you want to move this application to Recycle Bin?')) return;
+    
+    try {
+      // Move to recycle_bin collection
+      const binRef = collection(db, 'recycle_bin');
+      const binData = {
+        ...app,
+        type: 'application',
+        deleted_at: serverTimestamp(),
+        deleted_by: user?.uid,
+        name: app.user_name || app.reference_number, // Primary name for table
+        service_name: app.service_name || app.name || app.service_type || 'Unknown Service',
+        original_id: app.id
+      };
+      
+      // Clean data for bin (remove firestore id if needed, but keeping it in the payload is fine)
+      delete binData.id; 
+
+      await addDoc(binRef, binData);
+      
+      // Delete from applications collection
+      await deleteDoc(doc(db, 'applications', app.id));
+      
+      setApplications(applications.filter(a => a.id !== app.id));
+      alert('Moved to Recycle Bin');
+    } catch (err) {
+      console.error('Error soft deleting application:', err);
+      alert('Failed to move to Recycle Bin');
+    }
+  };
+
   const filtered = applications; // Filtering is now done on the backend
 
   const getStatusColor = (status: string) => {
@@ -420,6 +452,15 @@ const Applications = () => {
                       >
                         {downloadingId === item.id ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
                       </button>
+                      {(user?.role === 'admin' || user?.role === 'staff') && (
+                        <button 
+                          onClick={() => handleSoftDelete(item)}
+                          className="p-2.5 bg-white border border-slate-200 text-red-600 rounded-xl hover:bg-red-600 hover:text-white hover:border-red-600 transition-all shadow-sm group-hover:shadow-md"
+                          title="Move to Recycle Bin"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))

@@ -28,11 +28,11 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         console.log('Config received via snapshot');
         let data = docSnap.data();
         if (data.logo_url && (
-          data.logo_url.includes('regenerated_image_1777540244913') || 
-          data.logo_url.includes('regenerated_image_1777540525067') ||
-          data.logo_url.includes('input_file_1.png')
+          data.logo_url.includes('regenerated_image') || 
+          data.logo_url.includes('input_file_1.png') ||
+          data.logo_url.includes('firebasestorage.googleapis.com') // Fixing the broken storage link
         )) {
-          data.logo_url = '/regenerated_image_1777541195995.png';
+          data.logo_url = '/logo.svg';
         }
         setConfig(data);
       } else {
@@ -42,7 +42,7 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           theme_color: '#3b82f6',
           secondary_color: '#64748b',
           header_bg_color: '#1e293b',
-          logo_url: '/regenerated_image_1777541195995.png'
+          logo_url: '/logo.svg'
         });
       }
       setLoading(false);
@@ -64,7 +64,7 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           theme_color: '#3b82f6',
           secondary_color: '#64748b',
           header_bg_color: '#1e293b',
-          logo_url: '/regenerated_image_1777541195995.png'
+          logo_url: '/logo.svg'
         });
         setLoading(false);
       }

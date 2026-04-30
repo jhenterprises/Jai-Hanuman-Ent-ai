@@ -75,7 +75,7 @@ const Register = () => {
       >
         <div className="text-center space-y-2">
           <div className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl shadow-blue-500/10 overflow-hidden border border-slate-200 dark:border-white/10">
-            <img src={config.logo_url || "/regenerated_image_1777541195995.png"} alt="JH Logo" className="w-full h-full object-contain p-2" />
+            <img src={config.logo_url || "/logo.svg"} alt="JH Logo" className="w-full h-full object-contain p-2" />
           </div>
           <h2 className="text-3xl font-black text-slate-900 dark:text-white">Create Account</h2>
           <p className="text-slate-600 dark:text-slate-500">Join Jharkhand's digital citizen network</p>

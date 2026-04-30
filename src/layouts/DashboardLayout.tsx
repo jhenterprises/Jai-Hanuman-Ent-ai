@@ -138,7 +138,7 @@ const DashboardLayout = () => {
         <div className="flex items-center justify-between h-16 px-6 border-b border-slate-700/50">
           <Link to="/app" className="flex items-center gap-2">
             <div className="w-8 h-8 bg-white p-0.5 rounded-lg flex items-center justify-center shadow-lg overflow-hidden">
-              <img src={config.logo_url || "/regenerated_image_1777541195995.png"} alt="JH Logo" className="w-full h-full object-contain" />
+              <img src={config.logo_url || "/logo.svg"} alt="JH Logo" className="w-full h-full object-contain" />
             </div>
             <div className="flex flex-col">
               <span className="font-bold text-sm leading-tight tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-gold-400">

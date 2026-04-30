@@ -9,9 +9,75 @@ import { collection, getDocs, doc, updateDoc, serverTimestamp, addDoc, query, wh
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 
 import { useConfig } from '../context/ConfigContext';
+import { 
+  DndContext, 
+  closestCenter, 
+  KeyboardSensor, 
+  PointerSensor, 
+  useSensor, 
+  useSensors,
+  DragEndEvent
+} from '@dnd-kit/core';
+import { 
+  arrayMove, 
+  SortableContext, 
+  sortableKeyboardCoordinates, 
+  verticalListSortingStrategy,
+  useSortable
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { GripVertical, Star } from 'lucide-react';
+
+const SortableServiceItem = ({ service, isAdmin, onTogglePopular }: { service: any, isAdmin: boolean, onTogglePopular: (s: any) => void }) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ id: service.service_id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 10 : 1,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div 
+      ref={setNodeRef} 
+      style={style} 
+      className="flex items-center gap-4 bg-slate-900/40 border border-slate-700/50 p-4 rounded-2xl group hover:border-blue-500/30 transition-all"
+    >
+      <div {...attributes} {...listeners} className="cursor-grab p-2 text-slate-500 hover:text-white transition-colors">
+        <GripVertical size={20} />
+      </div>
+      
+      <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400">
+        <i className={`fas ${service.icon} text-lg`}></i>
+      </div>
+      
+      <div className="flex-1">
+        <h4 className="font-bold text-white leading-tight">{service.name}</h4>
+        <p className="text-xs text-slate-500 line-clamp-1">{service.description}</p>
+      </div>
+
+      <button 
+        onClick={() => onTogglePopular(service)}
+        className={`p-2 rounded-xl transition-all ${service.isPopular ? 'text-amber-400 bg-amber-400/10' : 'text-slate-500 hover:text-white bg-slate-800/40'}`}
+        title={service.isPopular ? "Remove from Popular" : "Make Popular"}
+      >
+        <Star size={18} fill={service.isPopular ? "currentColor" : "none"} />
+      </button>
+    </div>
+  );
+};
 
 const Services = () => {
   const { config } = useConfig();
+  const [activeTab, setActiveTab] = useState('all'); // 'all' or 'popular'
   const [services, setServices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -49,13 +115,80 @@ const Services = () => {
     service_price: 0,
     payment_required: false,
     fee: 0,
-    staff_commission: 0
+    staff_commission: 0,
+    isPopular: false,
+    order: 0
   });
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchServices();
   }, []);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (active.id !== over?.id && isAdmin) {
+      // Find indexes in the popular list context
+      const popularServices = services.filter(s => s.isPopular).sort((a, b) => (a.order || 0) - (b.order || 0));
+      const oldIndex = popularServices.findIndex((s) => s.service_id === active.id);
+      const newIndex = popularServices.findIndex((s) => s.service_id === over?.id);
+      
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const reorderedPopular = arrayMove(popularServices, oldIndex, newIndex);
+        
+        // Update local state to reflect change immediately
+        const newAllServices = services.map(s => {
+          const reorderedIndex = reorderedPopular.findIndex(p => p.service_id === s.service_id);
+          if (reorderedIndex !== -1) {
+            return { ...s, order: reorderedIndex };
+          }
+          return s;
+        });
+        setServices(newAllServices);
+
+        // Update Firestore
+        try {
+          const updates = reorderedPopular.map((service, index) => {
+            return updateDoc(doc(db, 'services', service.service_id), {
+              order: index,
+              updated_at: serverTimestamp()
+            });
+          });
+          await Promise.all(updates);
+        } catch (err) {
+          console.error('Error updating service orders:', err);
+          alert('Failed to save service order.');
+        }
+      }
+    }
+  };
+
+  const onTogglePopular = async (service: any) => {
+    if (!isAdmin) return;
+    const popularCount = services.filter(s => s.isPopular).length;
+    
+    if (!service.isPopular && popularCount >= 8) {
+      alert('Maximum 8 popular services allowed.');
+      return;
+    }
+
+    try {
+      await updateDoc(doc(db, 'services', service.service_id), {
+        isPopular: !service.isPopular,
+        updated_at: serverTimestamp()
+      });
+      fetchServices();
+    } catch (err) {
+      console.error('Error toggling popular status:', err);
+    }
+  };
 
   const fetchServices = async () => {
     setLoading(true);
@@ -74,7 +207,9 @@ const Services = () => {
           icon: data.icon || 'fa-file',
           enabled: data.enabled !== undefined ? data.enabled : (data.is_active !== undefined ? data.is_active : true),
           is_visible: data.is_visible !== undefined ? data.is_visible : true,
-          application_type: data.application_type || (data.url || data.service_url ? 'external' : 'internal')
+          application_type: data.application_type || (data.url || data.service_url ? 'external' : 'internal'),
+          isPopular: !!data.isPopular,
+          order: data.order || 0
         };
       });
       console.log('Fetched services:', servicesData);
@@ -167,6 +302,8 @@ const Services = () => {
           payment_required: !!formData.payment_required,
           fee: Number(formData.fee) || 0,
           staff_commission: Number(formData.staff_commission) || 0,
+          isPopular: !!formData.isPopular,
+          order: Number(formData.order) || 0,
           updated_at: serverTimestamp()
         });
         await updateDoc(serviceRef, updateData);
@@ -187,6 +324,8 @@ const Services = () => {
           payment_required: !!formData.payment_required,
           fee: Number(formData.fee) || 0,
           staff_commission: Number(formData.staff_commission) || 0,
+          isPopular: !!formData.isPopular,
+          order: Number(formData.order) || services.length,
           created_at: serverTimestamp(),
           updated_at: serverTimestamp()
         });
@@ -207,7 +346,9 @@ const Services = () => {
         service_price: 0,
         payment_required: false,
         fee: 0,
-        staff_commission: 0
+        staff_commission: 0,
+        isPopular: false,
+        order: services.length
       });
       fetchServices();
     } catch (err) {
@@ -230,7 +371,9 @@ const Services = () => {
       service_price: service.service_price || 0,
       payment_required: !!service.payment_required,
       fee: service.fee || 0,
-      staff_commission: service.staff_commission || 0
+      staff_commission: service.staff_commission || 0,
+      isPopular: !!service.isPopular,
+      order: service.order || 0
     });
     setShowForm(true);
     fetchServiceInputs(service.service_id);
@@ -341,6 +484,24 @@ const Services = () => {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <h1 className="text-3xl font-bold text-white">Digital Services</h1>
+        
+        {isAdmin && (
+          <div className="flex bg-slate-800/60 p-1 rounded-2xl border border-slate-700/50">
+            <button 
+              onClick={() => setActiveTab('all')}
+              className={`px-4 py-1.5 rounded-xl text-sm font-bold transition-all ${activeTab === 'all' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+            >
+              All Services
+            </button>
+            <button 
+              onClick={() => setActiveTab('popular')}
+              className={`px-4 py-1.5 rounded-xl text-sm font-bold transition-all ${activeTab === 'popular' ? 'bg-amber-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+            >
+              Popular (Home)
+            </button>
+          </div>
+        )}
+
         <div className="flex flex-wrap items-center gap-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
@@ -399,7 +560,9 @@ const Services = () => {
                   service_price: 0,
                   payment_required: false,
                   fee: 0,
-                  staff_commission: 0
+                  staff_commission: 0,
+                  isPopular: false,
+                  order: services.length
                 });
                 setShowForm(true);
               }}
@@ -410,15 +573,54 @@ const Services = () => {
         </div>
       </div>
 
-      {showForm && isAdmin && (
-        <div className="bg-slate-800/60 backdrop-blur-xl rounded-3xl p-6 border border-slate-700/50 shadow-lg mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-white">{editingService ? 'Edit Service' : 'Add New Service'}</h2>
-            <button onClick={() => setShowForm(false)} className="text-slate-400 hover:text-white">
-              <X size={20} />
-            </button>
+      {activeTab === 'popular' && isAdmin ? (
+        <div className="bg-slate-800/60 backdrop-blur-xl rounded-3xl p-8 border border-slate-700/50 shadow-lg">
+          <div className="mb-8">
+            <h2 className="text-2xl font-black text-white flex items-center gap-3">
+              <Star className="text-amber-400" /> Popular Services Control
+            </h2>
+            <p className="text-slate-400 text-sm mt-1">Drag and drop to reorder how they appear on the homepage (Max 8).</p>
           </div>
-          <form onSubmit={handleSubmit} className="space-y-4">
+
+          <DndContext 
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext 
+              items={services.filter(s => s.isPopular).sort((a,b) => (a.order || 0) - (b.order || 0)).map(s => s.service_id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="grid gap-3">
+                {services.filter(s => s.isPopular).sort((a,b) => (a.order || 0) - (b.order || 0)).map(service => (
+                  <SortableServiceItem 
+                    key={service.service_id} 
+                    service={service} 
+                    isAdmin={isAdmin}
+                    onTogglePopular={onTogglePopular}
+                  />
+                ))}
+                {services.filter(s => s.isPopular).length === 0 && (
+                  <div className="text-center py-12 border-2 border-dashed border-slate-700 rounded-3xl">
+                    <Star size={40} className="mx-auto text-slate-700 mb-4" />
+                    <p className="text-slate-500">No popular services selected. Mark services as popular from the "All Services" tab.</p>
+                  </div>
+                )}
+              </div>
+            </SortableContext>
+          </DndContext>
+        </div>
+      ) : (
+        <>
+          {showForm && isAdmin && (
+            <div className="bg-slate-800/60 backdrop-blur-xl rounded-3xl p-6 border border-slate-700/50 shadow-lg mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-white">{editingService ? 'Edit Service' : 'Add New Service'}</h2>
+                <button onClick={() => setShowForm(false)} className="text-slate-400 hover:text-white">
+                  <X size={20} />
+                </button>
+              </div>
+              <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1">
                 <label className="text-xs text-slate-400 font-medium">Service Name</label>
@@ -537,6 +739,24 @@ const Services = () => {
                   {formData.payment_required && <Check size={14} className="text-white" />}
                 </div>
                 <span className="text-sm text-slate-300">Payment Required before Application</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer group">
+                <input 
+                  type="checkbox" 
+                  checked={formData.isPopular} 
+                  onChange={e => {
+                    if (e.target.checked && services.filter(s => s.isPopular).length >= 8) {
+                      alert('Maximum 8 popular services allowed.');
+                      return;
+                    }
+                    setFormData({...formData, isPopular: e.target.checked})
+                  }}
+                  className="hidden"
+                />
+                <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${formData.isPopular ? 'bg-amber-600 border-amber-600' : 'border-slate-600 group-hover:border-slate-500'}`}>
+                  {formData.isPopular && <Check size={14} className="text-white" />}
+                </div>
+                <span className="text-sm text-slate-300">Mark as Popular (Homepage)</span>
               </label>
             </div>
 
@@ -667,6 +887,8 @@ const Services = () => {
           </div>
         )}
       </div>
+      )}
+      </>
       )}
 
       <ConfirmDialog
