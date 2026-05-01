@@ -23,6 +23,7 @@ const ApplyService = lazy(() => import('./pages/ApplyService'));
 const Wallet = lazy(() => import('./pages/Wallet'));
 const Support = lazy(() => import('./pages/Support'));
 const StaffManagement = lazy(() => import('./pages/StaffManagement'));
+const Profile = lazy(() => import('./pages/Profile'));
 const Settings = lazy(() => import('./pages/Settings'));
 const PortalConfig = lazy(() => import('./pages/PortalConfig'));
 const RecycleBin = lazy(() => import('./pages/RecycleBin'));
@@ -114,6 +115,7 @@ export default function App() {
                   <Route path="support" element={<ProtectedRoute roles={['admin', 'staff']}><Support /></ProtectedRoute>} />
                   <Route path="recycle-bin" element={<ProtectedRoute roles={['admin']}><RecycleBin /></ProtectedRoute>} />
                   <Route path="wallet" element={<Wallet />} />
+                  <Route path="profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                   
                   {/* Staff Specific Routes */}
                   <Route path="staff/dashboard" element={<ProtectedRoute roles={['staff']}><Dashboard /></ProtectedRoute>} />
@@ -134,6 +136,15 @@ export default function App() {
                     <Route path="portal" element={<PortalConfig />} />
                   </Route>
                 </Route>
+                
+                {/* 404 Catch-All Route */}
+                <Route path="*" element={
+                  <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950 p-4">
+                    <h1 className="text-4xl font-bold text-slate-800 dark:text-slate-200 mb-4">404 - Not Found</h1>
+                    <p className="text-slate-600 dark:text-slate-400 mb-8">The page you are looking for doesn't exist or has been moved.</p>
+                    <a href="/" className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Go to Home</a>
+                  </div>
+                } />
               </Routes>
             </Suspense>
           </Router>

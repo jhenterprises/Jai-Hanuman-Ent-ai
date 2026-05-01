@@ -42,7 +42,9 @@ let dbId = (finalConfig.firestoreDatabaseId && finalConfig.firestoreDatabaseId !
 
 console.log('Final Firestore Database ID:', dbId || '(default)');
 
-const firestoreSettings = {};
+const firestoreSettings = {
+  experimentalForceLongPolling: true,
+};
 
 let dbInstance;
 try {
@@ -56,14 +58,7 @@ export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 export const storage = getStorage(app);
 
-// Connectivity Warmup
-(async () => {
-  try {
-    await enableNetwork(dbInstance).catch(() => {});
-  } catch (e) {
-    // Ignore warmup errors
-  }
-})();
+// Connectivity Warmup removed
 
 export default app;
 

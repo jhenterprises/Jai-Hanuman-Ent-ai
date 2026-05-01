@@ -2,7 +2,7 @@ import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useConfig } from '../context/ConfigContext';
-import { Shield, LogOut, User, Menu, ArrowRight } from 'lucide-react';
+import { Shield, LogOut, User, Menu, ArrowRight, Settings } from 'lucide-react';
 import ModernButton from './ModernButton';
 
 const Navbar = () => {
@@ -47,6 +47,13 @@ const Navbar = () => {
                   </div>
                   <span className="text-sm font-semibold text-white">{user.name}</span>
                 </div>
+                <Link 
+                  to="/app/profile"
+                  className="p-2 text-slate-400 hover:text-white transition-colors"
+                  title="Settings"
+                >
+                  <Settings size={20} />
+                </Link>
                 <button 
                   onClick={handleLogout}
                   className="p-2 text-slate-400 hover:text-red-400 transition-colors"

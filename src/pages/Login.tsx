@@ -72,7 +72,11 @@ const Login = () => {
       navigate(from, { replace: true });
     } catch (err: any) {
       console.error('Email login error:', err);
-      setError(err.message || 'Login failed. Please check your credentials.');
+      if (err.code === 'auth/invalid-credential') {
+        setError('Invalid email or password. If you signed up with Google, please use the "Sign in with Google" button instead.');
+      } else {
+        setError(err.message || 'Login failed. Please check your credentials.');
+      }
     } finally {
       setLoading(false);
     }

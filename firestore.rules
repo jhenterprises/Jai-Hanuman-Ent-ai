@@ -7,11 +7,14 @@ service cloud.firestore {
     }
 
     function isVerified() {
-      return isSignedIn() && (request.auth.token.email_verified == true || request.auth.token.firebase.sign_in_provider == 'password');
+      return isSignedIn() && (
+        request.auth.token.get('email_verified', false) == true || 
+        request.auth.token.get('firebase', {}).get('sign_in_provider', '') == 'password'
+      );
     }
     
     function getEmail() {
-      return (request.auth != null && request.auth.token != null && 'email' in request.auth.token) ? request.auth.token.email.toLowerCase() : '';
+      return (request.auth != null && request.auth.token != null && request.auth.token.get('email', '') != '') ? request.auth.token.get('email', '').toLowerCase() : '';
     }
 
     function isBootstrapAdmin() {
@@ -27,7 +30,7 @@ service cloud.firestore {
       return isBootstrapAdmin() || (
         isSignedIn() && 
         exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'admin'
       );
     }
 
@@ -35,7 +38,7 @@ service cloud.firestore {
       return isAdmin() || (
         isSignedIn() && 
         exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'staff'
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'staff'
       );
     }
 
@@ -55,22 +58,27 @@ service cloud.firestore {
       return resource.data;
     }
 
-    // Pillar 0: Global Safety Net & Bootstrap Admin Bypass
-    match /{document=**} {
-      allow read, write: if isBootstrapAdmin();
-    }
-
     // -------------------------------------------------------------------------
     // USERS COLLECTION
     // -------------------------------------------------------------------------
     
     match /users/{userId} {
-      allow get: if isSignedIn() && (request.auth.uid == userId || isStaff());
-      allow list: if isStaff();
+      allow get: if isOwner(userId) || isStaff() || isBootstrapAdmin();
+      allow list: if isStaff() || isBootstrapAdmin();
       
-      allow create: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      allow update: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      allow delete: if isAdmin();
+      allow create: if isSignedIn() && (request.auth.uid == userId || isAdmin() || isBootstrapAdmin());
+      allow update: if isSignedIn() && (
+        (request.auth.uid == userId && 
+           incoming().diff(existing()).affectedKeys().hasOnly(['phone', 'photoURL', 'name'])) 
+        || 
+        (isAdmin() || isBootstrapAdmin())
+      );
+      allow delete: if isAdmin() || isBootstrapAdmin();
+    }
+
+    // Pillar 0: Global Safety Net & Bootstrap Admin Bypass
+    match /{document=**} {
+      allow read, write: if isBootstrapAdmin();
     }
 
     // -------------------------------------------------------------------------

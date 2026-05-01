@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { sendPasswordResetEmail } from 'firebase/auth';
 import { 
   collection, getDocs, doc, setDoc, updateDoc, 
   deleteDoc, query, where, serverTimestamp, getDoc 
@@ -36,6 +37,11 @@ const UsersPage = () => {
     phone: '',
     password: '',
     role: 'user'
+  });
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordFormData, setPasswordFormData] = useState({
+    newPassword: '',
+    confirmPassword: ''
   });
 
   // Confirm Dialog State
@@ -144,8 +150,42 @@ const UsersPage = () => {
     }
   };
 
-  const handleResetPassword = async (id: string) => {
-    alert('Password reset requires Firebase Auth Admin SDK (Cloud Functions) or the user using "Forgot Password".');
+  const handleManualPasswordReset = async () => {
+    if (!selectedUser) return;
+    if (passwordFormData.newPassword !== passwordFormData.confirmPassword) {
+        alert('Passwords do not match');
+        return;
+    }
+    if (passwordFormData.newPassword.length < 6) {
+        alert('Password must be at least 6 characters');
+        return;
+    }
+    
+    try {
+        const token = await auth.currentUser?.getIdToken();
+        const response = await fetch('/api/reset-password', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}` 
+            },
+            body: JSON.stringify({ 
+                uid: selectedUser.id, 
+                newPassword: passwordFormData.newPassword 
+            })
+        });
+        
+        if (!response.ok) {
+            const data = await response.json();
+            throw new Error(data.error || 'Failed to reset password');
+        }
+        
+        alert('Password updated successfully');
+        setShowPasswordModal(false);
+        setPasswordFormData({ newPassword: '', confirmPassword: '' });
+    } catch (err: any) {
+        alert('Error: ' + err.message);
+    }
   };
 
   const handleDelete = (id: string) => {
@@ -390,7 +430,7 @@ const UsersPage = () => {
                           {item.status === 'active' ? <UserMinus size={16} /> : <UserCheck size={16} />}
                         </button>
                         <button 
-                          onClick={() => handleResetPassword(item.id)}
+                          onClick={() => { setSelectedUser(item); setShowPasswordModal(true); }}
                           className="p-2 text-slate-400 hover:text-amber-400 hover:bg-amber-500/10 rounded-xl transition-all"
                           title="Reset Password"
                         >
@@ -566,6 +606,28 @@ const UsersPage = () => {
         onConfirm={confirmDialog.onConfirm}
         onCancel={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
       />
+
+      {showPasswordModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={() => setShowPasswordModal(false)} />
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+            className="relative w-full max-w-sm bg-slate-900 border border-slate-700 rounded-[2.5rem] shadow-2xl overflow-hidden p-8"
+          >
+            <h2 className="text-xl font-bold text-white mb-6">Reset Password for {selectedUser?.name}</h2>
+            <div className="space-y-4">
+              <input type="password" value={passwordFormData.newPassword} onChange={e => setPasswordFormData({...passwordFormData, newPassword: e.target.value})} className="w-full px-5 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white outline-none focus:ring-2 ring-amber-500" placeholder="New Password" />
+              <input type="password" value={passwordFormData.confirmPassword} onChange={e => setPasswordFormData({...passwordFormData, confirmPassword: e.target.value})} className="w-full px-5 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white outline-none focus:ring-2 ring-amber-500" placeholder="Confirm Password" />
+            </div>
+            <div className="flex gap-3 mt-8">
+              <button onClick={() => setShowPasswordModal(false)} className="flex-1 py-3 bg-slate-800 text-white font-bold rounded-xl hover:bg-slate-700">Cancel</button>
+              <button onClick={handleManualPasswordReset} className="flex-1 py-3 bg-amber-600 text-white font-bold rounded-xl hover:bg-amber-500">Reset</button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 };
