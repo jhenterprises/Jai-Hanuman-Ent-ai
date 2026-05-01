@@ -36,7 +36,8 @@ const UsersPage = () => {
     email: '',
     phone: '',
     password: '',
-    role: 'user'
+    role: 'user',
+    staff_id: ''
   });
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [passwordFormData, setPasswordFormData] = useState({
@@ -87,6 +88,26 @@ const UsersPage = () => {
     }
   };
 
+  const generateStaffId = async () => {
+    try {
+      const counterRef = doc(db, 'counters', 'staff');
+      const docSnap = await getDoc(counterRef);
+      let nextVal = 1;
+      
+      if (docSnap.exists()) {
+        nextVal = docSnap.data().value + 1;
+        await updateDoc(counterRef, { value: nextVal });
+      } else {
+        await setDoc(counterRef, { value: nextVal });
+      }
+
+      return `JH-STF-${nextVal.toString().padStart(3, '0')}`;
+    } catch (err) {
+      console.error('Error generating staff ID:', err);
+      return 'JH-STF-XXX';
+    }
+  };
+
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -97,14 +118,23 @@ const UsersPage = () => {
       // Alternatively, admins usually need a cloud function to create Auth users.
       // Since we must use "Firebase directly", we'll just create the doc.
       const userRef = doc(collection(db, 'users'));
-      await setDoc(userRef, {
+      
+      const updateData: any = {
         name: formData.name,
         email: formData.email,
         phone: formData.phone,
         role: formData.role,
         status: 'active',
         createdAt: serverTimestamp()
-      });
+      };
+      
+      if (formData.role === 'staff') {
+        updateData.staff_id = formData.staff_id && formData.staff_id.trim() !== '' 
+          ? formData.staff_id.trim() 
+          : await generateStaffId();
+      }
+      
+      await setDoc(userRef, updateData);
       setShowAddModal(false);
       resetForm();
       fetchUsers();
@@ -119,13 +149,22 @@ const UsersPage = () => {
     if (!selectedUser) return;
     try {
       const userRef = doc(db, 'users', selectedUser.id);
-      await updateDoc(userRef, {
+      
+      const updateData: any = {
         name: formData.name,
         email: formData.email,
         phone: formData.phone,
         role: formData.role,
         updatedAt: serverTimestamp()
-      });
+      };
+      
+      if (formData.role === 'staff') {
+        updateData.staff_id = formData.staff_id && formData.staff_id.trim() !== '' 
+          ? formData.staff_id.trim() 
+          : (selectedUser.staff_id || await generateStaffId());
+      }
+      
+      await updateDoc(userRef, updateData);
       setShowEditModal(false);
       resetForm();
       fetchUsers();
@@ -207,7 +246,7 @@ const UsersPage = () => {
   };
 
   const resetForm = () => {
-    setFormData({ name: '', email: '', phone: '', password: '', role: 'user' });
+    setFormData({ name: '', email: '', phone: '', password: '', role: 'user', staff_id: '' });
     setSelectedUser(null);
   };
 
@@ -218,7 +257,8 @@ const UsersPage = () => {
       email: user.email,
       phone: user.phone,
       password: '',
-      role: user.role
+      role: user.role,
+      staff_id: user.staff_id || ''
     });
     setShowEditModal(true);
   };
@@ -564,6 +604,17 @@ const UsersPage = () => {
                         </select>
                       </div>
                     </div>
+                    {formData.role === 'staff' && (
+                      <div className="space-y-2">
+                        <label className="text-[10px] text-slate-500 uppercase font-bold tracking-widest ml-1">Staff ID (Optional)</label>
+                        <input 
+                          type="text"
+                          value={formData.staff_id || ''} onChange={e => setFormData({...formData, staff_id: e.target.value})}
+                          className="w-full px-5 py-3 bg-slate-800/50 border border-slate-700 rounded-2xl text-white focus:border-blue-500 outline-none transition-all"
+                          placeholder="e.g. STF-001 (Leave blank to generate)"
+                        />
+                      </div>
+                    )}
                     {showAddModal && (
                       <div className="space-y-2">
                         <label className="text-[10px] text-slate-500 uppercase font-bold tracking-widest ml-1">Initial Password</label>

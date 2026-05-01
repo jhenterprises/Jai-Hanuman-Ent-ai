@@ -53,7 +53,8 @@ const StaffManagement = () => {
     phone: '',
     password: '',
     role: 'staff',
-    salary_amount: 0
+    salary_amount: 0,
+    staff_id: ''
   });
 
   // Confirm Dialog State
@@ -263,7 +264,9 @@ const StaffManagement = () => {
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const staffId = await generateStaffId();
+      const staffId = formData.staff_id && formData.staff_id.trim() !== '' 
+        ? formData.staff_id.trim() 
+        : await generateStaffId();
       await addDoc(collection(db, 'users'), {
         ...formData,
         staff_id: staffId,
@@ -289,6 +292,7 @@ const StaffManagement = () => {
         email: formData.email,
         phone: formData.phone,
         salary_amount: Number(formData.salary_amount),
+        staff_id: formData.staff_id ? formData.staff_id.trim() : selectedStaff.staff_id || '',
         updated_at: serverTimestamp()
       });
       setShowEditModal(false);
@@ -343,7 +347,7 @@ const StaffManagement = () => {
   };
 
   const resetForm = () => {
-    setFormData({ name: '', email: '', phone: '', password: '', role: 'staff', salary_amount: 0 });
+    setFormData({ name: '', email: '', phone: '', password: '', role: 'staff', salary_amount: 0, staff_id: '' });
     setSelectedStaff(null);
   };
 
@@ -355,7 +359,8 @@ const StaffManagement = () => {
       phone: member.phone,
       password: '',
       role: 'staff',
-      salary_amount: member.salary_amount || 0
+      salary_amount: member.salary_amount || 0,
+      staff_id: member.staff_id || ''
     });
     setShowEditModal(true);
   };
@@ -846,6 +851,15 @@ const StaffManagement = () => {
 
                 <form onSubmit={showAddModal ? handleAdd : handleEdit} className="space-y-6">
                   <div className="grid grid-cols-1 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-[10px] text-slate-500 uppercase font-bold tracking-widest ml-1">Staff ID (Optional)</label>
+                      <input 
+                        type="text"
+                        value={formData.staff_id || ''} onChange={e => setFormData({...formData, staff_id: e.target.value})}
+                        className="w-full px-5 py-3 bg-slate-800/50 border border-slate-700 rounded-2xl text-white focus:border-blue-500 outline-none transition-all"
+                        placeholder="Leave blank to auto-generate"
+                      />
+                    </div>
                     <div className="space-y-2">
                       <label className="text-[10px] text-slate-500 uppercase font-bold tracking-widest ml-1">Full Name</label>
                       <input 
