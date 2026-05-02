@@ -215,8 +215,15 @@ const UsersPage = () => {
         });
         
         if (!response.ok) {
-            const data = await response.json();
-            throw new Error(data.error || 'Failed to reset password');
+            let errorMessage = 'Failed to reset password';
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                const data = await response.json();
+                errorMessage = data.error || errorMessage;
+            } else {
+                errorMessage = `Server error (${response.status}): ${response.statusText}`;
+            }
+            throw new Error(errorMessage);
         }
         
         alert('Password updated successfully');
