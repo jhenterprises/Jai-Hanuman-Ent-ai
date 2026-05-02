@@ -93,16 +93,16 @@ const Ledger = () => {
     e.preventDefault();
     
     // 1. Validation
-    if (!newEntry.customer_name || !newEntry.service_name || !newEntry.principle_amount) {
-      toast.error('Please fill all required fields');
+    const principle = parseFloat(newEntry.principle_amount) || 0;
+    const profit = parseFloat(newEntry.profit_amount) || 0;
+
+    if (!newEntry.customer_name || !newEntry.service_name) {
+      toast.error('Please fill customer name and service name');
       return;
     }
-
-    const principle = parseFloat(newEntry.principle_amount);
-    const profit = parseFloat(newEntry.profit_amount) || 0;
     
-    if (isNaN(principle) || principle <= 0) {
-      toast.error('Principal amount must be a valid number');
+    if (principle === 0 && profit === 0) {
+      toast.error('At least one amount (Principal or Profit) is required');
       return;
     }
 
@@ -218,14 +218,17 @@ const Ledger = () => {
     if (!window.confirm('Are you sure you want to delete this entry? This action cannot be undone.')) return;
     try {
       await deleteDoc(doc(db, col, id));
-      fetchData();
+      await fetchData();
+      toast.success('Successfully deleted tracking record');
     } catch (err: any) {
+      console.error('Delete error:', err);
+      toast.error('Failed to delete record. Please check permissions.');
       handleFirestoreError(err, OperationType.DELETE, col);
     }
   };
 
   const exportToExcel = () => {
-    const data = ledgerWithBalance.map(item => ({
+    const dataRows = filtered.map(item => ({
       'SN': item.serial_number,
       'Date & Time': item.created_at?.toDate()?.toLocaleString() || '',
       'Customer': item.customer_name,
@@ -237,7 +240,25 @@ const Ledger = () => {
       'Mode': item.payment_mode,
       'Staff': item.staff_name
     }));
-    const ws = XLSX.utils.json_to_sheet(data);
+
+    // Add Total Row
+    if (filtered.length > 0) {
+      const totals = {
+        'SN': '',
+        'Date & Time': 'GRAND TOTAL',
+        'Customer': '',
+        'Service': '',
+        'Principal': filtered.reduce((sum, item) => sum + Math.abs(item.principle_amount || 0), 0),
+        'Profit': filtered.reduce((sum, item) => sum + (item.profit_amount || 0), 0),
+        'Total': filtered.reduce((sum, item) => sum + (item.total_amount || 0), 0),
+        'Balance': filtered[filtered.length - 1].runningBalance,
+        'Mode': '',
+        'Staff': ''
+      };
+      dataRows.push(totals);
+    }
+
+    const ws = XLSX.utils.json_to_sheet(dataRows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Ledger");
     XLSX.writeFile(wb, `Ledger_${dateRange.from}_to_${dateRange.to}.xlsx`);
@@ -248,7 +269,7 @@ const Ledger = () => {
     doc.text(`Ledger Report (${dateRange.from} to ${dateRange.to})`, 14, 15);
     
     const tableColumn = ["SN", "Date", "Customer", "Service", "Principal", "Profit", "Total", "Balance"];
-    const tableRows = ledgerWithBalance.map(item => [
+    const tableRows = filtered.map(item => [
       item.serial_number,
       item.created_at?.toDate()?.toLocaleDateString() || '',
       item.customer_name,
@@ -259,10 +280,22 @@ const Ledger = () => {
       item.runningBalance
     ]);
 
+    // Calculate Totals for Footer
+    const totalPrincipal = filtered.reduce((sum, item) => sum + Math.abs(item.principle_amount || 0), 0);
+    const totalProfit = filtered.reduce((sum, item) => sum + (item.profit_amount || 0), 0);
+    const totalAmount = filtered.reduce((sum, item) => sum + (item.total_amount || 0), 0);
+    const finalBalance = filtered.length > 0 ? filtered[filtered.length - 1].runningBalance : 0;
+
+    const footerRow = ["", "TOTAL", "", "", totalPrincipal.toLocaleString(), totalProfit.toLocaleString(), totalAmount.toLocaleString(), finalBalance.toLocaleString()];
+
     autoTable(doc, {
       head: [tableColumn],
       body: tableRows,
-      startY: 20
+      foot: [footerRow],
+      startY: 20,
+      theme: 'grid',
+      headStyles: { fillColor: [51, 65, 85] }, // slate-700 equivalent
+      footStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontStyle: 'bold' } // slate-100/900 equivalent
     });
     doc.save(`Ledger_${dateRange.from}_to_${dateRange.to}.pdf`);
   };
@@ -579,7 +612,6 @@ const Ledger = () => {
                 <input 
                   type="number" 
                   step="0.01"
-                  required
                   placeholder="0.00" 
                   value={newEntry.principle_amount} 
                   onChange={e => setNewEntry({...newEntry, principle_amount: e.target.value})} 
@@ -684,7 +716,7 @@ const Ledger = () => {
                     ₹{item.runningBalance?.toLocaleString()}
                   </td>
                   <td className="p-4 text-right">
-                    <div className="flex justify-end items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex justify-end items-center gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                       <button onClick={() => printInvoice(item)} className="p-2 text-slate-400 hover:text-white hover:bg-slate-600 rounded-lg transition-colors" title="Print Invoice">
                         <Printer size={16} />
                       </button>
@@ -692,7 +724,11 @@ const Ledger = () => {
                         <Edit2 size={16} />
                       </button>
                       {(user?.role === 'admin' || user?.uid === item.staff_id) && (
-                        <button onClick={() => handleDelete(item.id, 'ledger')} className="p-2 text-red-500 hover:text-white hover:bg-red-600 rounded-lg transition-colors" title="Delete">
+                        <button 
+                          onClick={() => handleDelete(item.id, 'ledger')} 
+                          className="p-2 text-red-500 hover:text-white hover:bg-red-600 rounded-lg transition-all active:scale-90" 
+                          title="Delete Action"
+                        >
                           <Trash2 size={16} />
                         </button>
                       )}

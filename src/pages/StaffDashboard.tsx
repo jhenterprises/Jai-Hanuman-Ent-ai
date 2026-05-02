@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { safeFormat } from '../utils/dateUtils';
 import { format } from 'date-fns';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 
 const StaffDashboard = () => {
   const navigate = useNavigate();

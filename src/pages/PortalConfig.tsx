@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useConfig } from '../context/ConfigContext';
 import { useAuth } from '../context/AuthContext';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { Settings, Palette, Layout, Type, Image as ImageIcon, Globe, Save, Loader2, CheckCircle2, AlertCircle, Upload, Trash2 } from 'lucide-react';
 import { doc, setDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';

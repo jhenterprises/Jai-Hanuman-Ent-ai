@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useConfig } from '../context/ConfigContext';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { LogIn, Mail, Lock, AlertCircle, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 
 const Login = () => {

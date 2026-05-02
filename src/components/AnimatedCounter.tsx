@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion, useSpring, useTransform } from 'framer-motion';
+import { motion, useSpring, useTransform } from 'motion/react';
 
 interface AnimatedCounterProps {
   value: number;

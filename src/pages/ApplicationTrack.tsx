@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useConfig } from '../context/ConfigContext';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { CheckCircle, Clock, ArrowLeft, Shield, Download } from 'lucide-react';
 import { safeFormat } from '../utils/dateUtils';
 

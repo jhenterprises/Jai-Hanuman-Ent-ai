@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { format } from 'date-fns';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 
 const UsersPage = () => {
   const { user: currentUser } = useAuth();

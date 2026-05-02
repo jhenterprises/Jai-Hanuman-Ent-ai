@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   Users, UserCheck, FileText, Clock, CheckCircle, XCircle, 
   IndianRupee, Activity, Plus, FileSpreadsheet, Server, Database,

@@ -1,5 +1,5 @@
 import React, { useRef, useState, useLayoutEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { LucideIcon } from 'lucide-react';
 
 interface ModernButtonProps {

@@ -110,24 +110,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         }, (err) => {
           if (!isMounted) return;
-          console.error('User listener error:', err);
+          console.error('Permission error on user listener:', err);
           
-          if (err.message?.includes('permissions')) {
-            console.error('Permission denied for user doc. Check Firestore Rules.');
-          }
-          
-          // Fallback for admins if offline or permission error during bootstrap
+          // Emergency Fallback for Bootstrap Admins
           const adminEmails = ['pancardjhc2018@gmail.com', 'pavan.tr16@gmail.com', 'admin@jh.com'];
-          if (firebaseUser.email && adminEmails.includes(firebaseUser.email)) {
-             console.warn('Using admin fallback due to error:', err.message);
-             setUser({
-               uid: firebaseUser.uid,
-               name: firebaseUser.displayName || 'Admin (Emergency)',
-               email: firebaseUser.email,
-               role: 'admin'
-             });
+          const userEmail = firebaseUser.email?.toLowerCase();
+          if (userEmail && adminEmails.includes(userEmail)) {
+            console.warn('Bootstrap Admin permission bypass triggered');
+            setUser({
+              uid: firebaseUser.uid,
+              name: firebaseUser.displayName || 'Admin (Bypass)',
+              email: firebaseUser.email || '',
+              role: 'admin'
+            });
+          } else {
+            handleFirestoreError(err, OperationType.GET, `users/${firebaseUser.uid}`);
           }
-           
           setLoading(false);
         });
 

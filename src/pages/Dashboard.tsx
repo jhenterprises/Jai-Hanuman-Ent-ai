@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   FileText, ArrowRight, Plus, Download, Calendar, 
   Loader2, Wallet, ArrowUpRight, History, Activity,

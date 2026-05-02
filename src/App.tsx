@@ -2,6 +2,7 @@ import React, { useEffect, useState, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ConfigProvider } from './context/ConfigContext';
+import { ThemeProvider } from './context/ThemeContext';
 import DashboardLayout from './layouts/DashboardLayout';
 import PublicLayout from './layouts/PublicLayout';
 
@@ -70,8 +71,6 @@ const DefaultRedirect = () => {
   }
   return <Navigate to="/app/dashboard" replace />;
 };
-
-import { ThemeProvider } from './context/ThemeContext';
 
 export default function App() {
   return (

@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { confirmPasswordReset } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 import { useConfig } from '../context/ConfigContext';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { Lock, AlertCircle, ArrowLeft, CheckCircle2, ShieldCheck, Eye, EyeOff } from 'lucide-react';
 
 const ResetPassword = () => {

@@ -6,39 +6,36 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid != null;
     }
 
+    function isBootstrapAdmin() {
+      return isSignedIn() && 
+             request.auth.token.get('email', '') != '' &&
+             request.auth.token.email.toLowerCase() in [
+               "pancardjhc2018@gmail.com",
+               "pavan.tr16@gmail.com",
+               "admin@jh.com"
+             ];
+    }
+
     function isVerified() {
       return isSignedIn() && (
-        request.auth.token.get('email_verified', false) == true || 
-        request.auth.token.get('firebase', {}).get('sign_in_provider', '') == 'password'
+        isBootstrapAdmin() ||
+        request.auth.token.get('email_verified', false) == true
       );
     }
     
-    function getEmail() {
-      return (request.auth != null && request.auth.token != null && request.auth.token.get('email', '') != '') ? request.auth.token.get('email', '').toLowerCase() : '';
-    }
-
-    function isBootstrapAdmin() {
-      // Current user pancardjhc2018@gmail.com is an admin
-      return isSignedIn() && (
-        getEmail() == "pancardjhc2018@gmail.com" || 
-        getEmail() == "pavan.tr16@gmail.com" || 
-        getEmail() == "admin@jh.com"
-      );
-    }
-
     function isAdmin() {
       return isBootstrapAdmin() || (
         isSignedIn() && 
         exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'admin'
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') == 'admin'
       );
     }
 
     function isStaff() {
-      return isAdmin() || (
+      return isBootstrapAdmin() || isAdmin() || (
         isSignedIn() && 
         exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'staff'
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') == 'staff'
       );
     }
 
@@ -63,20 +60,15 @@ service cloud.firestore {
     // -------------------------------------------------------------------------
     
     match /users/{userId} {
-      allow get: if isOwner(userId) || isStaff() || isBootstrapAdmin();
+      allow get: if isSignedIn() && (request.auth.uid == userId || isBootstrapAdmin() || isStaff());
       allow list: if isStaff() || isBootstrapAdmin();
       
-      allow create: if isSignedIn() && (request.auth.uid == userId || isAdmin() || isBootstrapAdmin());
-      allow update: if isSignedIn() && (
-        (request.auth.uid == userId && 
-           incoming().diff(existing()).affectedKeys().hasOnly(['phone', 'photoURL', 'name'])) 
-        || 
-        (isAdmin() || isBootstrapAdmin())
-      );
-      allow delete: if isAdmin() || isBootstrapAdmin();
+      allow create: if isSignedIn() && (request.auth.uid == userId || isBootstrapAdmin() || isAdmin());
+      allow update: if isSignedIn() && (request.auth.uid == userId || isBootstrapAdmin() || isAdmin());
+      allow delete: if isBootstrapAdmin() || isAdmin();
     }
 
-    // Pillar 0: Global Safety Net & Bootstrap Admin Bypass
+    // Pillar 0: Global Safety Net
     match /{document=**} {
       allow read, write: if isBootstrapAdmin();
     }
@@ -142,13 +134,13 @@ service cloud.firestore {
                data.principle_amount is number &&
                data.created_at is timestamp;
       }
-      allow get: if isSignedIn() && (resource.data.user_id == request.auth.uid || isStaff());
-      allow list: if isSignedIn() && (resource.data.user_id == request.auth.uid || isStaff());
+      allow get: if isSignedIn() && (resource.data.staff_id == request.auth.uid || isStaff());
+      allow list: if isSignedIn() && (resource.data.staff_id == request.auth.uid || isStaff());
       allow create: if isVerified() && isValidLedgerEntry(incoming());
       allow update: if isStaff() && 
                     incoming().staff_id == existing().staff_id &&
                     incoming().created_at == existing().created_at;
-      allow delete: if isAdmin();
+      allow delete: if isAdmin() || (isStaff() && resource.data.staff_id == request.auth.uid);
     }
 
     match /withdrawals/{withdrawalId} {
