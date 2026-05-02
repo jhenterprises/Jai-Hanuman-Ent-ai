@@ -39,6 +39,7 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@firebase/eslint-plugin-security-rules": "^0.0.2",
     "@types/exceljs": "^0.5.3",
     "@types/express": "^5.0.6",
     "@types/react": "^19.0.0",

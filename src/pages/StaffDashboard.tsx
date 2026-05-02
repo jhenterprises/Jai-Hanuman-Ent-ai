@@ -56,9 +56,6 @@ const StaffDashboard = () => {
     const unsubscribeToday = onSnapshot(qToday, (snapshot) => {
       if (!snapshot.empty) {
         setTodayAttendance(snapshot.docs[0].data());
-      } else {
-        // Just auto-mark login if it doesn't exist yet (this only happens once a day)
-        checkAttendance();
       }
     });
 
@@ -79,54 +76,6 @@ const StaffDashboard = () => {
       unsubscribeHistory();
     };
   }, [user]);
-
-  const checkAttendance = async () => {
-    if (!user) return;
-    const today = format(new Date(), 'yyyy-MM-dd');
-    const attendanceId = `${user.uid}_${today}`;
-    
-    try {
-      const snap = await getDocs(query(collection(db, 'attendance'), where('userId', '==', user.uid), where('date', '==', today), limit(1)));
-      
-      if (snap.empty) {
-        const newRecord = {
-          userId: user.uid,
-          staff_name: user.name,
-          staff_id: (user as any).staff_id || 'N/A',
-          date: today,
-          loginTime: new Date().toISOString(),
-          logoutTime: null,
-          totalHours: 0,
-          status: 'Present'
-        };
-        await setDoc(doc(db, 'attendance', attendanceId), newRecord);
-      }
-    } catch (err) {
-      console.error('Error auto-marking attendance:', err);
-    }
-  };
-
-  const handleLogout = async () => {
-    if (!user || !todayAttendance) return;
-    const today = format(new Date(), 'yyyy-MM-dd');
-    const attendanceId = `${user.uid}_${today}`;
-    
-    try {
-      const logoutTime = new Date().toISOString();
-      const loginTime = new Date(todayAttendance.loginTime);
-      const hours = (new Date(logoutTime).getTime() - loginTime.getTime()) / (1000 * 60 * 60);
-      
-      await updateDoc(doc(db, 'attendance', attendanceId), {
-        logoutTime,
-        totalHours: Number(hours.toFixed(2))
-      });
-      
-      setTodayAttendance({ ...todayAttendance, logoutTime, totalHours: hours });
-      alert('Logout time recorded successfully. Have a great day!');
-    } catch (err) {
-      console.error('Error recording logout:', err);
-    }
-  };
 
   const fetchApplications = async () => {
     setLoading(true);
@@ -202,45 +151,30 @@ const StaffDashboard = () => {
                       <LogIn size={20} />
                     </div>
                     <div>
-                      <p className="text-[10px] text-slate-500 uppercase font-black">Login Time</p>
-                      <p className="text-white font-bold">{todayAttendance?.loginTime ? format(new Date(todayAttendance.loginTime), 'hh:mm a') : 'Not Logged In'}</p>
+                      <p className="text-[10px] text-slate-500 uppercase font-black">Status</p>
+                      <p className="text-white font-bold">{todayAttendance?.status || 'Scheduled'}</p>
                     </div>
                   </div>
-                  <CheckCircle size={20} className="text-emerald-500" />
-                </div>
-
-                <div className="flex items-center justify-between p-4 bg-slate-900/50 rounded-2xl border border-white/5">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-rose-500/20 rounded-xl flex items-center justify-center text-rose-400">
-                      <LogOut size={20} />
-                    </div>
-                    <div>
-                      <p className="text-[10px] text-slate-500 uppercase font-black">Logout Time</p>
-                      <p className="text-white font-bold">{todayAttendance?.logoutTime ? format(new Date(todayAttendance.logoutTime), 'hh:mm a') : 'Shift Active'}</p>
-                    </div>
-                  </div>
-                  {!todayAttendance?.logoutTime ? (
-                    <button 
-                      onClick={handleLogout}
-                      className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-rose-600/20"
-                    >
-                      Clock Out
-                    </button>
-                  ) : <CheckCircle size={20} className="text-rose-500" />}
+                  <span className={`px-3 py-1 rounded-lg text-xs font-black uppercase ${
+                    todayAttendance?.status === 'Full Day' ? 'bg-emerald-500/10 text-emerald-400' :
+                    todayAttendance?.status === 'Half Day' ? 'bg-amber-500/10 text-amber-400' :
+                    todayAttendance?.status === 'Absent' ? 'bg-rose-500/10 text-rose-400' :
+                    'bg-slate-500/10 text-slate-400'
+                  }`}>
+                    {todayAttendance?.status || 'Pending'}
+                  </span>
                 </div>
 
                 <div className="pt-6 border-t border-white/5">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm text-slate-400">Total Working Hours</span>
-                    <span className="text-lg font-black text-white">{todayAttendance?.totalHours || 0} hrs</span>
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-sm text-slate-400">Monthly Performance</span>
+                    <span className="text-lg font-black text-white">{attendanceHistory.reduce((acc, h) => {
+                      if (h.status === 'Full Day') return acc + 1;
+                      if (h.status === 'Half Day') return acc + 0.5;
+                      return acc;
+                    }, 0)} Days</span>
                   </div>
-                  <div className="w-full h-2 bg-slate-900 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-blue-600 transition-all duration-1000" 
-                      style={{ width: `${Math.min((todayAttendance?.totalHours || 0) / 8 * 100, 100)}%` }}
-                    />
-                  </div>
-                  <p className="text-[10px] text-slate-500 mt-2 text-center">Your daily goal is 8 hours</p>
+                  <p className="text-[10px] text-slate-500 mt-2 text-center italic">Your attendance is automatically marked as 'Full Day' every morning.</p>
                 </div>
               </div>
             </div>
@@ -253,9 +187,13 @@ const StaffDashboard = () => {
               </div>
               <div className="bg-blue-500/10 border border-blue-500/20 rounded-3xl p-6 text-center">
                 <TrendingUp className="mx-auto text-blue-400 mb-2" />
-                <p className="text-xs text-slate-400">Avg Hours</p>
+                <p className="text-xs text-slate-400">Attendance Rate</p>
                 <p className="text-2xl font-black text-white">
-                  {(attendanceHistory.reduce((acc, h) => acc + (h.totalHours || 0), 0) / (attendanceHistory.length || 1)).toFixed(1)}
+                  {Math.round((attendanceHistory.reduce((acc, h) => {
+                    if (h.status === 'Full Day') return acc + 1;
+                    if (h.status === 'Half Day') return acc + 0.5;
+                    return acc;
+                  }, 0) / (attendanceHistory.length || 1)) * 100)}%
                 </p>
               </div>
             </div>
@@ -274,9 +212,6 @@ const StaffDashboard = () => {
                   <thead>
                     <tr className="bg-white/5 text-[10px] font-black uppercase tracking-widest text-slate-500">
                       <th className="px-8 py-4">Date</th>
-                      <th className="px-8 py-4">Clock In</th>
-                      <th className="px-8 py-4">Clock Out</th>
-                      <th className="px-8 py-4">Duration</th>
                       <th className="px-8 py-4 text-right">Status</th>
                     </tr>
                   </thead>
@@ -284,11 +219,12 @@ const StaffDashboard = () => {
                     {attendanceHistory.map((h, i) => (
                       <tr key={i} className="hover:bg-white/5 transition-colors">
                         <td className="px-8 py-4 text-sm font-bold text-white">{format(new Date(h.date), 'dd MMM, yyyy')}</td>
-                        <td className="px-8 py-4 text-xs text-slate-400">{format(new Date(h.loginTime), 'hh:mm a')}</td>
-                        <td className="px-8 py-4 text-xs text-slate-400">{h.logoutTime ? format(new Date(h.logoutTime), 'hh:mm a') : '--'}</td>
-                        <td className="px-8 py-4 text-xs font-mono text-blue-400">{h.totalHours || 0} hrs</td>
                         <td className="px-8 py-4 text-right">
-                          <span className="px-2.5 py-1 bg-emerald-500/10 text-emerald-400 rounded-lg text-[10px] font-black uppercase">
+                          <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase ${
+                            h.status === 'Full Day' ? 'bg-emerald-500/10 text-emerald-400' :
+                            h.status === 'Half Day' ? 'bg-amber-500/10 text-amber-400' :
+                            'bg-rose-500/10 text-rose-400'
+                          }`}>
                             {h.status}
                           </span>
                         </td>

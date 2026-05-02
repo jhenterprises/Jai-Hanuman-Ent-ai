@@ -187,18 +187,60 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
+    // -------------------------------------------------------------------------
+    // ATTENDANCE COLLECTION
+    // -------------------------------------------------------------------------
     match /attendance/{recordId} {
+      function isValidAttendance(data) {
+        return data.keys().hasAll(['userId', 'staff_name', 'staff_id', 'date', 'status', 'updated_at']) &&
+               data.keys().size() >= 6 && data.keys().size() <= 7 &&
+               isValidId(data.userId) &&
+               data.staff_name is string && data.staff_name.size() <= 200 &&
+               data.staff_id is string &&
+               data.date is string && data.date.size() <= 20 &&
+               data.status in ['Full Day', 'Half Day', 'Absent'] &&
+               data.updated_at is timestamp &&
+               (data.keys().size() == 6 || (data.keys().hasAll(['isAuto']) && data.isAuto is bool));
+      }
+
       allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isStaff());
-      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isStaff());
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && (resource.data.userId == request.auth.uid || isStaff());
+      allow list: if isSignedIn() && (isStaff() || resource.data.userId == request.auth.uid);
+      
+      allow create: if isSignedIn() && isValidAttendance(incoming());
+      allow update: if isSignedIn() && (isValidAttendance(incoming()) && (
+        isStaff() || 
+        (existing().userId == request.auth.uid && incoming().userId == existing().userId)
+      ));
       allow delete: if isAdmin();
     }
 
+    // -------------------------------------------------------------------------
+    // SALARIES COLLECTION
+    // -------------------------------------------------------------------------
     match /salaries/{salaryId} {
+      function isValidSalary(data) {
+        return data.keys().hasAll(['userId', 'staff_name', 'staff_id', 'month', 'base_salary', 'total_days', 'present_days', 'payable_salary', 'status', 'updated_at']) &&
+               data.keys().size() == 10 &&
+               isValidId(data.userId) &&
+               data.staff_name is string && data.staff_name.size() <= 200 &&
+               data.staff_id is string &&
+               data.month is string && data.month.size() <= 50 &&
+               data.base_salary is number &&
+               data.total_days is number &&
+               data.present_days is number &&
+               data.payable_salary is number &&
+               data.status in ['Pending', 'Paid'] &&
+               data.updated_at is timestamp;
+      }
+
       allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isStaff());
-      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isStaff());
-      allow write: if isAdmin();
+      allow list: if isSignedIn() && (isStaff() || resource.data.userId == request.auth.uid);
+      
+      allow create: if isAdmin() && isValidSalary(incoming());
+      allow update: if isAdmin() && (isValidSalary(incoming()) || (
+        isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'paid_at', 'updated_at'])
+      ));
+      allow delete: if isAdmin();
     }
 
     match /notifications/{notifId} {

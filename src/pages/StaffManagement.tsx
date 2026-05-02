@@ -18,6 +18,41 @@ import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string | null;
+    email?: string | null;
+    emailVerified?: boolean | null;
+  }
+}
+
+const handleFirestoreError = (error: unknown, operationType: OperationType, path: string | null, auth: any) => {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth?.uid,
+      email: auth?.email,
+      emailVerified: auth?.emailVerified,
+    },
+    operationType,
+    path
+  };
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+};
+
 const StaffManagement = () => {
   const { user: currentUser } = useAuth();
   const [activeView, setActiveView] = useState('staff'); // 'staff', 'attendance', 'payroll'
@@ -38,9 +73,7 @@ const StaffManagement = () => {
   const [attendanceData, setAttendanceData] = useState({
     userId: '',
     date: format(new Date(), 'yyyy-MM-dd'),
-    loginTime: '09:00',
-    logoutTime: '18:00',
-    status: 'Present'
+    status: 'Full Day'
   });
 
   // Modals State
@@ -79,6 +112,11 @@ const StaffManagement = () => {
         .filter((u: any) => !u.is_deleted);
       setStaff(staffList);
       setLoading(false);
+      
+      // Auto mark attendance for active staff
+      if (staffList.length > 0) {
+        autoMarkAttendance(staffList);
+      }
     });
 
     // Real-time Attendance
@@ -100,6 +138,35 @@ const StaffManagement = () => {
     };
   }, []); // Cleanup useEffect dependencies
 
+  const autoMarkAttendance = async (staffList: any[]) => {
+    const today = format(new Date(), 'yyyy-MM-dd');
+    const activeStaff = staffList.filter(s => s.role === 'staff' && s.status === 'active');
+    
+    for (const s of activeStaff) {
+      const attendanceId = `${s.id}_${today}`;
+      const attendanceRef = doc(db, 'attendance', attendanceId);
+      
+      try {
+        const docSnap = await getDoc(attendanceRef);
+        
+        if (!docSnap.exists()) {
+          await setDoc(attendanceRef, {
+            userId: s.id,
+            staff_name: s.name,
+            staff_id: s.staff_id || 'N/A',
+            date: today,
+            status: 'Full Day',
+            updated_at: serverTimestamp(),
+            isAuto: true
+          });
+        }
+      } catch (err) {
+        // Silent fail for auto-mark to not break UI, but log
+        console.warn('Auto-mark attendance failed for', s.name, err);
+      }
+    }
+  };
+
   const generateSalaries = async () => {
     setLoading(true);
     try {
@@ -107,11 +174,17 @@ const StaffManagement = () => {
       const start = new Date(fromDateFilter);
       const end = new Date(toDateFilter);
       
-      const attendanceSnap = await getDocs(query(
-        collection(db, 'attendance'),
-        where('date', '>=', format(start, 'yyyy-MM-dd')),
-        where('date', '<=', format(end, 'yyyy-MM-dd'))
-      ));
+      const attendancePath = 'attendance';
+      let attendanceSnap;
+      try {
+        attendanceSnap = await getDocs(query(
+          collection(db, attendancePath),
+          where('date', '>=', format(start, 'yyyy-MM-dd')),
+          where('date', '<=', format(end, 'yyyy-MM-dd'))
+        ));
+      } catch (err) {
+        handleFirestoreError(err, OperationType.LIST, attendancePath, currentUser);
+      }
       
       const attendanceData = attendanceSnap.docs.map(doc => doc.data());
       
@@ -119,29 +192,45 @@ const StaffManagement = () => {
 
       const salaryPromises = staffList.map(async s => {
         const staffAttendance = attendanceData.filter(a => a.userId === s.id);
-        const presentDays = staffAttendance.length;
+        const presentDays = staffAttendance.reduce((acc, current) => {
+          if (current.status === 'Full Day') return acc + 1;
+          if (current.status === 'Half Day') return acc + 0.5;
+          return acc;
+        }, 0);
         const totalDays = eachDayOfInterval({ start, end }).length;
         const baseSalary = s.salary_amount || 0;
         const payableSalary = Math.round((baseSalary / totalDays) * presentDays);
 
         const currentSalaryId = `${s.id}_${salaryId}`;
-        await setDoc(doc(db, 'salaries', currentSalaryId), {
-          userId: s.id,
-          staff_name: s.name,
-          staff_id: s.staff_id || 'N/A',
-          month: salaryId,
-          base_salary: baseSalary,
-          total_days: totalDays,
-          present_days: presentDays,
-          payable_salary: payableSalary,
-          status: 'Pending',
-          updated_at: serverTimestamp()
-        }, { merge: true });
+        const salariesPath = `salaries/${currentSalaryId}`;
+        try {
+          await setDoc(doc(db, 'salaries', currentSalaryId), {
+            userId: s.id,
+            staff_name: s.name,
+            staff_id: s.staff_id || 'N/A',
+            month: salaryId,
+            base_salary: baseSalary,
+            total_days: totalDays,
+            present_days: presentDays,
+            payable_salary: payableSalary,
+            status: 'Pending',
+            updated_at: serverTimestamp()
+          }, { merge: true });
+        } catch (err) {
+          handleFirestoreError(err, OperationType.WRITE, salariesPath, currentUser);
+        }
       });
       await Promise.all(salaryPromises);
       alert(`Salaries generated for ${salaryId}`);
     } catch (err) {
       console.error('Error generating salaries:', err);
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.startsWith('{')) {
+        const info = JSON.parse(msg);
+        alert(`Salary Generation Error: ${info.error} at ${info.path}`);
+      } else {
+        alert('Error generating salaries. Please check console.');
+      }
     } finally {
       setLoading(false);
     }
@@ -212,13 +301,6 @@ const StaffManagement = () => {
     e.preventDefault();
     try {
       const attendanceId = selectedAttendanceId || `${attendanceData.userId}_${attendanceData.date}`;
-      const [loginH, loginM] = attendanceData.loginTime.split(':');
-      const [logoutH, logoutM] = attendanceData.logoutTime.split(':');
-      
-      const loginDate = new Date(`${attendanceData.date}T${attendanceData.loginTime}`);
-      const logoutDate = new Date(`${attendanceData.date}T${attendanceData.logoutTime}`);
-      const hours = (logoutDate.getTime() - loginDate.getTime()) / (1000 * 60 * 60);
-
       const staffMember = staff.find(s => s.id === attendanceData.userId);
       
       await setDoc(doc(db, 'attendance', attendanceId), {
@@ -226,9 +308,6 @@ const StaffManagement = () => {
         staff_name: staffMember?.name || 'Unknown',
         staff_id: staffMember?.staff_id || 'N/A',
         date: attendanceData.date,
-        loginTime: loginDate.toISOString(),
-        logoutTime: logoutDate.toISOString(),
-        totalHours: Number(hours.toFixed(2)),
         status: attendanceData.status,
         updated_at: serverTimestamp()
       });
@@ -636,9 +715,6 @@ const StaffManagement = () => {
                   <tr className="bg-white/5 text-[10px] font-black uppercase tracking-widest text-slate-500">
                     <th className="px-6 py-4">Date</th>
                     <th className="px-6 py-4">Staff Member</th>
-                    <th className="px-6 py-4">Clock In</th>
-                    <th className="px-6 py-4">Clock Out</th>
-                    <th className="px-6 py-4">Hours</th>
                     <th className="px-6 py-4 text-right">Status</th>
                   </tr>
                 </thead>
@@ -657,12 +733,11 @@ const StaffManagement = () => {
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-xs text-slate-400">{format(new Date(at.loginTime), 'hh:mm a')}</td>
-                      <td className="px-6 py-4 text-xs text-slate-400">{at.logoutTime ? format(new Date(at.logoutTime), 'hh:mm a') : '--'}</td>
-                      <td className="px-6 py-4 text-xs font-mono text-blue-400">{at.totalHours || 0} hrs</td>
                       <td className="px-6 py-4 text-right flex items-center justify-end gap-2">
                         <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase ${
-                          at.status === 'Present' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'
+                          at.status === 'Full Day' ? 'bg-emerald-500/10 text-emerald-400' : 
+                          at.status === 'Half Day' ? 'bg-amber-500/10 text-amber-400' : 
+                          'bg-red-500/10 text-red-400'
                         }`}>
                           {at.status}
                         </span>
@@ -672,8 +747,6 @@ const StaffManagement = () => {
                             setAttendanceData({
                               userId: at.userId,
                               date: at.date,
-                              loginTime: format(new Date(at.loginTime), 'HH:mm'),
-                              logoutTime: at.logoutTime ? format(new Date(at.logoutTime), 'HH:mm') : '',
                               status: at.status
                             });
                             setShowAttendanceModal(true);
@@ -992,25 +1065,18 @@ const StaffManagement = () => {
                         className="w-full px-5 py-3 bg-slate-800/50 border border-slate-700 rounded-2xl text-white focus:border-amber-500 outline-none transition-all"
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="text-[10px] text-slate-500 uppercase font-bold tracking-widest ml-1">Clock In</label>
-                        <input 
-                          type="time" required
-                          value={attendanceData.loginTime} 
-                          onChange={e => setAttendanceData({...attendanceData, loginTime: e.target.value})}
-                          className="w-full px-5 py-3 bg-slate-800/50 border border-slate-700 rounded-2xl text-white focus:border-amber-500 outline-none transition-all"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[10px] text-slate-500 uppercase font-bold tracking-widest ml-1">Clock Out</label>
-                        <input 
-                          type="time" required
-                          value={attendanceData.logoutTime} 
-                          onChange={e => setAttendanceData({...attendanceData, logoutTime: e.target.value})}
-                          className="w-full px-5 py-3 bg-slate-800/50 border border-slate-700 rounded-2xl text-white focus:border-amber-500 outline-none transition-all"
-                        />
-                      </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] text-slate-500 uppercase font-bold tracking-widest ml-1">Attendance Status</label>
+                      <select 
+                        required
+                        value={attendanceData.status} 
+                        onChange={e => setAttendanceData({...attendanceData, status: e.target.value})}
+                        className="w-full px-5 py-3 bg-slate-800/50 border border-slate-700 rounded-2xl text-white focus:border-amber-500 outline-none transition-all"
+                      >
+                        <option value="Full Day">Full Day</option>
+                        <option value="Half Day">Half Day</option>
+                        <option value="Absent">Absent</option>
+                      </select>
                     </div>
                   </div>
 
