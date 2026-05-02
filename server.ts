@@ -33,9 +33,10 @@ const app = admin.initializeApp({
 const dbId = firebaseConfig.firestoreDatabaseId || process.env.FIREBASE_DATABASE_ID;
 const db = getFirestore(app, dbId);
 
+const expressApp = express();
+
 async function startServer() {
-  const app = express();
-  app.use(express.json());
+  expressApp.use(express.json());
   
   const PORT = 3000;
 
@@ -62,7 +63,7 @@ async function startServer() {
   };
 
   // API route to reset user password
-  app.post("/api/reset-password", isAdmin, async (req, res) => {
+  expressApp.post("/api/reset-password", isAdmin, async (req, res) => {
     const { uid, newPassword } = req.body;
     if (!uid || !newPassword) return res.status(400).json({ error: 'Missing params' });
     if (newPassword.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
@@ -82,18 +83,22 @@ async function startServer() {
       server: { middlewareMode: true },
       appType: "spa",
     });
-    app.use(vite.middlewares);
+    expressApp.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*all', (req, res) => {
+    expressApp.use(express.static(distPath));
+    expressApp.get('*all', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
+  if (!process.env.VERCEL) {
+    expressApp.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on http://localhost:${PORT}`);
+    });
+  }
 }
 
 startServer();
+
+export default expressApp;
