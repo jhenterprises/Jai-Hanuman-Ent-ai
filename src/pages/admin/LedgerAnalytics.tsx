@@ -44,10 +44,12 @@ const LedgerAnalytics = () => {
     let withdrawals = 0;
     
     ledger.forEach(item => {
-      if (item.type === 'credit') {
+      const p = (item.profit_amount || 0);
+      profit += p;
+
+      if (item.type === 'credit' || item.type === 'deposit') {
         revenue += (item.principle_amount || 0);
-        profit += (item.profit_amount || 0);
-      } else {
+      } else if (item.type === 'debit' || item.type === 'withdrawal') {
         withdrawals += Math.abs(item.total_amount || 0);
       }
     });
@@ -67,9 +69,12 @@ const LedgerAnalytics = () => {
       if (!grouped[date]) {
         grouped[date] = { date, revenue: 0, profit: 0, entries: 0 };
       }
-      if (item.type === 'credit') {
+      
+      const p = (item.profit_amount || 0);
+      grouped[date].profit += p;
+
+      if (item.type === 'credit' || item.type === 'deposit') {
         grouped[date].revenue += (item.principle_amount || 0);
-        grouped[date].profit += (item.profit_amount || 0);
       }
       grouped[date].entries += 1;
     });
@@ -84,9 +89,12 @@ const LedgerAnalytics = () => {
         report[name] = { name, entries: 0, revenue: 0, profit: 0 };
       }
       report[name].entries += 1;
-      if (item.type === 'credit') {
+      
+      const p = (item.profit_amount || 0);
+      report[name].profit += p;
+
+      if (item.type === 'credit' || item.type === 'deposit') {
         report[name].revenue += (item.principle_amount || 0);
-        report[name].profit += (item.profit_amount || 0);
       }
     });
     return Object.values(report).sort((a: any, b: any) => b.profit - a.profit);

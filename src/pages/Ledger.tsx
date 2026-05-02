@@ -133,7 +133,7 @@ const Ledger = () => {
         customer_name: newEntry.customer_name,
         service_name: newEntry.service_name,
         principle_amount: principle,
-        profit_amount: isDebit ? 0 : profit,
+        profit_amount: profit,
         total_amount: total,
         payment_mode: newEntry.payment_mode,
         type: isDebit ? 'withdrawal' : 'deposit',
@@ -195,7 +195,7 @@ const Ledger = () => {
         customer_name: newEntry.customer_name || 'N/A',
         service_name: newEntry.service_name || 'N/A',
         principle_amount: principle,
-        profit_amount: isDebit ? 0 : profit,
+        profit_amount: profit,
         total_amount: isDebit ? -principle : (principle + profit),
         payment_mode: newEntry.payment_mode,
         updated_at: serverTimestamp()
