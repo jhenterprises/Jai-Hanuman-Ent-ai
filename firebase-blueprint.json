@@ -113,7 +113,7 @@
         "principle_amount": { "type": "number" },
         "profit_amount": { "type": "number" },
         "total_amount": { "type": "number" },
-        "payment_mode": { "type": "string", "enum": ["Cash", "PhonePe", "UPI"] },
+        "payment_mode": { "type": "string", "enum": ["Cash", "PhonePe", "GPay"] },
         "service_type": { "type": "string", "enum": ["Service", "Money Transfer", "Cash Withdrawal", "Other"] },
         "type": { "type": "string", "enum": ["credit", "debit"] },
         "date_string": { "type": "string" },

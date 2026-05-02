@@ -227,41 +227,131 @@ const Ledger = () => {
     }
   };
 
-  const exportToExcel = () => {
-    const dataRows = filtered.map(item => ({
-      'SN': item.serial_number,
-      'Date & Time': item.created_at?.toDate()?.toLocaleString() || '',
-      'Customer': item.customer_name,
-      'Service': item.service_name,
-      'Principal': item.principle_amount,
-      'Profit': item.profit_amount,
-      'Total': item.total_amount,
-      'Balance': item.runningBalance,
-      'Mode': item.payment_mode,
-      'Staff': item.staff_name
-    }));
+  const exportToExcel = async () => {
+    const ExcelJS = await import('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Ledger');
+
+    // Define columns
+    worksheet.columns = [
+      { header: 'SN', key: 'sn', width: 5 },
+      { header: 'Date & Time', key: 'date', width: 25 },
+      { header: 'Customer', key: 'customer', width: 25 },
+      { header: 'Service', key: 'service', width: 25 },
+      { header: 'Principal', key: 'principal', width: 15 },
+      { header: 'Profit', key: 'profit', width: 15 },
+      { header: 'Total', key: 'total', width: 15 },
+      { header: 'Balance', key: 'balance', width: 15 },
+      { header: 'Mode', key: 'mode', width: 12 },
+      { header: 'Staff', key: 'staff', width: 15 }
+    ];
+
+    // Style Header
+    const headerRow = worksheet.getRow(1);
+    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    headerRow.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF1E293B' } // slate-800
+    };
+    headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
+
+    // Add Data Rows
+    filtered.forEach(item => {
+      worksheet.addRow({
+        sn: item.serial_number,
+        date: item.created_at?.toDate()?.toLocaleString() || '',
+        customer: item.customer_name,
+        service: item.service_name,
+        principal: item.principle_amount,
+        profit: item.profit_amount,
+        total: item.total_amount,
+        balance: item.runningBalance,
+        mode: item.payment_mode,
+        staff: item.staff_name
+      });
+    });
 
     // Add Total Row
     if (filtered.length > 0) {
-      const totals = {
-        'SN': '',
-        'Date & Time': 'GRAND TOTAL',
-        'Customer': '',
-        'Service': '',
-        'Principal': filtered.reduce((sum, item) => sum + Math.abs(item.principle_amount || 0), 0),
-        'Profit': filtered.reduce((sum, item) => sum + (item.profit_amount || 0), 0),
-        'Total': filtered.reduce((sum, item) => sum + (item.total_amount || 0), 0),
-        'Balance': filtered[filtered.length - 1].runningBalance,
-        'Mode': '',
-        'Staff': ''
+      const totalPrincipal = filtered.reduce((sum, item) => sum + Math.abs(item.principle_amount || 0), 0);
+      const totalProfit = filtered.reduce((sum, item) => sum + (item.profit_amount || 0), 0);
+      const totalAmount = filtered.reduce((sum, item) => sum + (item.total_amount || 0), 0);
+      const finalBalance = filtered[filtered.length - 1].runningBalance;
+
+      const totalRow = worksheet.addRow({
+        sn: '',
+        date: 'GRAND TOTAL',
+        customer: '',
+        service: '',
+        principal: totalPrincipal,
+        profit: totalProfit,
+        total: totalAmount,
+        balance: finalBalance,
+        mode: '',
+        staff: ''
+      });
+
+      // Style Total Row
+      totalRow.font = { bold: true };
+      totalRow.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFF1F5F9' } // slate-100
       };
-      dataRows.push(totals);
+      
+      // Add Spacer
+      worksheet.addRow({});
+      
+      // Add Split Header
+      const splitHeader = worksheet.addRow({ date: 'PAYMENT MODE SPLIT' });
+      splitHeader.font = { bold: true };
+      splitHeader.getCell(2).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFCBD5E1' } // slate-300
+      };
+
+      // Calculate Split
+      const splitStats: Record<string, { total: number, profit: number }> = {};
+      filtered.forEach(item => {
+        const mode = item.payment_mode || 'Cash';
+        if (!splitStats[mode]) splitStats[mode] = { total: 0, profit: 0 };
+        splitStats[mode].total += (item.total_amount || 0);
+        splitStats[mode].profit += (item.profit_amount || 0);
+      });
+
+      Object.entries(splitStats).forEach(([mode, stats]) => {
+        const row = worksheet.addRow([
+          '', // SN
+          mode, // Date/Mode
+          `Profit: ₹${stats.profit.toLocaleString()}`, // Customer
+          `Net: ₹${stats.total.toLocaleString()}`, // Service
+        ]);
+        row.getCell(2).font = { bold: true };
+      });
     }
 
-    const ws = XLSX.utils.json_to_sheet(dataRows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Ledger");
-    XLSX.writeFile(wb, `Ledger_${dateRange.from}_to_${dateRange.to}.xlsx`);
+    // Border for all cells
+    worksheet.eachRow((row) => {
+      row.eachCell((cell) => {
+        cell.border = {
+          top: { style: 'thin' },
+          left: { style: 'thin' },
+          bottom: { style: 'thin' },
+          right: { style: 'thin' }
+        };
+      });
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `Ledger_${dateRange.from}_to_${dateRange.to}.xlsx`;
+    anchor.click();
+    window.URL.revokeObjectURL(url);
   };
 
   const exportToPDF = () => {
@@ -286,7 +376,16 @@ const Ledger = () => {
     const totalAmount = filtered.reduce((sum, item) => sum + (item.total_amount || 0), 0);
     const finalBalance = filtered.length > 0 ? filtered[filtered.length - 1].runningBalance : 0;
 
-    const footerRow = ["", "TOTAL", "", "", totalPrincipal.toLocaleString(), totalProfit.toLocaleString(), totalAmount.toLocaleString(), finalBalance.toLocaleString()];
+    const footerRow = [
+      "", 
+      "TOTAL", 
+      "", 
+      "", 
+      `Rs.${totalPrincipal.toLocaleString()}`, 
+      `Rs.${totalProfit.toLocaleString()}`, 
+      `Rs.${totalAmount.toLocaleString()}`, 
+      `Rs.${finalBalance.toLocaleString()}`
+    ];
 
     autoTable(doc, {
       head: [tableColumn],
@@ -294,9 +393,37 @@ const Ledger = () => {
       foot: [footerRow],
       startY: 20,
       theme: 'grid',
+      styles: { fontSize: 8, cellPadding: 2 },
       headStyles: { fillColor: [51, 65, 85] }, // slate-700 equivalent
       footStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontStyle: 'bold' } // slate-100/900 equivalent
     });
+
+    // Add Payment Split Table
+    const splitStats: Record<string, { total: number, profit: number }> = {};
+    filtered.forEach(item => {
+      const mode = item.payment_mode || 'Cash';
+      if (!splitStats[mode]) splitStats[mode] = { total: 0, profit: 0 };
+      splitStats[mode].total += (item.total_amount || 0);
+      splitStats[mode].profit += (item.profit_amount || 0);
+    });
+
+    const splitRows = Object.entries(splitStats).map(([mode, stats]) => [
+      mode,
+      `Rs.${stats.profit.toLocaleString()}`,
+      `Rs.${stats.total.toLocaleString()}`
+    ]);
+
+    autoTable(doc, {
+      head: [['Payment Mode', 'Total Profit', 'Net Balance']],
+      body: splitRows,
+      startY: (doc as any).lastAutoTable.finalY + 10,
+      margin: { left: 100 }, // Align to the right
+      tableWidth: 80,
+      theme: 'grid',
+      styles: { fontSize: 8, cellPadding: 2 },
+      headStyles: { fillColor: [30, 41, 59] }
+    });
+
     doc.save(`Ledger_${dateRange.from}_to_${dateRange.to}.pdf`);
   };
 
@@ -435,6 +562,16 @@ const Ledger = () => {
   
   const dailyTotalBalance = ledger.reduce((sum, item) => sum + (item.total_amount || 0), 0);
 
+  const paymentTotals = useMemo(() => {
+    const totals: Record<string, number> = { 'Cash': 0, 'PhonePe': 0, 'GPay': 0 };
+    ledger.forEach(item => {
+      const mode = item.payment_mode || 'Cash';
+      if (!(mode in totals)) totals[mode] = 0;
+      totals[mode] += (item.total_amount || 0);
+    });
+    return totals;
+  }, [ledger]);
+
   return (
     <div className="space-y-6 pb-10">
       <Toaster position="top-right" />
@@ -537,9 +674,22 @@ const Ledger = () => {
             ₹{dailyTotalBalance.toLocaleString()}
           </p>
         </div>
-        <div className="bg-slate-800 p-6 rounded-3xl border border-slate-700 shadow-xl">
-          <p className="text-slate-400 text-sm mb-1">Total Entries</p>
-          <p className="text-3xl font-bold text-blue-400">{ledger.length}</p>
+        <div className="bg-slate-800 p-6 rounded-3xl border border-slate-700 shadow-xl overflow-hidden">
+          <p className="text-slate-400 text-sm mb-3">Balance Split</p>
+          <div className="flex gap-4">
+            <div className="flex-1">
+              <p className="text-[10px] text-orange-400 font-bold uppercase">Cash</p>
+              <p className="text-lg font-bold text-white">₹{paymentTotals['Cash']?.toLocaleString() || 0}</p>
+            </div>
+            <div className="flex-1 border-x border-slate-700 px-4">
+              <p className="text-[10px] text-purple-400 font-bold uppercase">PhonePe</p>
+              <p className="text-lg font-bold text-white">₹{paymentTotals['PhonePe']?.toLocaleString() || 0}</p>
+            </div>
+            <div className="flex-1">
+              <p className="text-[10px] text-blue-400 font-bold uppercase">GPay</p>
+              <p className="text-lg font-bold text-white">₹{paymentTotals['GPay']?.toLocaleString() || 0}</p>
+            </div>
+          </div>
         </div>
         <div className="relative">
           <input 
@@ -645,7 +795,7 @@ const Ledger = () => {
               >
                 <option value="Cash">Cash</option>
                 <option value="PhonePe">PhonePe</option>
-                <option value="UPI">UPI</option>
+                <option value="GPay">GPay</option>
                 <option value="Bank Transfer">Bank Transfer</option>
               </select>
             </div>

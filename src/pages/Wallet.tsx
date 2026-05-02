@@ -392,7 +392,7 @@ const Wallet = () => {
               </button>
 
               <div className="flex items-center justify-center gap-4 opacity-50 grayscale">
-                <img src="https://upload.wikimedia.org/wikipedia/commons/e/e1/UPI-Logo.png" alt="UPI" className="h-4" />
+                <img src="https://upload.wikimedia.org/wikipedia/commons/e/e1/UPI-Logo.png" alt="GPay" className="h-4" />
                 <img src="https://upload.wikimedia.org/wikipedia/commons/8/89/Razorpay_logo.svg" alt="Razorpay" className="h-4" />
               </div>
             </form>

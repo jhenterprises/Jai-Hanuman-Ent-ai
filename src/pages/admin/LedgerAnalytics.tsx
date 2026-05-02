@@ -100,6 +100,27 @@ const LedgerAnalytics = () => {
     return Object.values(report).sort((a: any, b: any) => b.profit - a.profit);
   }, [ledger]);
 
+  const paymentReport = useMemo(() => {
+    const report: any = {};
+    ledger.forEach(item => {
+      const mode = item.payment_mode || 'Cash';
+      if (!report[mode]) {
+        report[mode] = { mode, entries: 0, revenue: 0, profit: 0, withdrawals: 0 };
+      }
+      report[mode].entries += 1;
+      
+      const p = (item.profit_amount || 0);
+      report[mode].profit += p;
+
+      if (item.type === 'credit' || item.type === 'deposit') {
+        report[mode].revenue += (item.principle_amount || 0);
+      } else {
+        report[mode].withdrawals += Math.abs(item.total_amount || 0);
+      }
+    });
+    return Object.values(report).sort((a: any, b: any) => b.revenue - a.revenue);
+  }, [ledger]);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -217,6 +238,45 @@ const LedgerAnalytics = () => {
                     <td className="py-4 text-center text-sm text-slate-400 font-mono">{staff.entries}</td>
                     <td className="py-4 text-right text-sm text-slate-400 font-mono">₹{staff.revenue.toLocaleString()}</td>
                     <td className="py-4 text-right text-sm font-bold text-green-400 font-mono">₹{staff.profit.toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="bg-slate-800 p-6 rounded-3xl border border-slate-700 shadow-xl overflow-hidden">
+          <h3 className="text-lg font-bold text-white mb-6">Payment Mode Split</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="text-slate-400 text-xs uppercase tracking-wider">
+                  <th className="pb-4 font-bold">Mode</th>
+                  <th className="pb-4 font-bold text-center">Entries</th>
+                  <th className="pb-4 font-bold text-right">Revenue</th>
+                  <th className="pb-4 font-bold text-right">Profit</th>
+                  <th className="pb-4 font-bold text-right text-red-400">Withdrawals</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-700/30">
+                {paymentReport.map((pay: any) => (
+                  <tr key={pay.mode} className="hover:bg-slate-700/20">
+                    <td className="py-4">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                          pay.mode === 'Cash' ? 'bg-orange-500/10 text-orange-400' : 
+                          pay.mode === 'PhonePe' ? 'bg-purple-500/10 text-purple-400' :
+                          'bg-blue-500/10 text-blue-400'
+                        }`}>
+                          {pay.mode === 'GPay' ? 'GP' : pay.mode.substring(0, 2).toUpperCase()}
+                        </div>
+                        <span className="text-sm font-medium text-slate-200">{pay.mode}</span>
+                      </div>
+                    </td>
+                    <td className="py-4 text-center text-sm text-slate-400 font-mono">{pay.entries}</td>
+                    <td className="py-4 text-right text-sm text-slate-400 font-mono">₹{pay.revenue.toLocaleString()}</td>
+                    <td className="py-4 text-right text-sm font-bold text-green-400 font-mono">₹{pay.profit.toLocaleString()}</td>
+                    <td className="py-4 text-right text-sm text-red-400/80 font-mono">₹{pay.withdrawals.toLocaleString()}</td>
                   </tr>
                 ))}
               </tbody>

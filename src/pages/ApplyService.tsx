@@ -934,7 +934,7 @@ const ApplyService = () => {
               >
                 <QrCode size={32} />
                 <div className="text-center">
-                  <div className="font-bold">UPI / Cards</div>
+                  <div className="font-bold">GPay / Cards</div>
                   <div className="text-[10px] opacity-60">Razorpay Secure</div>
                 </div>
               </button>
@@ -944,7 +944,7 @@ const ApplyService = () => {
               <div className="p-4 bg-orange-500/10 border border-orange-500/20 rounded-2xl flex items-start gap-3 mt-4">
                 <AlertTriangle className="text-orange-500 shrink-0" size={18} />
                 <p className="text-xs text-orange-200/80">
-                  Insufficient wallet balance. You can pay using UPI/Cards or <Link to="/app/wallet" className="text-orange-500 font-bold hover:underline">add money</Link> to your wallet.
+                  Insufficient wallet balance. You can pay using GPay/Cards or <Link to="/app/wallet" className="text-orange-500 font-bold hover:underline">add money</Link> to your wallet.
                 </p>
               </div>
             )}
