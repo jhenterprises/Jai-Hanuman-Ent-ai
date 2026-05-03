@@ -3,31 +3,41 @@ import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from 'url';
 import admin from 'firebase-admin';
-import firebaseConfig from './firebase-applet-config.json' with { type: "json" };
+import { readFileSync } from 'fs';
 
 import { getFirestore } from 'firebase-admin/firestore';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Load config manually to avoid import attribute issues
+const firebaseConfigPath = path.join(__dirname, 'firebase-applet-config.json');
+const firebaseConfig = JSON.parse(readFileSync(firebaseConfigPath, 'utf8'));
+
 // Initialize Firebase Admin
 let credential;
-if (process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
-  let privateKey = process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n');
-  privateKey = privateKey.replace(/^"|"$/g, '');
-  credential = admin.credential.cert({
-    projectId: process.env.FIREBASE_PROJECT_ID || firebaseConfig.projectId,
-    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-    privateKey,
-  });
-} else {
-  credential = admin.credential.applicationDefault();
+try {
+  if (process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
+    let privateKey = process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n');
+    privateKey = privateKey.replace(/^"|"$/g, '');
+    credential = admin.credential.cert({
+      projectId: process.env.FIREBASE_PROJECT_ID || firebaseConfig.projectId,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey,
+    });
+  } else {
+    // If we're in AI Studio, it might not have application default credentials set up correctly for local dev
+    // but initializeApp might still work if it's already been set up by the environment.
+    credential = admin.credential.applicationDefault();
+  }
+} catch (e) {
+  console.error('Error setting up Firebase credential:', e);
 }
 
 const firebaseApp = admin.initializeApp({
   credential,
   projectId: process.env.FIREBASE_PROJECT_ID || firebaseConfig.projectId,
-}, 'admin-app'); // Use a name to avoid conflict if already initialized
+}, 'admin-app'); 
 
 const dbId = firebaseConfig.firestoreDatabaseId || process.env.FIREBASE_DATABASE_ID;
 const db = getFirestore(firebaseApp, dbId);
@@ -35,6 +45,12 @@ const auth = admin.auth(firebaseApp);
 
 const expressApp = express();
 expressApp.use(express.json());
+
+// Global logging middleware
+expressApp.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} ${req.method} ${req.url}`);
+  next();
+});
 
 // API health check
 expressApp.get("/api/health", (req, res) => {
@@ -104,6 +120,12 @@ expressApp.post("/api/reset-password", isAdmin, async (req, res) => {
     
     res.status(500).json({ error: 'Internal server error while resetting password' });
   }
+});
+
+// Global Error Handler
+expressApp.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error('Unhandled Error:', err);
+  res.status(500).json({ error: 'Internal Server Error', message: err.message });
 });
 
 async function startServer() {

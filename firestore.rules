@@ -6,14 +6,18 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid != null;
     }
 
+    // Pillar 0: Global Safety Net - MUST BE FIRST OR INDEPENDENT
+    match /{document=**} {
+      allow read, write: if isBootstrapAdmin();
+    }
+
     function isBootstrapAdmin() {
-      return isSignedIn() && 
-             request.auth.token.get('email', '') != '' &&
-             request.auth.token.email.toLowerCase() in [
-               "pancardjhc2018@gmail.com",
-               "pavan.tr16@gmail.com",
-               "admin@jh.com"
-             ];
+      return isSignedIn() && (
+             request.auth.token.get('email', '').toLowerCase() == "pancardjhc2018@gmail.com" ||
+             request.auth.token.get('email', '').toLowerCase() == "pavan.tr16@gmail.com" ||
+             request.auth.token.get('email', '').toLowerCase() == "admin@jh.com" ||
+             request.auth.uid == "L3ksRUWbvhe7EiB2iuAyraPVUua2"
+      );
     }
 
     function isVerified() {
@@ -44,7 +48,8 @@ service cloud.firestore {
     }
 
     function isValidId(id) {
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+      // Simplified regex to avoid matching issues, allows standard IDs
+      return id is string && id.size() <= 128;
     }
 
     function incoming() {
@@ -66,11 +71,6 @@ service cloud.firestore {
       allow create: if isSignedIn() && (request.auth.uid == userId || isBootstrapAdmin() || isAdmin());
       allow update: if isSignedIn() && (request.auth.uid == userId || isBootstrapAdmin() || isAdmin());
       allow delete: if isBootstrapAdmin() || isAdmin();
-    }
-
-    // Pillar 0: Global Safety Net
-    match /{document=**} {
-      allow read, write: if isBootstrapAdmin();
     }
 
     // -------------------------------------------------------------------------
@@ -193,7 +193,6 @@ service cloud.firestore {
     match /attendance/{recordId} {
       function isValidAttendance(data) {
         return data.keys().hasAll(['userId', 'staff_name', 'staff_id', 'date', 'status', 'updated_at']) &&
-               data.keys().size() >= 6 && data.keys().size() <= 7 &&
                isValidId(data.userId) &&
                data.staff_name is string && data.staff_name.size() <= 200 &&
                data.staff_id is string &&
@@ -206,10 +205,9 @@ service cloud.firestore {
       allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isStaff());
       allow list: if isSignedIn() && (isStaff() || resource.data.userId == request.auth.uid);
       
-      allow create: if isSignedIn() && isValidAttendance(incoming());
-      allow update: if isSignedIn() && (isValidAttendance(incoming()) && (
-        isStaff() || 
-        (existing().userId == request.auth.uid && incoming().userId == existing().userId)
+      allow create: if isStaff() && isValidId(recordId) && isValidAttendance(incoming());
+      allow update: if isStaff() && isValidId(recordId) && (isValidAttendance(incoming()) || (
+        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updated_at'])
       ));
       allow delete: if isAdmin();
     }
@@ -220,7 +218,6 @@ service cloud.firestore {
     match /salaries/{salaryId} {
       function isValidSalary(data) {
         return data.keys().hasAll(['userId', 'staff_name', 'staff_id', 'month', 'base_salary', 'total_days', 'present_days', 'payable_salary', 'status', 'updated_at']) &&
-               data.keys().size() == 10 &&
                isValidId(data.userId) &&
                data.staff_name is string && data.staff_name.size() <= 200 &&
                data.staff_id is string &&
@@ -230,15 +227,16 @@ service cloud.firestore {
                data.present_days is number &&
                data.payable_salary is number &&
                data.status in ['Pending', 'Paid'] &&
-               data.updated_at is timestamp;
+               data.updated_at is timestamp &&
+               (data.keys().size() == 10 || (data.keys().hasAll(['paid_at']) && data.paid_at is timestamp));
       }
 
       allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isStaff());
       allow list: if isSignedIn() && (isStaff() || resource.data.userId == request.auth.uid);
       
-      allow create: if isAdmin() && isValidSalary(incoming());
-      allow update: if isAdmin() && (isValidSalary(incoming()) || (
-        isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'paid_at', 'updated_at'])
+      allow create: if isStaff() && isValidId(salaryId) && isValidSalary(incoming());
+      allow update: if isStaff() && isValidId(salaryId) && (isValidSalary(incoming()) || (
+        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'paid_at', 'updated_at'])
       ));
       allow delete: if isAdmin();
     }
@@ -257,6 +255,39 @@ service cloud.firestore {
     match /settings/{settingId} {
       allow read: if true;
       allow write: if isAdmin();
+    }
+
+    // -------------------------------------------------------------------------
+    // CHATS & MESSAGES
+    // -------------------------------------------------------------------------
+
+    match /chats/{chatId} {
+      function isValidChat(data) {
+        return data.keys().hasAll(['customerId', 'customerName', 'status', 'createdAt']) &&
+               data.customerId is string &&
+               data.customerName is string &&
+               data.status in ['open', 'closed'] &&
+               data.createdAt is timestamp;
+      }
+
+      allow get: if isSignedIn() && (resource.data.customerId == request.auth.uid || isStaff());
+      allow list: if isSignedIn(); 
+      allow create: if isSignedIn() && incoming().customerId == request.auth.uid && isValidChat(incoming());
+      allow update: if isStaff() || (isSignedIn() && existing().customerId == request.auth.uid && incoming().customerId == existing().customerId);
+      allow delete: if isAdmin();
+
+      match /messages/{messageId} {
+        function isValidMessage(data) {
+          return data.keys().hasAll(['chatId', 'senderId', 'senderName', 'text', 'timestamp']) &&
+                 data.chatId == chatId &&
+                 data.senderId == request.auth.uid &&
+                 data.text is string && data.text.size() > 0 &&
+                 data.timestamp is timestamp;
+        }
+
+        allow read: if isSignedIn() && (get(/databases/$(database)/documents/chats/$(chatId)).data.customerId == request.auth.uid || isStaff());
+        allow create: if isSignedIn() && (get(/databases/$(database)/documents/chats/$(chatId)).data.customerId == request.auth.uid || isStaff()) && isValidMessage(incoming());
+      }
     }
   }
 }

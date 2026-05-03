@@ -24,6 +24,7 @@ const ApplyService = lazy(() => import('./pages/ApplyService'));
 const Wallet = lazy(() => import('./pages/Wallet'));
 const Support = lazy(() => import('./pages/Support'));
 const StaffManagement = lazy(() => import('./pages/StaffManagement'));
+const SupportCenter = lazy(() => import('./pages/SupportCenter'));
 const Profile = lazy(() => import('./pages/Profile'));
 const Settings = lazy(() => import('./pages/Settings'));
 const PortalConfig = lazy(() => import('./pages/PortalConfig'));
@@ -112,6 +113,7 @@ export default function App() {
                   <Route path="staff-management" element={<ProtectedRoute roles={['admin']}><StaffManagement /></ProtectedRoute>} />
                   <Route path="applications" element={<ProtectedRoute roles={['admin', 'staff']}><Applications /></ProtectedRoute>} />
                   <Route path="support" element={<ProtectedRoute roles={['admin', 'staff']}><Support /></ProtectedRoute>} />
+                  <Route path="support-center" element={<ProtectedRoute roles={['admin', 'staff']}><SupportCenter /></ProtectedRoute>} />
                   <Route path="recycle-bin" element={<ProtectedRoute roles={['admin']}><RecycleBin /></ProtectedRoute>} />
                   <Route path="wallet" element={<Wallet />} />
                   <Route path="profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />

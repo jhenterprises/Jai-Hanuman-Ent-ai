@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { auth, db } from '../lib/firebase';
-import { collection, query, where, orderBy, limit, getDocs, updateDoc, doc } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, getDocs, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { useConfig } from '../context/ConfigContext';
-import AIChatbot from '../components/AIChatbot';
+import LiveSupport from '../components/LiveSupport';
 import { safeFormat } from '../utils/dateUtils';
 import { 
   LayoutDashboard, 
@@ -16,16 +16,17 @@ import {
   X,
   Settings,
   Wallet as WalletIcon,
-  MessageSquare,
-  Sun,
-  Moon,
-  Home,
-  Bell,
-  Link as LinkIcon,
-  CheckCircle2,
-  Clock,
-  Trash2,
-  TrendingUp
+  MessageSquare, 
+  Sun, 
+  Moon, 
+  Home, 
+  Bell, 
+  Link as LinkIcon, 
+  CheckCircle2, 
+  Clock, 
+  Trash2, 
+  TrendingUp,
+  Headphones
 } from 'lucide-react';
 
 const DashboardLayout = () => {
@@ -37,6 +38,24 @@ const DashboardLayout = () => {
   const [isDark, setIsDark] = useState(true);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
+
+  // Update last_active periodically
+  useEffect(() => {
+    if (user?.uid) {
+      const updatePresence = async () => {
+        try {
+          await updateDoc(doc(db, 'users', user.uid), {
+            last_active: serverTimestamp()
+          });
+        } catch (e) {
+          console.error("Presence update failed", e);
+        }
+      };
+      updatePresence();
+      const interval = setInterval(updatePresence, 3 * 60 * 1000); // every 3 mins
+      return () => clearInterval(interval);
+    }
+  }, [user?.uid]);
 
   // Initialize theme
   useEffect(() => {
@@ -110,6 +129,8 @@ const DashboardLayout = () => {
     { path: '/app/users', label: 'Users List', icon: <Users size={20} />, roles: ['admin', 'staff'] },
     { path: '/app/staff-management', label: 'Staff Management', icon: <Users size={20} />, roles: ['admin'] },
     { path: '/app/admin/wallets', label: 'Wallet Management', icon: <WalletIcon size={20} />, roles: ['admin'] },
+    { path: '/app/support', label: 'Ticket Support', icon: <MessageSquare size={20} />, roles: ['admin', 'staff', 'user'] },
+    { path: '/app/support-center', label: 'Live Chat Support', icon: <Headphones size={20} />, roles: ['admin', 'staff'] },
     { path: '/app/recycle-bin', label: 'Recycle Bin', icon: <Trash2 size={20} />, roles: ['admin'] },
     { path: '/app/settings/portal', label: 'Portal Config', icon: <Settings size={20} />, roles: ['admin'] },
     { path: '/app/settings', label: 'Settings', icon: <Settings size={20} />, roles: ['admin', 'staff', 'user'] },
@@ -133,9 +154,10 @@ const DashboardLayout = () => {
       <aside className={`
         fixed inset-y-0 left-0 z-30 w-64 bg-slate-800/80 backdrop-blur-xl border-r border-slate-700/50
         transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0
+        flex flex-col
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
-        <div className="flex items-center justify-between h-16 px-6 border-b border-slate-700/50">
+        <div className="flex items-center justify-between h-16 px-6 border-b border-slate-700/50 flex-shrink-0">
           <Link to="/app" className="flex items-center gap-2">
             <div className="w-8 h-8 bg-white p-0.5 rounded-lg flex items-center justify-center shadow-lg overflow-hidden">
               <img src={config.logo_url || "/logo.svg"} alt="JH Logo" className="w-full h-full object-contain" />
@@ -154,7 +176,7 @@ const DashboardLayout = () => {
           </button>
         </div>
 
-        <nav className="p-4 space-y-1">
+        <nav className="flex-1 overflow-y-auto p-4 space-y-1 custom-scrollbar">
           {filteredNavItems.map((item) => {
             const isActive = location.pathname === item.path;
             return (
@@ -282,7 +304,7 @@ const DashboardLayout = () => {
           </div>
         </main>
       </div>
-      <AIChatbot />
+      <LiveSupport />
     </div>
   );
 };

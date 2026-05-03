@@ -151,10 +151,10 @@ const StaffManagement = () => {
         
         if (!docSnap.exists()) {
           await setDoc(attendanceRef, {
-            userId: s.id,
-            staff_name: s.name,
-            staff_id: s.staff_id || 'N/A',
-            date: today,
+            userId: String(s.id),
+            staff_name: String(s.name || 'Unknown'),
+            staff_id: String(s.staff_id || 'N/A'),
+            date: String(today),
             status: 'Full Day',
             updated_at: serverTimestamp(),
             isAuto: true
@@ -205,14 +205,14 @@ const StaffManagement = () => {
         const salariesPath = `salaries/${currentSalaryId}`;
         try {
           await setDoc(doc(db, 'salaries', currentSalaryId), {
-            userId: s.id,
-            staff_name: s.name,
-            staff_id: s.staff_id || 'N/A',
-            month: salaryId,
-            base_salary: baseSalary,
-            total_days: totalDays,
-            present_days: presentDays,
-            payable_salary: payableSalary,
+            userId: String(s.id),
+            staff_name: String(s.name || 'Unknown'),
+            staff_id: String(s.staff_id || 'N/A'),
+            month: String(salaryId),
+            base_salary: Number(baseSalary),
+            total_days: Number(totalDays),
+            present_days: Number(presentDays),
+            payable_salary: Number(payableSalary),
             status: 'Pending',
             updated_at: serverTimestamp()
           }, { merge: true });
@@ -299,16 +299,17 @@ const StaffManagement = () => {
 
   const saveAttendance = async (e: React.FormEvent) => {
     e.preventDefault();
+    const attendanceId = selectedAttendanceId || `${attendanceData.userId}_${attendanceData.date}`;
+    const attendancePath = `attendance/${attendanceId}`;
     try {
-      const attendanceId = selectedAttendanceId || `${attendanceData.userId}_${attendanceData.date}`;
       const staffMember = staff.find(s => s.id === attendanceData.userId);
       
       await setDoc(doc(db, 'attendance', attendanceId), {
-        userId: attendanceData.userId,
-        staff_name: staffMember?.name || 'Unknown',
-        staff_id: staffMember?.staff_id || 'N/A',
-        date: attendanceData.date,
-        status: attendanceData.status,
+        userId: String(attendanceData.userId),
+        staff_name: String(staffMember?.name || 'Unknown'),
+        staff_id: String(staffMember?.staff_id || 'N/A'),
+        date: String(attendanceData.date),
+        status: String(attendanceData.status),
         updated_at: serverTimestamp()
       });
       
@@ -316,7 +317,7 @@ const StaffManagement = () => {
       setSelectedAttendanceId(null);
       alert('Attendance record saved successfully');
     } catch (err) {
-      console.error('Error saving manual attendance:', err);
+      handleFirestoreError(err, OperationType.WRITE, attendancePath, currentUser);
     }
   };
 

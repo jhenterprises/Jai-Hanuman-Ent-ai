@@ -13,6 +13,7 @@
         "staff_id": { "type": "string", "description": "Employee ID (JH-STF-001)" },
         "salary_amount": { "type": "number", "description": "Monthly base salary" },
         "status": { "type": "string", "enum": ["active", "disabled"] },
+        "last_active": { "type": "string", "format": "date-time", "description": "Last seen online" },
         "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" }
       },
       "required": ["uid", "name", "email", "role"]
@@ -189,6 +190,34 @@
         "deleted_at": { "type": "string", "format": "date-time" },
         "data": { "type": "object" }
       }
+    },
+    "chats": {
+      "title": "Chat",
+      "description": "Support chat session",
+      "type": "object",
+      "properties": {
+        "customerId": { "type": "string" },
+        "customerName": { "type": "string" },
+        "status": { "type": "string", "enum": ["open", "closed"] },
+        "lastMessage": { "type": "string" },
+        "lastMessageAt": { "type": "string", "format": "date-time" },
+        "unreadCount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["customerId", "customerName", "status", "createdAt"]
+    },
+    "messages": {
+      "title": "Message",
+      "description": "Single message in a chat session",
+      "type": "object",
+      "properties": {
+        "chatId": { "type": "string" },
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "text": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["chatId", "senderId", "text", "timestamp"]
     }
   },
   "firestore": {
@@ -243,6 +272,14 @@
     "/settings/portal": {
       "schema": "portal_config",
       "description": "Main portal configuration"
+    },
+    "/chats/{chatId}": {
+      "schema": "chats",
+      "description": "Active support chat sessions"
+    },
+    "/chats/{chatId}/messages/{messageId}": {
+      "schema": "messages",
+      "description": "Messages within a chat session"
     }
   }
 }
