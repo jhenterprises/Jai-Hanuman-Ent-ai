@@ -11,7 +11,7 @@ import {
   serverTimestamp,
   updateDoc
 } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
+import { db, auth } from '../../lib/firebase';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Plus, 
@@ -64,12 +64,16 @@ const LedgerSettings = () => {
         setLoading(false);
       } catch (err) {
         console.error("Error processing field configs:", err);
-        toast.error("Failed to process field configurations");
+        toast.error("Data error. Check console.");
         setLoading(false);
       }
     }, (error) => {
-      console.error("Ledger config snapshot error:", error);
-      toast.error("Permission denied or connection lost");
+      if (error.code === 'permission-denied') {
+        console.error("Ledger config: Permission Denied. User:", auth.currentUser?.email, "UID:", auth.currentUser?.uid);
+      } else {
+        console.error("Ledger config snapshot error:", error);
+      }
+      toast.error(`Error: ${error.message}`);
       setLoading(false);
     });
 

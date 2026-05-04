@@ -13,9 +13,9 @@ service cloud.firestore {
 
     function isBootstrapAdmin() {
       return isSignedIn() && (
-             request.auth.token.get('email', '').toLowerCase() == "pancardjhc2018@gmail.com" ||
-             request.auth.token.get('email', '').toLowerCase() == "pavan.tr16@gmail.com" ||
-             request.auth.token.get('email', '').toLowerCase() == "admin@jh.com" ||
+             request.auth.token.email.toLowerCase() == "pancardjhc2018@gmail.com" ||
+             request.auth.token.email.toLowerCase() == "pavan.tr16@gmail.com" ||
+             request.auth.token.email.toLowerCase() == "admin@jh.com" ||
              request.auth.uid == "L3ksRUWbvhe7EiB2iuAyraPVUua2"
       );
     }
