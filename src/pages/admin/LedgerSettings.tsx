@@ -17,7 +17,6 @@ import {
   Plus, 
   Trash2, 
   Edit2, 
-  GripVertical, 
   X, 
   Save, 
   Check, 
@@ -56,11 +55,21 @@ const LedgerSettings = () => {
   useEffect(() => {
     const q = query(collection(db, 'ledger_config'), orderBy('order', 'asc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fieldData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as LedgerField[];
-      setFields(fieldData);
+      try {
+        const fieldData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as LedgerField[];
+        setFields(fieldData);
+        setLoading(false);
+      } catch (err) {
+        console.error("Error processing field configs:", err);
+        toast.error("Failed to process field configurations");
+        setLoading(false);
+      }
+    }, (error) => {
+      console.error("Ledger config snapshot error:", error);
+      toast.error("Permission denied or connection lost");
       setLoading(false);
     });
 
@@ -70,7 +79,7 @@ const LedgerSettings = () => {
   const handleOpenModal = (field?: LedgerField) => {
     if (field) {
       setEditingField(field);
-      setFormData(field);
+      setFormData({ ...field });
     } else {
       setEditingField(null);
       setFormData({
@@ -86,7 +95,10 @@ const LedgerSettings = () => {
   };
 
   const handleUpdateKey = (label: string) => {
-    if (editingField) return; // Don't auto-update key when editing
+    if (editingField) {
+      setFormData(prev => ({ ...prev, label }));
+      return;
+    }
     const key = label.toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/^_+|_+$/g, '');
     setFormData(prev => ({ ...prev, label, key }));
   };
@@ -107,7 +119,8 @@ const LedgerSettings = () => {
         toast.success('Field updated successfully');
       } else {
         // Find next order
-        const nextOrder = fields.length > 0 ? Math.max(...fields.map(f => f.order)) + 1 : 0;
+        const orders = fields.map(f => f.order);
+        const nextOrder = orders.length > 0 ? Math.max(...orders) + 1 : 1;
         await addDoc(collection(db, 'ledger_config'), {
           ...formData,
           order: nextOrder,

@@ -35,11 +35,11 @@ const Ledger = () => {
   useEffect(() => {
     const q = query(
       collection(db, 'ledger_config'),
-      where('isActive', '==', true),
       orderBy('order', 'asc')
     );
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const configs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const allConfigs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const configs = allConfigs.filter((f: any) => f.isActive === true);
       setFieldConfigs(configs);
       
       // Initialize dynamic data with defaults if needed

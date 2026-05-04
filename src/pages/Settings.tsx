@@ -13,6 +13,7 @@ const SettingsLayout = () => {
     { name: 'User Management', icon: <Users size={20} />, path: '/app/settings/users', roles: ['admin'] },
     { name: 'Staff Management', icon: <Users size={20} />, path: '/app/settings/staff', roles: ['admin'] },
     { name: 'Services Control', icon: <Briefcase size={20} />, path: '/app/settings/services', roles: ['admin'] },
+    { name: 'Ledger Settings', icon: <List size={20} />, path: '/app/admin/ledger-settings', roles: ['admin'] },
     { name: 'Payment & Pricing', icon: <Wallet size={20} />, path: '/app/admin/payments', roles: ['admin'] },
     { name: 'Ledger Analytics', icon: <FileText size={20} />, path: '/app/admin/ledger-analytics', roles: ['admin'] },
     { name: 'System Permissions', icon: <Lock size={20} />, path: '/app/settings/permissions', roles: ['admin'] },
