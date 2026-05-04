@@ -35,8 +35,8 @@ const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
 const AdminWalletManagement = lazy(() => import('./pages/admin/AdminWalletManagement'));
 const AdminPayments = lazy(() => import('./pages/admin/AdminPayments'));
 const ServiceFormBuilder = lazy(() => import('./pages/admin/ServiceFormBuilder'));
-const LedgerAnalytics = lazy(() => import('./pages/admin/LedgerAnalytics'));
-const LedgerSettings = lazy(() => import('./pages/admin/LedgerSettings'));
+import LedgerAnalytics from './pages/admin/LedgerAnalytics';
+import LedgerSettings from './pages/admin/LedgerSettings';
 
 const FullPageLoader = () => (
   <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
