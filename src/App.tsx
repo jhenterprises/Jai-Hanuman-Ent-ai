@@ -36,6 +36,7 @@ const AdminWalletManagement = lazy(() => import('./pages/admin/AdminWalletManage
 const AdminPayments = lazy(() => import('./pages/admin/AdminPayments'));
 const ServiceFormBuilder = lazy(() => import('./pages/admin/ServiceFormBuilder'));
 const LedgerAnalytics = lazy(() => import('./pages/admin/LedgerAnalytics'));
+const LedgerSettings = lazy(() => import('./pages/admin/LedgerSettings'));
 
 const FullPageLoader = () => (
   <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
@@ -106,6 +107,7 @@ export default function App() {
                   <Route path="admin/wallets" element={<ProtectedRoute roles={['admin']}><AdminWalletManagement /></ProtectedRoute>} />
                   <Route path="admin/payments" element={<ProtectedRoute roles={['admin']}><AdminPayments /></ProtectedRoute>} />
                   <Route path="admin/ledger-analytics" element={<ProtectedRoute roles={['admin']}><LedgerAnalytics /></ProtectedRoute>} />
+                  <Route path="admin/ledger-settings" element={<ProtectedRoute roles={['admin']}><LedgerSettings /></ProtectedRoute>} />
                   <Route path="services" element={<Services />} />
                   <Route path="services/:id/builder" element={<ProtectedRoute roles={['admin']}><ServiceFormBuilder /></ProtectedRoute>} />
                   <Route path="ledger" element={<ProtectedRoute roles={['admin', 'staff']}><Ledger /></ProtectedRoute>} />

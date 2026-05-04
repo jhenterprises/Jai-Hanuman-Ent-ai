@@ -127,20 +127,28 @@ service cloud.firestore {
     // -------------------------------------------------------------------------
     // LEDGER & WALLETS
     // -------------------------------------------------------------------------
+
+    match /ledger_config/{fieldId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
     
     match /ledger/{ledgerId} {
-      function isValidLedgerEntry(data) {
-        return data.customer_name is string && data.customer_name.size() > 0 &&
-               data.principle_amount is number &&
-               data.created_at is timestamp;
+      function isValidLedgerEntryData(data) {
+        return data.userId is string &&
+               data.createdAt is timestamp &&
+               data.data is map;
       }
-      allow get: if isSignedIn() && (resource.data.staff_id == request.auth.uid || isStaff());
-      allow list: if isSignedIn() && (resource.data.staff_id == request.auth.uid || isStaff());
-      allow create: if isVerified() && isValidLedgerEntry(incoming());
-      allow update: if isStaff() && 
-                    incoming().staff_id == existing().staff_id &&
-                    incoming().created_at == existing().created_at;
-      allow delete: if isAdmin() || (isStaff() && resource.data.staff_id == request.auth.uid);
+      
+      // Keep existing rules for backward compatibility if needed, but prioritize the new structure
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.staff_id == request.auth.uid || isStaff());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.staff_id == request.auth.uid || isStaff());
+      allow create: if isSignedIn() && (
+        (incoming().keys().hasAll(['userId', 'createdAt', 'data']) && incoming().userId == request.auth.uid) ||
+        (incoming().keys().hasAll(['staff_id', 'created_at']) && incoming().staff_id == request.auth.uid)
+      );
+      allow update: if isStaff();
+      allow delete: if isAdmin();
     }
 
     match /withdrawals/{withdrawalId} {

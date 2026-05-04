@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { collection, getDocs, query, orderBy, doc, updateDoc, addDoc, serverTimestamp, deleteDoc, where, Timestamp } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, doc, updateDoc, addDoc, serverTimestamp, deleteDoc, where, Timestamp, onSnapshot } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import { useConfig } from '../context/ConfigContext';
@@ -13,6 +13,7 @@ import autoTable from 'jspdf-autotable';
 const Ledger = () => {
   const { config } = useConfig();
   const [ledger, setLedger] = useState<any[]>([]);
+  const [fieldConfigs, setFieldConfigs] = useState<any[]>([]);
   const [dateRange, setDateRange] = useState({ 
     from: new Date().toISOString().split('T')[0], 
     to: new Date().toISOString().split('T')[0] 
@@ -20,18 +21,46 @@ const Ledger = () => {
   const [search, setSearch] = useState('');
   const [showAdd, setShowAdd] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [newEntry, setNewEntry] = useState({ 
-    service_type: 'Service',
-    customer_name: '', 
-    service_name: '', 
-    principle_amount: '', 
-    profit_amount: '', 
-    payment_mode: 'Cash'
-  });
+  const [loadingConfigs, setLoadingConfigs] = useState(true);
+  
+  // Dynamic form state
+  const [dynamicData, setDynamicData] = useState<Record<string, any>>({});
+  
   const [editingEntry, setEditingEntry] = useState<any>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [successData, setSuccessData] = useState<any>(null);
   const { user } = useAuth();
+
+  // Fetch dynamic field configurations
+  useEffect(() => {
+    const q = query(
+      collection(db, 'ledger_config'),
+      where('isActive', '==', true),
+      orderBy('order', 'asc')
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const configs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setFieldConfigs(configs);
+      
+      // Initialize dynamic data with defaults if needed
+      const initialData: Record<string, any> = {};
+      configs.forEach((field: any) => {
+        if (field.type === 'select') {
+          initialData[field.key] = field.options?.[0] || '';
+        } else if (field.type === 'number') {
+          initialData[field.key] = '';
+        } else if (field.type === 'date') {
+          initialData[field.key] = new Date().toISOString().split('T')[0];
+        } else {
+          initialData[field.key] = '';
+        }
+      });
+      setDynamicData(initialData);
+      setLoadingConfigs(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const playSuccessSound = () => {
     try {
@@ -67,21 +96,26 @@ const Ledger = () => {
   const ledgerWithBalance = useMemo(() => {
     let balance = 0;
     return ledger.map(item => {
-      balance += (item.total_amount || 0);
+      const total = item.total_amount || 0;
+      balance += total;
       return { ...item, runningBalance: balance };
     }).reverse(); // Reverse back for display (newest first)
   }, [ledger]);
 
   const handleEdit = (entry: any) => {
     setEditingEntry(entry);
-    setNewEntry({
-      service_type: entry.service_type || 'Service',
-      customer_name: entry.customer_name || '',
-      service_name: entry.service_name || '',
-      principle_amount: Math.abs(entry.principle_amount || 0).toString(),
-      profit_amount: (entry.profit_amount || 0).toString(),
-      payment_mode: entry.payment_mode || 'Cash'
+    
+    // Map dynamic data or legacy data
+    const editableData: Record<string, any> = { ...entry.data };
+    
+    // For legacy entries or if fields are not in 'data'
+    fieldConfigs.forEach(field => {
+      if (editableData[field.key] === undefined && entry[field.key] !== undefined) {
+        editableData[field.key] = entry[field.key];
+      }
     });
+
+    setDynamicData(editableData);
     setShowAdd(true);
   };
 
@@ -92,17 +126,13 @@ const Ledger = () => {
   const handleSaveEntry = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // 1. Validation
-    const principle = parseFloat(newEntry.principle_amount) || 0;
-    const profit = parseFloat(newEntry.profit_amount) || 0;
+    // 1. Validation for required fields
+    const missingFields = fieldConfigs
+      .filter(f => f.required && !dynamicData[f.key])
+      .map(f => f.label);
 
-    if (!newEntry.customer_name || !newEntry.service_name) {
-      toast.error('Please fill customer name and service name');
-      return;
-    }
-    
-    if (principle === 0 && profit === 0) {
-      toast.error('At least one amount (Principal or Profit) is required');
+    if (missingFields.length > 0) {
+      toast.error(`Required fields missing: ${missingFields.join(', ')}`);
       return;
     }
 
@@ -111,10 +141,15 @@ const Ledger = () => {
     const savePromise = (async () => {
       const now = new Date();
       const dateString = now.toISOString().split('T')[0];
-      const isDebit = newEntry.service_type === 'Cash Withdrawal' || newEntry.service_type === 'Withdrawal';
-      const isMoneyTransfer = newEntry.service_type === 'Money Transfer';
       
-      // Calculate Total
+      // Calculate Total from dynamic fields
+      // Look for principle_amount, amount, or fee
+      const principle = parseFloat(dynamicData.principle_amount || dynamicData.amount || 0) || 0;
+      const profit = parseFloat(dynamicData.profit_amount || dynamicData.profit || dynamicData.fee || 0) || 0;
+      const serviceType = dynamicData.service_type || dynamicData.type || '';
+      
+      const isDebit = serviceType === 'Cash Withdrawal' || serviceType === 'Withdrawal';
+      
       let total = 0;
       if (isDebit) {
         total = -principle;
@@ -129,19 +164,22 @@ const Ledger = () => {
 
       const entryData = {
         serial_number: newSerialNumber,
-        service_type: newEntry.service_type,
-        customer_name: newEntry.customer_name,
-        service_name: newEntry.service_name,
+        userId: user?.uid,
+        staff_id: user?.uid || 'unknown',
+        staff_name: user?.name || 'Unknown Staff',
+        createdAt: serverTimestamp(),
+        created_at: serverTimestamp(), // Backward compat
+        date_string: dateString,
+        data: dynamicData,
+        // Promote some fields to top-level for existing query logic/display
+        customer_name: dynamicData.customer_name || 'N/A',
+        service_name: dynamicData.service_name || dynamicData.service || 'N/A',
+        service_type: serviceType || 'Service',
         principle_amount: principle,
         profit_amount: profit,
         total_amount: total,
-        payment_mode: newEntry.payment_mode,
-        type: isDebit ? 'withdrawal' : 'deposit',
-        money_transfer: isMoneyTransfer,
-        date_string: dateString,
-        staff_id: user?.uid || 'unknown',
-        staff_name: user?.name || 'Unknown Staff',
-        created_at: serverTimestamp()
+        payment_mode: dynamicData.payment_mode || 'Cash',
+        type: isDebit ? 'withdrawal' : 'deposit'
       };
 
       const docRef = await addDoc(collection(db, 'ledger'), entryData);
@@ -150,14 +188,15 @@ const Ledger = () => {
       playSuccessSound();
       setSuccessData({ id: docRef.id, ...entryData, created_at: Timestamp.now() });
       setShowAdd(false);
-      setNewEntry({ 
-        service_type: 'Service', 
-        customer_name: '', 
-        service_name: '', 
-        principle_amount: '', 
-        profit_amount: '', 
-        payment_mode: 'Cash' 
+      
+      // Reset form
+      const initialData: Record<string, any> = {};
+      fieldConfigs.forEach((field: any) => {
+        if (field.type === 'select') initialData[field.key] = field.options?.[0] || '';
+        else if (field.type === 'date') initialData[field.key] = new Date().toISOString().split('T')[0];
+        else initialData[field.key] = '';
       });
+      setDynamicData(initialData);
       
       // Instant Refresh
       await fetchData();
@@ -179,31 +218,56 @@ const Ledger = () => {
     }
   };
 
+  const handleFieldChange = (key: string, value: any) => {
+    setDynamicData(prev => {
+      const newData = { ...prev, [key]: value };
+      
+      // Autofill logic: If service_type changes, update service_name too
+      if (key === 'service_type') {
+        newData.service_name = value;
+      }
+      
+      return newData;
+    });
+  };
+
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingEntry) return;
     
     setIsSaving(true);
     try {
-      const principle = parseFloat(newEntry.principle_amount) || 0;
-      const profit = parseFloat(newEntry.profit_amount) || 0;
-      const isDebit = newEntry.service_type === 'Cash Withdrawal' || newEntry.service_type === 'Withdrawal';
+      const principle = parseFloat(dynamicData.principle_amount || dynamicData.amount || 0) || 0;
+      const profit = parseFloat(dynamicData.profit_amount || dynamicData.profit || dynamicData.fee || 0) || 0;
+      const serviceType = dynamicData.service_type || dynamicData.type || '';
+      const isDebit = serviceType === 'Cash Withdrawal' || serviceType === 'Withdrawal';
       
       await updateDoc(doc(db, 'ledger', editingEntry.id), {
-        service_type: newEntry.service_type,
-        type: isDebit ? 'withdrawal' : 'deposit',
-        customer_name: newEntry.customer_name || 'N/A',
-        service_name: newEntry.service_name || 'N/A',
+        data: dynamicData,
+        customer_name: dynamicData.customer_name || 'N/A',
+        service_name: dynamicData.service_name || dynamicData.service || 'N/A',
+        service_type: serviceType || 'Service',
         principle_amount: principle,
         profit_amount: profit,
         total_amount: isDebit ? -principle : (principle + profit),
-        payment_mode: newEntry.payment_mode,
+        payment_mode: dynamicData.payment_mode || 'Cash',
+        type: isDebit ? 'withdrawal' : 'deposit',
+        updatedAt: serverTimestamp(),
         updated_at: serverTimestamp()
       });
       
       setShowAdd(false);
       setEditingEntry(null);
-      setNewEntry({ service_type: 'Service', customer_name: '', service_name: '', principle_amount: '', profit_amount: '', payment_mode: 'Cash' });
+      
+      // Reset form
+      const initialData: Record<string, any> = {};
+      fieldConfigs.forEach((field: any) => {
+        if (field.type === 'select') initialData[field.key] = field.options?.[0] || '';
+        else if (field.type === 'date') initialData[field.key] = new Date().toISOString().split('T')[0];
+        else initialData[field.key] = '';
+      });
+      setDynamicData(initialData);
+
       fetchData();
       toast.success('Successfully updated record');
     } catch (err: any) {
@@ -710,97 +774,51 @@ const Ledger = () => {
               <XCircle size={24} />
             </button>
           </div>
-          <form onSubmit={editingEntry ? handleUpdate : handleSaveEntry} className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-400">Service Type</label>
-              <select 
-                value={newEntry.service_type} 
-                onChange={e => setNewEntry({...newEntry, service_type: e.target.value})} 
-                className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-white focus:ring-2 focus:ring-blue-500 outline-none"
-              >
-                <option value="Service">Standard Service</option>
-                <option value="Money Transfer">Money Transfer</option>
-                <option value="Cash Withdrawal">Cash Withdrawal</option>
-                <option value="Print">Print</option>
-                <option value="Other">Other</option>
-              </select>
-              {newEntry.service_type === 'Money Transfer' && (
-                <p className="text-[10px] text-blue-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                  <AlertCircle size={12} /> Tracks as separate money flow
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-400">Customer Name</label>
-              <input 
-                type="text" 
-                placeholder="Name" 
-                required
-                value={newEntry.customer_name} 
-                onChange={e => setNewEntry({...newEntry, customer_name: e.target.value})} 
-                className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-white focus:ring-2 focus:ring-blue-500 outline-none" 
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-400">Service Name/Detail</label>
-              <input 
-                type="text" 
-                placeholder={newEntry.service_type === 'Other' ? "Specify service" : "Service details"} 
-                required
-                value={newEntry.service_name} 
-                onChange={e => setNewEntry({...newEntry, service_name: e.target.value})} 
-                className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-white focus:ring-2 focus:ring-blue-500 outline-none" 
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-400">Principal Amount</label>
-              <div className="relative">
-                <span className="absolute left-4 top-3.5 text-slate-500">₹</span>
-                <input 
-                  type="number" 
-                  step="0.01"
-                  placeholder="0.00" 
-                  value={newEntry.principle_amount} 
-                  onChange={e => setNewEntry({...newEntry, principle_amount: e.target.value})} 
-                  className="w-full pl-8 pr-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-white focus:ring-2 focus:ring-blue-500 outline-none" 
-                />
+          <form onSubmit={editingEntry ? handleUpdate : handleSaveEntry} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {fieldConfigs.map((field) => (
+              <div key={field.id} className="space-y-2">
+                <label className="text-sm font-medium text-slate-400 flex items-center justify-between">
+                  {field.label}
+                  {field.required && <span className="text-[10px] text-red-500 font-bold uppercase tracking-wider">Required</span>}
+                </label>
+                
+                {field.type === 'select' ? (
+                  <select 
+                    value={dynamicData[field.key] || ''} 
+                    onChange={e => handleFieldChange(field.key, e.target.value)} 
+                    className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                    required={field.required}
+                  >
+                    {field.options?.map((opt: string) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                ) : field.type === 'date' ? (
+                  <input 
+                    type="date" 
+                    value={dynamicData[field.key] || ''} 
+                    onChange={e => handleFieldChange(field.key, e.target.value)} 
+                    className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-white focus:ring-2 focus:ring-blue-500 outline-none" 
+                    required={field.required}
+                  />
+                ) : (
+                  <div className="relative">
+                    {field.type === 'number' && <span className="absolute left-4 top-3.5 text-slate-500">₹</span>}
+                    <input 
+                      type={field.type}
+                      step={field.type === 'number' ? '0.01' : undefined}
+                      placeholder={`Enter ${field.label.toLowerCase()}...`}
+                      value={dynamicData[field.key] || ''} 
+                      onChange={e => handleFieldChange(field.key, e.target.value)} 
+                      className={`w-full ${field.type === 'number' ? 'pl-8' : 'px-4'} py-3 bg-slate-900 border border-slate-700 rounded-xl text-white focus:ring-2 focus:ring-blue-500 outline-none`} 
+                      required={field.required}
+                    />
+                  </div>
+                )}
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-400">Profit / Fee</label>
-              <div className="relative">
-                <span className="absolute left-4 top-3.5 text-slate-500">₹</span>
-                <input 
-                  type="number" 
-                  step="0.01"
-                  placeholder="0.00" 
-                  /* disabled={newEntry.service_type === 'Cash Withdrawal' || newEntry.service_type === 'Withdrawal'} */
-                  value={newEntry.profit_amount} 
-                  onChange={e => setNewEntry({...newEntry, profit_amount: e.target.value})} 
-                  className="w-full pl-8 pr-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-white focus:ring-2 focus:ring-blue-500 outline-none disabled:opacity-50" 
-                />
-              </div>
-            </div>
+            ))}
             
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-400">Payment Mode</label>
-              <select 
-                value={newEntry.payment_mode} 
-                onChange={e => setNewEntry({...newEntry, payment_mode: e.target.value})} 
-                className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-white focus:ring-2 focus:ring-blue-500 outline-none"
-              >
-                <option value="Cash">Cash</option>
-                <option value="PhonePe">PhonePe</option>
-                <option value="GPay">GPay</option>
-                <option value="Bank Transfer">Bank Transfer</option>
-              </select>
-            </div>
-
-            <div className="md:col-span-3 flex justify-end gap-3 mt-4">
+            <div className="lg:col-span-3 flex justify-end gap-3 mt-4">
               <button 
                 type="button" 
                 onClick={() => { setShowAdd(false); setEditingEntry(null); }} 
@@ -867,6 +885,18 @@ const Ledger = () => {
                   </td>
                   <td className="p-4 text-right">
                     <div className="flex justify-end items-center gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                      <button 
+                        onClick={() => {
+                          const details = Object.entries(item.data || {})
+                            .map(([key, val]) => `${key}: ${val}`)
+                            .join('\n');
+                          alert(`Custom Fields:\n${details || 'No custom fields'}`);
+                        }} 
+                        className="p-2 text-slate-400 hover:text-white hover:bg-slate-600 rounded-lg transition-colors" 
+                        title="View Details"
+                      >
+                        <Search size={16} />
+                      </button>
                       <button onClick={() => printInvoice(item)} className="p-2 text-slate-400 hover:text-white hover:bg-slate-600 rounded-lg transition-colors" title="Print Invoice">
                         <Printer size={16} />
                       </button>

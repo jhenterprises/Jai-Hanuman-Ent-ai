@@ -1,285 +1,72 @@
 {
   "entities": {
-    "users": {
-      "title": "User",
-      "description": "User profile information",
+    "LedgerFieldConfig": {
+      "title": "Ledger Field Configuration",
+      "description": "Configuration for dynamic ledger input fields",
       "type": "object",
       "properties": {
-        "uid": { "type": "string", "description": "Firebase Auth UID" },
-        "name": { "type": "string", "description": "Full name" },
-        "email": { "type": "string", "format": "email", "description": "Email address" },
-        "phone": { "type": "string" },
-        "role": { "type": "string", "enum": ["user", "staff", "admin"], "description": "User role" },
-        "staff_id": { "type": "string", "description": "Employee ID (JH-STF-001)" },
-        "salary_amount": { "type": "number", "description": "Monthly base salary" },
-        "status": { "type": "string", "enum": ["active", "disabled"] },
-        "last_active": { "type": "string", "format": "date-time", "description": "Last seen online" },
-        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" }
+        "key": {
+          "type": "string",
+          "description": "Unique key for the field (camelCase, no spaces)"
+        },
+        "label": {
+          "type": "string",
+          "description": "Display label for the field"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["text", "number", "select", "date"],
+          "description": "Input type"
+        },
+        "options": {
+          "type": "array",
+          "description": "Dropdown options (if type is select)"
+        },
+        "required": {
+          "type": "boolean",
+          "description": "Whether the field is mandatory"
+        },
+        "order": {
+          "type": "number",
+          "description": "Display order in the form"
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Whether the field is currently enabled"
+        }
       },
-      "required": ["uid", "name", "email", "role"]
+      "required": ["key", "label", "type", "order", "isActive"]
     },
-    "attendance": {
-      "title": "Attendance Record",
-      "description": "Daily staff attendance",
-      "type": "object",
-      "properties": {
-        "userId": { "type": "string" },
-        "staff_name": { "type": "string" },
-        "staff_id": { "type": "string" },
-        "date": { "type": "string", "format": "date" },
-        "loginTime": { "type": "string", "format": "date-time" },
-        "logoutTime": { "type": "string", "format": "date-time" },
-        "totalHours": { "type": "number" },
-        "status": { "type": "string", "enum": ["Present", "Absent", "On Leave"] }
-      },
-      "required": ["userId", "date", "loginTime"]
-    },
-    "salaries": {
-      "title": "Salary Record",
-      "description": "Monthly staff payroll",
-      "type": "object",
-      "properties": {
-        "userId": { "type": "string" },
-        "staff_name": { "type": "string" },
-        "staff_id": { "type": "string" },
-        "month": { "type": "string", "description": "Month-Year format" },
-        "base_salary": { "type": "number" },
-        "total_days": { "type": "number" },
-        "present_days": { "type": "number" },
-        "payable_salary": { "type": "number" },
-        "status": { "type": "string", "enum": ["Pending", "Paid"] },
-        "paid_at": { "type": "string", "format": "date-time" }
-      },
-      "required": ["userId", "month", "payable_salary", "status"]
-    },
-    "applications": {
-      "title": "Application",
-      "description": "Service application details",
-      "type": "object",
-      "properties": {
-        "userId": { "type": "string", "description": "UID of the applicant" },
-        "user_email": { "type": "string", "description": "Email of the applicant" },
-        "user_name": { "type": "string", "description": "Name of the applicant" },
-        "user_phone": { "type": "string", "description": "Phone of the applicant" },
-        "service_id": { "type": "string", "description": "ID of the service" },
-        "service_name": { "type": "string", "description": "Name of the service" },
-        "service_type": { "type": "string", "description": "Type of service" },
-        "status": { "type": "string", "enum": ["Pending", "Processing", "Approved", "Rejected", "Completed"], "description": "Current status" },
-        "form_data": { "type": "object", "description": "Dynamic form data" },
-        "documents": { "type": "array", "description": "Uploaded documents" },
-        "assignedTo": { "type": "string", "description": "UID of the staff member assigned to this application" },
-        "assignedToName": { "type": "string", "description": "Name of the staff member assigned to this application" },
-        "completed_by": { "type": "string", "description": "UID of the staff who completed the application" },
-        "completed_by_name": { "type": "string", "description": "Name of the staff who completed the application" },
-        "payment_status": { "type": "string", "description": "Status of payment" },
-        "reference_number": { "type": "string", "description": "Unique reference number" },
-        "created_at": { "type": "string", "format": "date-time", "description": "Submission timestamp" },
-        "updated_at": { "type": "string", "format": "date-time", "description": "Update timestamp" }
-      },
-      "required": ["userId", "service_id", "status", "reference_number"]
-    },
-    "services": {
-      "title": "Service",
-      "description": "Available government services",
-      "type": "object",
-      "properties": {
-        "name": { "type": "string" },
-        "description": { "type": "string" },
-        "url": { "type": "string" },
-        "icon": { "type": "string" },
-        "enabled": { "type": "boolean" },
-        "is_visible": { "type": "boolean" },
-        "isPopular": { "type": "boolean", "description": "Whether to show on homepage" },
-        "order": { "type": "number", "description": "Display order in popular section" }
-      }
-    },
-    "portal_config": {
-      "title": "Portal Config",
-      "description": "Global portal settings",
-      "type": "object",
-      "properties": {
-        "portal_name": { "type": "string" },
-        "theme_color": { "type": "string" }
-      }
-    },
-    "ledger": {
+    "LedgerEntry": {
       "title": "Ledger Entry",
-      "description": "Financial transaction entries",
+      "description": "A single entry in the ledger",
       "type": "object",
       "properties": {
-        "serial_number": { "type": "number" },
-        "customer_name": { "type": "string" },
-        "phone_number": { "type": "string" },
-        "service_name": { "type": "string" },
-        "principle_amount": { "type": "number" },
-        "profit_amount": { "type": "number" },
-        "total_amount": { "type": "number" },
-        "payment_mode": { "type": "string", "enum": ["Cash", "PhonePe", "GPay"] },
-        "service_type": { "type": "string", "enum": ["Service", "Money Transfer", "Cash Withdrawal", "Other"] },
-        "type": { "type": "string", "enum": ["credit", "debit"] },
-        "date_string": { "type": "string" },
-        "staff_id": { "type": "string" },
-        "staff_name": { "type": "string" },
-        "created_at": { "type": "string", "format": "date-time" }
+        "userId": {
+          "type": "string",
+          "description": "ID of the user/staff who created the entry"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of creation"
+        },
+        "data": {
+          "type": "object",
+          "description": "Dynamic field data"
+        }
       },
-      "required": ["serial_number", "customer_name", "principle_amount", "created_at"]
-    },
-    "withdrawals": {
-      "title": "Withdrawal",
-      "description": "Cash withdrawal requests",
-      "type": "object",
-      "properties": {
-        "amount": { "type": "number" },
-        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
-        "staff_id": { "type": "string" },
-        "staff_name": { "type": "string" },
-        "created_at": { "type": "string", "format": "date-time" },
-        "approved_at": { "type": "string", "format": "date-time" }
-      }
-    },
-    "counters": {
-      "title": "Counter",
-      "description": "Auto incrementing counters",
-      "type": "object",
-      "properties": {
-        "value": { "type": "number" }
-      }
-    },
-    "wallets": {
-      "title": "Wallet",
-      "description": "User wallet balance",
-      "type": "object",
-      "properties": {
-        "userId": { "type": "string" },
-        "balance": { "type": "number" },
-        "updated_at": { "type": "string", "format": "date-time" }
-      }
-    },
-    "support_tickets": {
-      "title": "Support Ticket",
-      "description": "Customer support requests",
-      "type": "object",
-      "properties": {
-        "user_id": { "type": "string" },
-        "user_name": { "type": "string" },
-        "subject": { "type": "string" },
-        "message": { "type": "string" },
-        "status": { "type": "string", "enum": ["Open", "Closed"] },
-        "created_at": { "type": "string", "format": "date-time" }
-      }
-    },
-    "activity_logs": {
-      "title": "Activity Log",
-      "description": "System activity logs for auditing",
-      "type": "object",
-      "properties": {
-        "admin_id": { "type": "string" },
-        "admin_name": { "type": "string" },
-        "action": { "type": "string" },
-        "timestamp": { "type": "string", "format": "date-time" }
-      }
-    },
-    "recycle_bin": {
-      "title": "Recycle Bin",
-      "description": "Ghost of deleted documents",
-      "type": "object",
-      "properties": {
-        "original_id": { "type": "string" },
-        "type": { "type": "string" },
-        "name": { "type": "string" },
-        "deleted_at": { "type": "string", "format": "date-time" },
-        "data": { "type": "object" }
-      }
-    },
-    "chats": {
-      "title": "Chat",
-      "description": "Support chat session",
-      "type": "object",
-      "properties": {
-        "customerId": { "type": "string" },
-        "customerName": { "type": "string" },
-        "status": { "type": "string", "enum": ["open", "closed"] },
-        "lastMessage": { "type": "string" },
-        "lastMessageAt": { "type": "string", "format": "date-time" },
-        "unreadCount": { "type": "number" },
-        "createdAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["customerId", "customerName", "status", "createdAt"]
-    },
-    "messages": {
-      "title": "Message",
-      "description": "Single message in a chat session",
-      "type": "object",
-      "properties": {
-        "chatId": { "type": "string" },
-        "senderId": { "type": "string" },
-        "senderName": { "type": "string" },
-        "text": { "type": "string" },
-        "timestamp": { "type": "string", "format": "date-time" }
-      },
-      "required": ["chatId", "senderId", "text", "timestamp"]
+      "required": ["userId", "createdAt", "data"]
     }
   },
   "firestore": {
-    "/users/{userId}": {
-      "schema": "users",
-      "description": "User profile documents"
+    "/ledger_config/{fieldId}": {
+      "schema": "LedgerFieldConfig",
+      "description": "Collection of dynamic field configurations"
     },
-    "/applications/{applicationId}": {
-      "schema": "applications",
-      "description": "Service application documents"
-    },
-    "/services/{serviceId}": {
-      "schema": "services",
-      "description": "Available services"
-    },
-    "/ledger/{ledgerId}": {
-      "schema": "ledger",
-      "description": "Financial transaction entries"
-    },
-    "/withdrawals/{withdrawalId}": {
-      "schema": "withdrawals",
-      "description": "Cash withdrawal requests"
-    },
-    "/counters/{counterId}": {
-      "schema": "counters",
-      "description": "System counters"
-    },
-    "/wallets/{walletId}": {
-      "schema": "wallets",
-      "description": "User wallet balances"
-    },
-    "/support_tickets/{ticketId}": {
-      "schema": "support_tickets",
-      "description": "Support ticket documents"
-    },
-    "/activity_logs/{logId}": {
-      "schema": "activity_logs",
-      "description": "Audit log documents"
-    },
-    "/recycle_bin/{binId}": {
-      "schema": "recycle_bin",
-      "description": "Deleted items archive"
-    },
-    "/attendance/{recordId}": {
-      "schema": "attendance",
-      "description": "Daily attendance records"
-    },
-    "/salaries/{salaryId}": {
-      "schema": "salaries",
-      "description": "Monthly payroll records"
-    },
-    "/settings/portal": {
-      "schema": "portal_config",
-      "description": "Main portal configuration"
-    },
-    "/chats/{chatId}": {
-      "schema": "chats",
-      "description": "Active support chat sessions"
-    },
-    "/chats/{chatId}/messages/{messageId}": {
-      "schema": "messages",
-      "description": "Messages within a chat session"
+    "/ledger/{entryId}": {
+      "schema": "LedgerEntry",
+      "description": "Collection of submitted ledger entries"
     }
   }
 }

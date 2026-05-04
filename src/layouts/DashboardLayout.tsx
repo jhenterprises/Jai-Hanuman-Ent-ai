@@ -125,6 +125,7 @@ const DashboardLayout = () => {
     { path: user?.role === 'user' ? '/app/user/applications' : (user?.role === 'staff' ? '/app/staff/applications' : '/app/applications'), label: user?.role === 'user' ? 'My Applications' : 'User Applications', icon: <FileText size={20} />, roles: ['admin', 'staff', 'user'] },
     { path: user?.role === 'admin' ? '/app/services' : (user?.role === 'staff' ? '/app/staff/apply-service' : '/app/services'), label: 'Apply for Services', icon: <Briefcase size={20} />, roles: ['admin', 'staff', 'user'] },
     { path: '/app/ledger', label: 'Ledger', icon: <FileText size={20} />, roles: ['admin', 'staff'] },
+    { path: '/app/admin/ledger-settings', label: 'Ledger Settings', icon: <Settings size={20} />, roles: ['admin'] },
     { path: '/app/admin/ledger-analytics', label: 'Ledger Analytics', icon: <TrendingUp size={20} />, roles: ['admin'] },
     { path: '/app/users', label: 'Users List', icon: <Users size={20} />, roles: ['admin', 'staff'] },
     { path: '/app/staff-management', label: 'Staff Management', icon: <Users size={20} />, roles: ['admin'] },
