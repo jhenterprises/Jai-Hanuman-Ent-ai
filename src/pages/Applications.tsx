@@ -530,7 +530,7 @@ const Applications = () => {
                     </h3>
                     <div className="space-y-3">
                       {selectedApp.documents && selectedApp.documents.length > 0 ? (
-                        selectedApp.documents.map((doc: any) => (
+                        selectedApp.documents?.map((doc: any) => (
                           <div 
                             key={doc.id}
                             className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all group cursor-pointer"
@@ -567,7 +567,7 @@ const Applications = () => {
                       <Activity size={16} className="text-blue-600" /> Timeline
                     </h3>
                     <div className="space-y-6 relative before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-100">
-                      {selectedApp.updates && selectedApp.updates.map((update: any, idx: number) => (
+                      {selectedApp.updates && selectedApp.updates?.map((update: any, idx: number) => (
                         <div key={update.id} className="relative pl-8">
                           <div className={`absolute left-0 top-1 w-6 h-6 rounded-full border-4 border-white flex items-center justify-center z-10 shadow-sm ${idx === 0 ? 'bg-blue-600' : 'bg-slate-200'}`}>
                             <div className="w-1.5 h-1.5 rounded-full bg-white" />

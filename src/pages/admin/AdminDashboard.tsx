@@ -14,7 +14,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { safeFormat } from '../../utils/dateUtils';
 import { db } from '../../lib/firebase';
-import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, limit, onSnapshot } from 'firebase/firestore';
 
 const COLORS = ['#3b82f6', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6'];
 
@@ -23,6 +23,7 @@ const AdminDashboard = () => {
   const navigate = useNavigate();
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [currentTime, setCurrentTime] = useState(new Date());
   const [error, setError] = useState<string | null>(null);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -30,53 +31,36 @@ const AdminDashboard = () => {
   const profileMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetchStats();
-    // Poll every 60 seconds for real-time feel
-    const interval = setInterval(fetchStats, 60000);
-    
-    const handleClickOutside = (event: MouseEvent) => {
-      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
-        setShowProfileMenu(false);
-      }
-      if (!(event.target as Element).closest('.action-menu-container')) {
-        setOpenActionMenuId(null);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    
-    return () => {
-      clearInterval(interval);
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [user]);
+    // 1. Live Clock Interval
+    const clockInterval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
 
-  const fetchStats = async () => {
-    setError(null);
-    try {
-      console.log('Fetching dashboard stats from Firestore...');
-      
-      const usersSnap = await getDocs(collection(db, 'users'));
-      const appsSnap = await getDocs(collection(db, 'applications'));
-      const ledgerSnap = await getDocs(collection(db, 'ledger'));
-      const logsSnap = await getDocs(query(collection(db, 'activity_logs'), orderBy('timestamp', 'desc'), limit(10)));
-      
-      // Filter non-deleted items in memory
-      const activeUsers = usersSnap.docs.filter((doc: any) => !doc.data().deleted_at);
-      const activeApps = appsSnap.docs.filter((doc: any) => !doc.data().deleted_at);
-      const activeLedger = ledgerSnap.docs.filter((doc: any) => !doc.data().deleted_at);
+    // 2. Real-time Status via Snapshots
+    const unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
+      const activeDocs = snap.docs.filter((doc: any) => !doc.data().deleted_at);
+      setStats((prev: any) => {
+        const newStats = { ...(prev || { overview: {} }) };
+        if (!newStats.overview) newStats.overview = {};
+        newStats.overview.totalUsers = activeDocs.filter((doc: any) => doc.data().role === 'user').length;
+        newStats.overview.totalStaff = activeDocs.filter((doc: any) => doc.data().role === 'staff').length;
+        return newStats;
+      });
+      setLoading(false);
+    }, (err) => setError('Users: ' + err.message));
 
-      const totalUsers = activeUsers.filter((doc: any) => doc.data().role === 'user').length;
-      const totalStaff = activeUsers.filter((doc: any) => doc.data().role === 'staff').length;
-      const totalApplications = activeApps.length;
-      
+    const unsubApps = onSnapshot(collection(db, 'applications'), (snap) => {
+      const activeApps = snap.docs.filter((doc: any) => !doc.data().deleted_at);
       const pendingStatuses = ['Submitted', 'Under Review', 'Processing', 'Documents Required', 'Pending'];
       const approvedStatuses = ['Approved', 'Completed'];
       
-      let pendingApplications = 0;
-      let approvedApplications = 0;
-      let rejectedApplications = 0;
+      let pending = 0;
+      let approved = 0;
+      let rejected = 0;
       const statusMap = new Map();
       const dailyAppsMap = new Map();
+      const servicesMap = new Map();
+      const staffPerfMap = new Map();
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
@@ -85,49 +69,19 @@ const AdminDashboard = () => {
         const status = data.status || 'Unknown';
         statusMap.set(status, (statusMap.get(status) || 0) + 1);
         
-        if (pendingStatuses.includes(status)) pendingApplications++;
-        if (approvedStatuses.includes(status)) approvedApplications++;
-        if (status === 'Rejected') rejectedApplications++;
+        if (pendingStatuses.includes(status)) pending++;
+        if (approvedStatuses.includes(status)) approved++;
+        if (status === 'Rejected') rejected++;
         
         const createdAt = data.created_at?.toDate?.() || (data.created_at ? new Date(data.created_at) : null);
         if (createdAt && createdAt >= sevenDaysAgo) {
           const date = createdAt.toISOString().split('T')[0];
           dailyAppsMap.set(date, (dailyAppsMap.get(date) || 0) + 1);
         }
-      });
 
-      let totalRevenue = 0;
-      activeLedger.forEach((doc: any) => {
-        totalRevenue += (doc.data().amount || 0);
-      });
-
-      const recentApplications = activeApps
-        .sort((a: any, b: any) => {
-          const timeA = a.data().created_at?.toDate?.()?.getTime() || new Date(a.data().created_at || 0).getTime();
-          const timeB = b.data().created_at?.toDate?.()?.getTime() || new Date(b.data().created_at || 0).getTime();
-          return timeB - timeA;
-        })
-        .slice(0, 5)
-        .map((doc: any) => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-
-      // Top Services
-      const servicesMap = new Map();
-      activeApps.forEach((doc: any) => {
-        const name = doc.data().service_name || 'General';
+        const name = data.service_name || 'General';
         servicesMap.set(name, (servicesMap.get(name) || 0) + 1);
-      });
-      const topServices = Array.from(servicesMap.entries())
-        .map(([name, value]) => ({ name, value }))
-        .sort((a: any, b: any) => b.value - a.value)
-        .slice(0, 5);
 
-      // Staff Performance
-      const staffPerfMap = new Map();
-      activeApps.forEach((doc: any) => {
-        const data = doc.data();
         if (data.assignedTo) {
           const staffId = data.assignedTo;
           const staffName = data.assignedToName || 'Unknown';
@@ -143,45 +97,101 @@ const AdminDashboard = () => {
           }
         }
       });
-      const staffPerformance = Array.from(staffPerfMap.values());
+
+      const recentApplications = activeApps
+        .sort((a: any, b: any) => {
+          const timeA = a.data().created_at?.toDate?.()?.getTime() || new Date(a.data().created_at || 0).getTime();
+          const timeB = b.data().created_at?.toDate?.()?.getTime() || new Date(b.data().created_at || 0).getTime();
+          return timeB - timeA;
+        })
+        .slice(0, 5)
+        .map((doc: any) => ({ id: doc.id, ...doc.data() }));
 
       const systemNotifications: any[] = [];
-      if (pendingApplications > 0) {
+      if (pending > 0) {
         systemNotifications.push({
-          message: `There are ${pendingApplications} pending applications waiting for review.`,
+          message: `There are ${pending} pending applications waiting for review.`,
           created_at: new Date().toISOString(),
           is_read: false
         });
       }
 
-      const dashboardStats = {
+      setStats((prev: any) => ({
+        ...prev,
         overview: {
-          totalUsers,
-          totalStaff,
-          totalApplications,
-          pendingApplications,
-          approvedApplications,
-          rejectedApplications,
-          totalRevenue,
-          serviceRevenue: totalRevenue // Simplified for now
+          ...(prev?.overview || {}),
+          totalApplications: activeApps.length,
+          pendingApplications: pending,
+          approvedApplications: approved,
+          rejectedApplications: rejected
         },
         appsByStatus: Array.from(statusMap.entries()).map(([name, value]) => ({ name, value })),
         dailyApps: Array.from(dailyAppsMap.entries()).map(([date, count]) => ({ date, count })).sort((a: any, b: any) => a.date.localeCompare(b.date)),
         recentApplications,
-        topServices,
-        staffPerformance,
-        adminLogs: logsSnap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() })),
+        topServices: Array.from(servicesMap.entries()).map(([name, value]) => ({ name, value })).sort((a: any, b: any) => b.value - a.value).slice(0, 5),
+        staffPerformance: Array.from(staffPerfMap.values()),
         systemNotifications
-      };
-      
-      setStats(dashboardStats);
-      setLoading(false);
-    } catch (err: any) {
-      console.error('Error fetching dashboard stats from Firestore:', err);
-      setError('Failed to load dashboard data. Please check your connection.');
-      setLoading(false);
-    }
-  };
+      }));
+    }, (err) => setError('Apps: ' + err.message));
+
+    const unsubLedger = onSnapshot(collection(db, 'ledger'), (snap) => {
+      const activeLedger = snap.docs.filter((doc: any) => !doc.data().deleted_at);
+      let totalRev = 0;
+      let serviceRev = 0;
+
+      activeLedger.forEach((doc: any) => {
+        const data = doc.data();
+        const principle = data.principle_amount || data.amount || 0;
+        const profit = data.profit_amount || data.profit || data.fee || 0;
+        const sType = data.serviceType || data.service_type || data.type || '';
+        const isDebit = sType === 'Cash Withdrawal' || sType === 'Withdrawal' || data.type === 'withdrawal';
+        
+        if (!isDebit) {
+          totalRev += (principle + profit);
+          serviceRev += profit;
+        } else {
+          // For withdrawals, the "profit" is the fee collected (inflow)
+          totalRev += profit;
+          serviceRev += profit;
+        }
+      });
+
+      setStats((prev: any) => ({
+        ...prev,
+        overview: {
+          ...(prev?.overview || {}),
+          totalRevenue: totalRev,
+          serviceRevenue: serviceRev
+        }
+      }));
+    }, (err) => setError('Ledger: ' + err.message));
+
+    const unsubLogs = onSnapshot(query(collection(db, 'activity_logs'), orderBy('timestamp', 'desc'), limit(10)), (snap) => {
+      setStats((prev: any) => ({
+        ...prev,
+        adminLogs: snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+      }));
+    });
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
+        setShowProfileMenu(false);
+      }
+      if (!(event.target as Element).closest('.action-menu-container')) {
+        setOpenActionMenuId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    
+    return () => {
+      clearInterval(clockInterval);
+      unsubUsers();
+      unsubApps();
+      unsubLedger();
+      unsubLogs();
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [user]);
 
   const handleLogout = () => {
     logout();
@@ -202,7 +212,7 @@ const AdminDashboard = () => {
         <div className="p-4 bg-rose-50 text-rose-600 rounded-xl border border-rose-100 max-w-md text-center">
           <p className="font-medium">{error}</p>
           <button 
-            onClick={() => { setLoading(true); fetchStats(); }}
+            onClick={() => window.location.reload()}
             className="mt-4 px-6 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-colors"
           >
             Retry Loading
@@ -214,15 +224,24 @@ const AdminDashboard = () => {
 
   if (!stats) return null;
 
-  const { overview, appsByStatus, dailyApps, recentApplications, topServices, staffPerformance, adminLogs } = stats;
+  const { 
+    overview = {}, 
+    appsByStatus = [], 
+    dailyApps = [], 
+    recentApplications = [], 
+    topServices = [], 
+    staffPerformance = [], 
+    adminLogs = [],
+    systemNotifications = []
+  } = stats || {};
 
   const statCards = [
-    { title: 'Total Users', value: overview.totalUsers, icon: <Users size={24} />, color: 'bg-blue-500', trend: '+12% this week' },
-    { title: 'Total Staff', value: overview.totalStaff, icon: <UserCheck size={24} />, color: 'bg-indigo-500', trend: 'Active' },
-    { title: 'Total Applications', value: overview.totalApplications, icon: <FileText size={24} />, color: 'bg-purple-500', trend: '+5% today' },
-    { title: 'Pending Applications', value: overview.pendingApplications, icon: <Clock size={24} />, color: 'bg-amber-500', trend: 'Needs attention' },
-    { title: 'Approved Applications', value: overview.approvedApplications, icon: <CheckCircle size={24} />, color: 'bg-emerald-500', trend: 'Completed' },
-    { title: 'Rejected Applications', value: overview.rejectedApplications, icon: <XCircle size={24} />, color: 'bg-rose-500', trend: 'Action required' },
+    { title: 'Total Users', value: overview.totalUsers || 0, icon: <Users size={24} />, color: 'bg-blue-500', trend: '+12% this week' },
+    { title: 'Total Staff', value: overview.totalStaff || 0, icon: <UserCheck size={24} />, color: 'bg-indigo-500', trend: 'Active' },
+    { title: 'Total Applications', value: overview.totalApplications || 0, icon: <FileText size={24} />, color: 'bg-purple-500', trend: '+5% today' },
+    { title: 'Pending Applications', value: overview.pendingApplications || 0, icon: <Clock size={24} />, color: 'bg-amber-500', trend: 'Needs attention' },
+    { title: 'Approved Applications', value: overview.approvedApplications || 0, icon: <CheckCircle size={24} />, color: 'bg-emerald-500', trend: 'Completed' },
+    { title: 'Rejected Applications', value: overview.rejectedApplications || 0, icon: <XCircle size={24} />, color: 'bg-rose-500', trend: 'Action required' },
     { title: 'Service Revenue', value: `₹${(overview.serviceRevenue || 0).toLocaleString()}`, icon: <IndianRupee size={24} />, color: 'bg-blue-600', trend: 'From Paid Services' },
     { title: 'Total Revenue', value: `₹${(overview.totalRevenue || 0).toLocaleString()}`, icon: <IndianRupee size={24} />, color: 'bg-amber-400', trend: '+15% this month' },
   ];
@@ -242,7 +261,9 @@ const AdminDashboard = () => {
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Welcome back, {user?.name}</h1>
-          <p className="text-slate-500 text-sm mt-1">{new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} | {new Date().toLocaleTimeString('en-IN')}</p>
+          <p className="text-slate-500 text-sm mt-1">
+            {currentTime.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} | {currentTime.toLocaleTimeString('en-IN')}
+          </p>
         </div>
         
         <div className="flex flex-col sm:flex-row items-center gap-4 w-full xl:w-auto">
@@ -358,7 +379,7 @@ const AdminDashboard = () => {
                   paddingAngle={5}
                   dataKey="value"
                 >
-                  {appsByStatus.map((entry: any, index: number) => (
+                  {appsByStatus?.map((entry: any, index: number) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
@@ -419,7 +440,7 @@ const AdminDashboard = () => {
                     <td colSpan={6} className="p-8 text-center text-slate-500">No recent applications</td>
                   </tr>
                 ) : (
-                  recentApplications.map((app: any) => (
+                  recentApplications?.map((app: any) => (
                     <tr key={app.id} className="hover:bg-slate-50 transition-colors">
                       <td className="p-4 font-mono text-xs font-medium text-slate-900">{app.reference_number}</td>
                       <td className="p-4 text-sm text-slate-700">{app.user_name}</td>
@@ -530,7 +551,7 @@ const AdminDashboard = () => {
                     <td colSpan={4} className="p-8 text-center text-slate-500">No staff data available</td>
                   </tr>
                 ) : (
-                  staffPerformance.map((staff: any, idx: number) => (
+                  staffPerformance?.map((staff: any, idx: number) => (
                     <tr key={idx} className="hover:bg-slate-50 transition-colors">
                       <td className="p-4 text-sm font-medium text-slate-900 flex items-center gap-2">
                         <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs">
@@ -588,11 +609,11 @@ const AdminDashboard = () => {
             <h3 className="text-lg font-bold text-slate-900">System Notifications</h3>
           </div>
           <div className="p-0">
-            {(!stats.systemNotifications || stats.systemNotifications.length === 0) ? (
+            {systemNotifications.length === 0 ? (
               <div className="p-8 text-center text-slate-500">No recent notifications</div>
             ) : (
               <div className="divide-y divide-slate-100">
-                {stats.systemNotifications.map((notif: any, idx: number) => (
+                {systemNotifications?.map((notif: any, idx: number) => (
                   <div key={idx} className="p-4 flex items-start gap-4 hover:bg-slate-50 transition-colors">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${!notif.is_read ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-500'}`}>
                       <Bell size={16} />
@@ -619,7 +640,7 @@ const AdminDashboard = () => {
               <div className="p-8 text-center text-slate-500">No recent activity</div>
             ) : (
               <div className="divide-y divide-slate-100">
-                {adminLogs.map((log: any, idx: number) => (
+                {adminLogs?.map((log: any, idx: number) => (
                   <div key={idx} className="p-4 flex items-start gap-4 hover:bg-slate-50 transition-colors">
                     <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center shrink-0 text-slate-500">
                       <ShieldCheck size={16} />

@@ -223,8 +223,9 @@ const Ledger = () => {
       const newData = { ...prev, [key]: value };
       
       // Autofill logic: If service_type changes, update service_name too
-      if (key === 'service_type') {
+      if (key === 'service_type' || key === 'serviceType') {
         newData.service_name = value;
+        newData.serviceName = value;
       }
       
       return newData;

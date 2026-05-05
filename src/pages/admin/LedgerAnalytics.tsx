@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { collection, getDocs, query, orderBy, where } from 'firebase/firestore';
+import { collection, query, orderBy, where, onSnapshot } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../../lib/firebase';
+import toast from 'react-hot-toast';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
   LineChart, Line, AreaChart, Area 
@@ -16,27 +17,28 @@ const LedgerAnalytics = () => {
   });
 
   useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
     setLoading(true);
-    try {
-      const q = query(
-        collection(db, 'ledger'),
-        where('date_string', '>=', dateRange.from),
-        where('date_string', '<=', dateRange.to),
-        orderBy('date_string', 'asc')
-      );
-      const snapshot = await getDocs(q);
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const q = query(
+      collection(db, 'ledger'),
+      where('date_string', '>=', dateRange.from),
+      where('date_string', '<=', dateRange.to),
+      orderBy('date_string', 'asc')
+    );
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .filter((item: any) => !item.deleted_at); // Filter deleted
       setLedger(data);
-    } catch (err: any) {
-      handleFirestoreError(err, OperationType.LIST, 'ledger');
-    } finally {
       setLoading(false);
-    }
-  };
+    }, (err) => {
+      console.error("Ledger analytics error:", err);
+      toast.error("Failed to fetch real-time analytics");
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [dateRange.from, dateRange.to]);
 
   const stats = useMemo(() => {
     let revenue = 0;
@@ -44,13 +46,17 @@ const LedgerAnalytics = () => {
     let withdrawals = 0;
     
     ledger.forEach(item => {
-      const p = (item.profit_amount || 0);
+      const p = parseFloat(item.profit_amount || item.profit || item.fee || 0);
+      const pr = parseFloat(item.principle_amount || item.amount || 0);
+      const type = item.service_type || item.type || '';
+      const isDebit = type === 'Cash Withdrawal' || type === 'Withdrawal' || item.type === 'withdrawal';
+
       profit += p;
 
-      if (item.type === 'credit' || item.type === 'deposit') {
-        revenue += (item.principle_amount || 0);
-      } else if (item.type === 'debit' || item.type === 'withdrawal') {
-        withdrawals += Math.abs(item.total_amount || 0);
+      if (!isDebit) {
+        revenue += pr;
+      } else {
+        withdrawals += Math.abs(item.total_amount || -pr || 0);
       }
     });
 
@@ -58,7 +64,7 @@ const LedgerAnalytics = () => {
       revenue,
       profit,
       withdrawals,
-      netBalance: revenue + profit - withdrawals
+      netBalance: (revenue + profit) - withdrawals
     };
   }, [ledger]);
 
@@ -70,11 +76,15 @@ const LedgerAnalytics = () => {
         grouped[date] = { date, revenue: 0, profit: 0, entries: 0 };
       }
       
-      const p = (item.profit_amount || 0);
+      const p = parseFloat(item.profit_amount || item.profit || item.fee || 0);
+      const pr = parseFloat(item.principle_amount || item.amount || 0);
+      const type = item.service_type || item.type || '';
+      const isDebit = type === 'Cash Withdrawal' || type === 'Withdrawal' || item.type === 'withdrawal';
+
       grouped[date].profit += p;
 
-      if (item.type === 'credit' || item.type === 'deposit') {
-        grouped[date].revenue += (item.principle_amount || 0);
+      if (!isDebit) {
+        grouped[date].revenue += pr;
       }
       grouped[date].entries += 1;
     });
@@ -90,11 +100,15 @@ const LedgerAnalytics = () => {
       }
       report[name].entries += 1;
       
-      const p = (item.profit_amount || 0);
+      const p = parseFloat(item.profit_amount || item.profit || item.fee || 0);
+      const pr = parseFloat(item.principle_amount || item.amount || 0);
+      const type = item.service_type || item.type || '';
+      const isDebit = type === 'Cash Withdrawal' || type === 'Withdrawal' || item.type === 'withdrawal';
+
       report[name].profit += p;
 
-      if (item.type === 'credit' || item.type === 'deposit') {
-        report[name].revenue += (item.principle_amount || 0);
+      if (!isDebit) {
+        report[name].revenue += pr;
       }
     });
     return Object.values(report).sort((a: any, b: any) => b.profit - a.profit);
@@ -109,16 +123,20 @@ const LedgerAnalytics = () => {
       }
       report[mode].entries += 1;
       
-      const p = (item.profit_amount || 0);
+      const p = parseFloat(item.profit_amount || item.profit || item.fee || 0);
+      const pr = parseFloat(item.principle_amount || item.amount || 0);
+      const type = item.service_type || item.type || '';
+      const isDebit = type === 'Cash Withdrawal' || type === 'Withdrawal' || item.type === 'withdrawal';
+
       report[mode].profit += p;
 
-      if (item.type === 'credit' || item.type === 'deposit') {
-        report[mode].revenue += (item.principle_amount || 0);
+      if (!isDebit) {
+        report[mode].revenue += pr;
       } else {
-        report[mode].withdrawals += Math.abs(item.total_amount || 0);
+        report[mode].withdrawals += Math.abs(item.total_amount || -pr || 0);
       }
     });
-    return Object.values(report).sort((a: any, b: any) => b.revenue - a.revenue);
+    return Object.values(report).sort((a: any, b: any) => b.profit - a.profit);
   }, [ledger]);
 
   return (
@@ -147,12 +165,6 @@ const LedgerAnalytics = () => {
              onChange={e => setDateRange({...dateRange, to: e.target.value})} 
              className="bg-transparent text-white border-0 text-sm focus:ring-0" 
            />
-           <button 
-             onClick={fetchData} 
-             className="ml-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-bold transition-all"
-           >
-             Apply
-           </button>
         </div>
       </div>
 
