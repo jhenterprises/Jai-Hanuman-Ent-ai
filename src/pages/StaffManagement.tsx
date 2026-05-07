@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { 
   collection, getDocs, addDoc, updateDoc, doc, query, 
-  where, serverTimestamp, setDoc, getDoc, orderBy, onSnapshot, limit 
+  where, serverTimestamp, setDoc, getDoc, orderBy, onSnapshot, limit,
+  deleteDoc 
 } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import { 
   Search, Plus, Trash2, Shield, User, Edit2, X, 
@@ -17,41 +18,6 @@ import { motion, AnimatePresence } from 'motion/react';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-
-enum OperationType {
-  CREATE = 'create',
-  UPDATE = 'update',
-  DELETE = 'delete',
-  LIST = 'list',
-  GET = 'get',
-  WRITE = 'write',
-}
-
-interface FirestoreErrorInfo {
-  error: string;
-  operationType: OperationType;
-  path: string | null;
-  authInfo: {
-    userId?: string | null;
-    email?: string | null;
-    emailVerified?: boolean | null;
-  }
-}
-
-const handleFirestoreError = (error: unknown, operationType: OperationType, path: string | null, auth: any) => {
-  const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
-    authInfo: {
-      userId: auth?.uid,
-      email: auth?.email,
-      emailVerified: auth?.emailVerified,
-    },
-    operationType,
-    path
-  };
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
-};
 
 const StaffManagement = () => {
   const { user: currentUser } = useAuth();
@@ -120,9 +86,21 @@ const StaffManagement = () => {
     });
 
     // Real-time Attendance
-    const qAttendance = query(collection(db, 'attendance'), orderBy('date', 'desc'), limit(100));
+    const today = format(new Date(), 'yyyy-MM-dd');
+    const qAttendance = query(
+      collection(db, 'attendance'), 
+      where('date', '>=', format(startOfMonth(new Date()), 'yyyy-MM-dd')),
+      orderBy('date', 'desc')
+    );
     const unsubscribeAttendance = onSnapshot(qAttendance, (snapshot) => {
-      setAttendance(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      console.log(`Fetched ${data.length} attendance records for this month`);
+      setAttendance(data);
+    }, (err) => {
+      console.error('Attendance fetch error:', err);
+      if (err.message.includes('permission')) {
+        handleFirestoreError(err, OperationType.LIST, 'attendance');
+      }
     });
 
     // Real-time Salaries
@@ -139,9 +117,17 @@ const StaffManagement = () => {
   }, []); // Cleanup useEffect dependencies
 
   const autoMarkAttendance = async (staffList: any[]) => {
+    console.log(`Processing auto-attendance for ${staffList.length} staff docs...`);
     const today = format(new Date(), 'yyyy-MM-dd');
-    const activeStaff = staffList.filter(s => s.role === 'staff' && s.status === 'active');
+    // Consider both staff and active status. If status is missing, assume active for existing staff.
+    const activeStaff = staffList.filter(s => 
+      (s.role === 'staff' || s.role === 'admin') && 
+      (s.status === 'active' || !s.status)
+    );
     
+    console.log(`Found ${activeStaff.length} active staff/admins to mark.`);
+    let markedCount = 0;
+
     for (const s of activeStaff) {
       const attendanceId = `${s.id}_${today}`;
       const attendanceRef = doc(db, 'attendance', attendanceId);
@@ -157,13 +143,17 @@ const StaffManagement = () => {
             date: String(today),
             status: 'Full Day',
             updated_at: serverTimestamp(),
-            isAuto: true
+            isAuto: true,
+            created_at: serverTimestamp()
           });
+          markedCount++;
         }
       } catch (err) {
-        // Silent fail for auto-mark to not break UI, but log
         console.warn('Auto-mark attendance failed for', s.name, err);
       }
+    }
+    if (markedCount > 0) {
+      console.log(`Successfully auto-marked ${markedCount} staff members for today.`);
     }
   };
 
@@ -183,7 +173,7 @@ const StaffManagement = () => {
           where('date', '<=', format(end, 'yyyy-MM-dd'))
         ));
       } catch (err) {
-        handleFirestoreError(err, OperationType.LIST, attendancePath, currentUser);
+        handleFirestoreError(err, OperationType.LIST, attendancePath);
       }
       
       const attendanceData = attendanceSnap.docs.map(doc => doc.data());
@@ -217,7 +207,7 @@ const StaffManagement = () => {
             updated_at: serverTimestamp()
           }, { merge: true });
         } catch (err) {
-          handleFirestoreError(err, OperationType.WRITE, salariesPath, currentUser);
+          handleFirestoreError(err, OperationType.WRITE, salariesPath);
         }
       });
       await Promise.all(salaryPromises);
@@ -317,8 +307,26 @@ const StaffManagement = () => {
       setSelectedAttendanceId(null);
       alert('Attendance record saved successfully');
     } catch (err) {
-      handleFirestoreError(err, OperationType.WRITE, attendancePath, currentUser);
+      handleFirestoreError(err, OperationType.WRITE, attendancePath);
     }
+  };
+
+  const handleDeleteAttendance = (at: any) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Delete Attendance Record',
+      message: `Are you sure you want to PERMANENTLY delete the attendance record for ${at.staff_name} on ${at.date}?`,
+      onConfirm: async () => {
+        try {
+          await deleteDoc(doc(db, 'attendance', at.id));
+          alert('Attendance record deleted successfully');
+        } catch (err: any) {
+          console.error('Delete attendance error:', err);
+          handleFirestoreError(err, OperationType.DELETE, `attendance/${at.id}`);
+        }
+        setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+      }
+    });
   };
 
   const generateStaffId = async () => {
@@ -398,28 +406,69 @@ const StaffManagement = () => {
     alert('Please use the regular "Forgot Password" flow on the login page. As an admin, you cannot directly set passwords in Firebase client-side.');
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = (id: any) => {
+    // Robustly extract ID
+    let targetId = '';
+    if (typeof id === 'string') {
+      targetId = id;
+    } else if (id && typeof id === 'object' && id.id) {
+      targetId = String(id.id);
+    } else {
+      targetId = String(id);
+    }
+    
+    // Clean targetId
+    targetId = targetId.trim();
+    
+    if (!targetId || targetId === '[object Object]') {
+      console.error('Invalid ID passed to handleDelete:', id);
+      alert('Invalid staff ID');
+      return;
+    }
+
+    const staffMember = staff.find(s => s.id === targetId);
+    console.log('Attempting to delete staff member:', targetId, staffMember?.name);
+
     setConfirmDialog({
       isOpen: true,
       title: 'Remove Staff Member',
-      message: 'Are you sure you want to remove this staff member? This will move them to the Recycle Bin.',
+      message: `Are you sure you want to remove ${staffMember?.name || 'this staff member'}? This will move them to the Recycle Bin.`,
       onConfirm: async () => {
+        const staffPath = `users/${targetId}`;
         try {
-          const staffRef = doc(db, 'users', id);
-          await updateDoc(staffRef, { is_deleted: true, updated_at: serverTimestamp() });
+          console.log('Soft-deleting staff member:', targetId);
           
-          // Optionally add to recycle_bin collection
-          await addDoc(collection(db, 'recycle_bin'), {
-            original_id: id,
-            type: 'user',
-            name: staff.find(s => s.id === id)?.name || 'Unknown',
-            deleted_at: serverTimestamp(),
-            data: staff.find(s => s.id === id) || {}
-          });
+          // Step 1: Update user status using setDoc with merge for maximum reliability
+          // setDoc with merge: true is often more robust than updateDoc for simple field updates
+          await setDoc(doc(db, 'users', String(targetId)), { 
+            is_deleted: true, 
+            status: 'deleted',
+            updated_at: serverTimestamp() 
+          }, { merge: true });
+          
+          // Step 2: Add to recycle bin
+          try {
+            const recycleData = staffMember ? { ...staffMember } : {};
+            // Remove non-serializable fields if any
+            delete recycleData.created_at;
+            delete recycleData.updated_at;
+
+            await addDoc(collection(db, 'recycle_bin'), {
+              original_id: String(targetId),
+              type: 'user',
+              name: String(staffMember?.name || 'Unknown'),
+              deleted_at: serverTimestamp(),
+              data: recycleData,
+              moved_by: String(currentUser?.uid || 'system')
+            });
+          } catch (recycleErr) {
+            console.warn('Recycle bin record failed (non-critical):', recycleErr);
+          }
 
           alert('Staff member moved to Recycle Bin');
         } catch (err: any) {
-          alert('Failed to remove staff member: ' + err.message);
+          console.error("Delete operation failed:", err);
+          handleFirestoreError(err, OperationType.WRITE, staffPath);
         }
         setConfirmDialog(prev => ({ ...prev, isOpen: false }));
       }
@@ -508,13 +557,20 @@ const StaffManagement = () => {
 
       {activeView === 'staff' ? (
         <>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-4">
             <button 
               onClick={() => { resetForm(); setShowAddModal(true); }}
               className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl transition-all shadow-lg shadow-blue-600/20 font-bold text-sm w-fit"
             >
               <Plus size={20} />
               Add New Staff
+            </button>
+            <button 
+              onClick={() => autoMarkAttendance(staff)}
+              className="flex items-center gap-2 px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-2xl transition-all shadow-lg font-bold text-sm w-fit"
+            >
+              <Activity size={20} className="text-amber-500" />
+              Sync Today's Attendance
             </button>
           </div>
           {/* Filters & Search */}
@@ -722,7 +778,9 @@ const StaffManagement = () => {
                 <tbody className="divide-y divide-white/5">
                   {attendance.map((at, i) => (
                     <tr key={i} className="hover:bg-white/5 transition-colors">
-                      <td className="px-6 py-4 text-sm font-bold text-white">{format(new Date(at.date), 'dd MMM, yyyy')}</td>
+                      <td className="px-6 py-4 text-sm font-bold text-white">
+                        {at.date}
+                      </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-[10px] font-bold text-white">
@@ -753,8 +811,16 @@ const StaffManagement = () => {
                             setShowAttendanceModal(true);
                           }}
                           className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg"
+                          title="Edit Attendance"
                         >
                           <Edit2 size={14} />
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteAttendance(at)}
+                          className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg"
+                          title="Delete Attendance"
+                        >
+                          <Trash2 size={14} />
                         </button>
                       </td>
                     </tr>

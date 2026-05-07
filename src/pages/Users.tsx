@@ -234,18 +234,47 @@ const UsersPage = () => {
     }
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = (id: any) => {
+    // Robustly extract ID
+    let targetId = '';
+    if (typeof id === 'string') {
+      targetId = id;
+    } else if (id && typeof id === 'object' && id.id) {
+      targetId = String(id.id);
+    } else {
+      targetId = String(id);
+    }
+    
+    // Clean targetId
+    targetId = targetId.trim();
+    
+    if (!targetId || targetId === '[object Object]') {
+      console.error('Invalid ID passed to handleDelete:', id);
+      alert('Invalid user ID');
+      return;
+    }
+
+    const userToDelete = users.find(u => u.id === targetId);
+
     setConfirmDialog({
       isOpen: true,
       title: 'Delete User',
-      message: 'Are you sure you want to PERMANENTLY delete this user? This action cannot be undone.',
+      message: `Are you sure you want to remove ${userToDelete?.name || 'this user'}? This will disable their account and move them to history.`,
       onConfirm: async () => {
+        const userPath = `users/${targetId}`;
         try {
-          await deleteDoc(doc(db, 'users', id));
+          console.log('Soft-deleting user:', targetId);
+          await setDoc(doc(db, 'users', String(targetId)), {
+            is_deleted: true,
+            status: 'deleted',
+            updatedAt: serverTimestamp()
+          }, { merge: true });
+          
           fetchUsers();
-          alert('User deleted successfully');
+          alert('User removed successfully');
         } catch (err: any) {
-          handleFirestoreError(err, OperationType.DELETE, `users/${id}`);
+          console.error('Delete error:', err);
+          handleFirestoreError(err, OperationType.WRITE, userPath);
         }
         setConfirmDialog(prev => ({ ...prev, isOpen: false }));
       }

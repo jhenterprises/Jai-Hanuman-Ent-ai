@@ -279,16 +279,39 @@ const Ledger = () => {
     }
   };
 
-  const handleDelete = async (id: string, col: string) => {
-    if (!window.confirm('Are you sure you want to delete this entry? This action cannot be undone.')) return;
+  const handleDelete = async (id: any, col: any) => {
+    // Robustly extract ID and collection
+    let targetId = '';
+    if (typeof id === 'string') {
+      targetId = id;
+    } else if (id && typeof id === 'object' && id.id) {
+      targetId = String(id.id);
+    } else {
+      targetId = String(id);
+    }
+    
+    targetId = targetId.trim();
+    const targetCol = String(col || 'ledger').trim();
+    
+    if (!targetId || targetId === '[object Object]' || targetId === 'undefined') {
+      console.error('Invalid ID in Ledger handleDelete:', id);
+      toast.error('Invalid record ID');
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to delete this entry? This action cannot be undone.`)) return;
+    
+    const fullPath = `${targetCol}/${targetId}`;
+    
     try {
-      await deleteDoc(doc(db, col, id));
+      console.log('Deleting entry from:', fullPath);
+      await deleteDoc(doc(db, targetCol, targetId));
       await fetchData();
       toast.success('Successfully deleted tracking record');
     } catch (err: any) {
-      console.error('Delete error:', err);
+      console.error('Delete error at', fullPath, ':', err);
       toast.error('Failed to delete record. Please check permissions.');
-      handleFirestoreError(err, OperationType.DELETE, col);
+      handleFirestoreError(err, OperationType.DELETE, fullPath);
     }
   };
 

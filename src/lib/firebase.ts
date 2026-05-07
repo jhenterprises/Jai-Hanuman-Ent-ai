@@ -34,26 +34,13 @@ if (isSet(firebaseConfigEnv.measurementId)) finalConfig.measurementId = firebase
 
 const app = initializeApp(finalConfig);
 
-let dbId = (finalConfig.firestoreDatabaseId && finalConfig.firestoreDatabaseId !== '(default)' && finalConfig.firestoreDatabaseId !== '')
+const dbId = (finalConfig.firestoreDatabaseId && finalConfig.firestoreDatabaseId !== '(default)' && finalConfig.firestoreDatabaseId !== '')
   ? finalConfig.firestoreDatabaseId
   : ((firebaseConfigEnv.firestoreDatabaseId && firebaseConfigEnv.firestoreDatabaseId !== '(default)' && firebaseConfigEnv.firestoreDatabaseId !== '')
       ? firebaseConfigEnv.firestoreDatabaseId
       : undefined);
 
-console.log('Final Firestore Database ID:', dbId || '(default)');
-
-const firestoreSettings = {
-  experimentalForceLongPolling: true,
-};
-
-let dbInstance;
-try {
-  dbInstance = initializeFirestore(app, firestoreSettings, dbId);
-} catch (e: any) {
-  dbInstance = getFirestore(app, dbId);
-}
-
-export const db = dbInstance;
+export const db = getFirestore(app, dbId);
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 export const storage = getStorage(app);
@@ -89,6 +76,7 @@ interface FirestoreErrorInfo {
 }
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const safePath = path ? String(path) : null;
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
@@ -103,7 +91,7 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
       })) || []
     },
     operationType,
-    path
+    path: safePath
   }
   console.error('Firestore Error: ', JSON.stringify(errInfo));
   throw new Error(JSON.stringify(errInfo));
