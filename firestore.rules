@@ -260,6 +260,27 @@ service cloud.firestore {
     }
 
     // -------------------------------------------------------------------------
+    // ID CARD SETTINGS
+    // -------------------------------------------------------------------------
+
+    match /id_card_settings/{settingId} {
+      function isValidIDCardSettings(data) {
+        return data.keys().hasAll(['front_bg_color', 'company_name', 'company_tagline']) &&
+               data.front_bg_color is string && data.front_bg_color.size() <= 20 &&
+               data.company_name is string && data.company_name.size() <= 100 &&
+               data.company_tagline is string && data.company_tagline.size() <= 100;
+      }
+
+      allow read: if isSignedIn();
+      allow create: if isAdmin() && isValidIDCardSettings(incoming());
+      allow update: if isAdmin() && (
+        isValidIDCardSettings(incoming()) || 
+        incoming().diff(existing()).affectedKeys().hasOnly(['front_bg_image', 'back_bg_image', 'company_logo', 'signature_url', 'instructions', 'emergency_contact', 'website', 'card_width', 'card_height', 'enabled_fields', 'font_size_name', 'font_size_details', 'text_color', 'accent_color', 'border_color', 'header_bg_color', 'footer_bg_color', 'back_bg_color'])
+      );
+      allow delete: if isAdmin();
+    }
+
+    // -------------------------------------------------------------------------
     // SETTINGS / CONFIG
     // -------------------------------------------------------------------------
     

@@ -52,6 +52,29 @@ expressApp.use((req, res, next) => {
   next();
 });
 
+// Proxy image route to bypass CORS
+expressApp.get("/api/proxy-image", async (req, res) => {
+  const imageUrl = req.query.url as string;
+  if (!imageUrl) return res.status(400).send("URL is required");
+
+  try {
+    const response = await fetch(imageUrl);
+    if (!response.ok) throw new Error(`Failed to fetch image: ${response.statusText}`);
+    
+    const contentType = response.headers.get("content-type");
+    if (contentType) res.setHeader("Content-Type", contentType);
+    
+    // Set caching headers for better performance
+    res.setHeader("Cache-Control", "public, max-age=3600");
+    
+    const arrayBuffer = await response.arrayBuffer();
+    res.send(Buffer.from(arrayBuffer));
+  } catch (error: any) {
+    console.error("Proxy image error:", error);
+    res.status(500).send("Failed to proxy image: " + error.message);
+  }
+});
+
 // API health check
 expressApp.get("/api/health", (req, res) => {
   res.json({ status: "ok", env: process.env.NODE_ENV, vercel: !!process.env.VERCEL });

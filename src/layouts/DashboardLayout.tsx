@@ -26,7 +26,8 @@ import {
   Clock, 
   Trash2, 
   TrendingUp,
-  Headphones
+  Headphones,
+  IdCard
 } from 'lucide-react';
 
 const DashboardLayout = () => {
@@ -129,6 +130,7 @@ const DashboardLayout = () => {
     { path: '/app/admin/ledger-analytics', label: 'Ledger Analytics', icon: <TrendingUp size={20} />, roles: ['admin'] },
     { path: '/app/users', label: 'Users List', icon: <Users size={20} />, roles: ['admin', 'staff'] },
     { path: '/app/staff-management', label: 'Staff Management', icon: <Users size={20} />, roles: ['admin'] },
+    { path: '/app/admin/id-card-designer', label: 'ID Card Designer', icon: <IdCard size={20} />, roles: ['admin'] },
     { path: '/app/admin/wallets', label: 'Wallet Management', icon: <WalletIcon size={20} />, roles: ['admin'] },
     { path: '/app/support', label: 'Ticket Support', icon: <MessageSquare size={20} />, roles: ['admin', 'staff', 'user'] },
     { path: '/app/support-center', label: 'Live Chat Support', icon: <Headphones size={20} />, roles: ['admin', 'staff'] },

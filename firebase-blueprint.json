@@ -1,5 +1,52 @@
 {
   "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User account and staff member details",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "staff", "user"] },
+        "staff_id": { "type": "string" },
+        "designation": { "type": "string" },
+        "address": { "type": "string" },
+        "blood_group": { "type": "string" },
+        "joining_date": { "type": "string" },
+        "photo_url": { "type": "string" },
+        "is_deleted": { "type": "boolean" },
+        "salary_amount": { "type": "number" }
+      }
+    },
+    "IDCardSettings": {
+      "title": "ID Card Settings",
+      "description": "Customization settings for the PVC ID card template",
+      "type": "object",
+      "properties": {
+        "front_bg_color": { "type": "string" },
+        "front_bg_image": { "type": "string" },
+        "back_bg_color": { "type": "string" },
+        "back_bg_image": { "type": "string" },
+        "company_logo": { "type": "string" },
+        "company_name": { "type": "string" },
+        "company_tagline": { "type": "string" },
+        "text_color": { "type": "string" },
+        "accent_color": { "type": "string" },
+        "border_color": { "type": "string" },
+        "header_bg_color": { "type": "string" },
+        "footer_bg_color": { "type": "string" },
+        "instructions": { "type": "string" },
+        "emergency_contact": { "type": "string" },
+        "website": { "type": "string" },
+        "signature_url": { "type": "string" },
+        "card_width": { "type": "number" },
+        "card_height": { "type": "number" },
+        "enabled_fields": { "type": "array" },
+        "font_size_name": { "type": "number" },
+        "font_size_details": { "type": "number" }
+      }
+    },
     "LedgerFieldConfig": {
       "title": "Ledger Field Configuration",
       "description": "Configuration for dynamic ledger input fields",
@@ -60,6 +107,14 @@
     }
   },
   "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles and staff data"
+    },
+    "/id_card_settings/default": {
+      "schema": "IDCardSettings",
+      "description": "Global ID card template settings"
+    },
     "/ledger_config/{fieldId}": {
       "schema": "LedgerFieldConfig",
       "description": "Collection of dynamic field configurations"

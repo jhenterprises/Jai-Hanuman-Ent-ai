@@ -60,6 +60,7 @@ const UsersPage = () => {
 
   useEffect(() => {
     fetchUsers();
+    console.log('Users page mounted');
   }, []);
 
   const fetchUsers = async () => {
@@ -125,7 +126,8 @@ const UsersPage = () => {
         phone: formData.phone,
         role: formData.role,
         status: 'active',
-        createdAt: serverTimestamp()
+        created_at: serverTimestamp(),
+        updated_at: serverTimestamp()
       };
       
       if (formData.role === 'staff') {
@@ -155,7 +157,7 @@ const UsersPage = () => {
         email: formData.email,
         phone: formData.phone,
         role: formData.role,
-        updatedAt: serverTimestamp()
+        updated_at: serverTimestamp()
       };
       
       if (formData.role === 'staff') {
@@ -180,7 +182,7 @@ const UsersPage = () => {
       const userRef = doc(db, 'users', user.id);
       await updateDoc(userRef, {
         status: newStatus,
-        updatedAt: serverTimestamp()
+        updated_at: serverTimestamp()
       });
       fetchUsers();
       alert(`User ${newStatus === 'active' ? 'enabled' : 'disabled'} successfully`);
@@ -267,7 +269,7 @@ const UsersPage = () => {
           await setDoc(doc(db, 'users', String(targetId)), {
             is_deleted: true,
             status: 'deleted',
-            updatedAt: serverTimestamp()
+            updated_at: serverTimestamp()
           }, { merge: true });
           
           fetchUsers();
@@ -337,7 +339,7 @@ const UsersPage = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-white">User Management</h1>

@@ -4,13 +4,15 @@ import {
   where, serverTimestamp, setDoc, getDoc, orderBy, onSnapshot, limit,
   deleteDoc 
 } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import { 
   Search, Plus, Trash2, Shield, User, Edit2, X, 
   UserMinus, UserCheck, Key, Filter, ChevronLeft, ChevronRight,
   Phone, Mail, Calendar, Info, Briefcase, Activity, DollarSign,
-  Download, FileText, CheckCircle2, Clock, MapPin
+  Download, FileText, CheckCircle2, Clock, MapPin, Camera, IdCard,
+  UserCircle
 } from 'lucide-react';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from 'date-fns';
@@ -18,6 +20,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import html2canvas from 'html2canvas';
 
 const StaffManagement = () => {
   const { user: currentUser } = useAuth();
@@ -32,6 +35,10 @@ const StaffManagement = () => {
   const [toDateFilter, setToDateFilter] = useState(format(endOfMonth(new Date()), 'yyyy-MM-dd'));
   const [page, setPage] = useState(1);
   const itemsPerPage = 10;
+
+  // Photo Upload State
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
 
   // Manual Attendance State
   const [showAttendanceModal, setShowAttendanceModal] = useState(false);
@@ -53,7 +60,12 @@ const StaffManagement = () => {
     password: '',
     role: 'staff',
     salary_amount: 0,
-    staff_id: ''
+    staff_id: '',
+    designation: '',
+    address: '',
+    blood_group: '',
+    joining_date: format(new Date(), 'yyyy-MM-dd'),
+    photo_url: ''
   });
 
   // Confirm Dialog State
@@ -115,6 +127,33 @@ const StaffManagement = () => {
       unsubscribeSalaries();
     };
   }, []); // Cleanup useEffect dependencies
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      alert('Photo must be less than 2MB');
+      return;
+    }
+
+    setIsUploadingPhoto(true);
+    try {
+      const fileExt = file.name.split('.').pop() || 'jpg';
+      const storageRef = ref(storage, `staff_photos/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`);
+      
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      
+      setFormData(prev => ({ ...prev, photo_url: url }));
+      setPhotoPreview(url);
+    } catch (err: any) {
+      console.error('Photo upload failed:', err);
+      alert('Failed to upload photo: ' + err.message);
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  };
 
   const autoMarkAttendance = async (staffList: any[]) => {
     console.log(`Processing auto-attendance for ${staffList.length} staff docs...`);
@@ -360,7 +399,8 @@ const StaffManagement = () => {
         staff_id: staffId,
         role: 'staff',
         status: 'active',
-        created_at: serverTimestamp()
+        created_at: serverTimestamp(),
+        updated_at: serverTimestamp()
       });
       setShowAddModal(false);
       resetForm();
@@ -381,6 +421,11 @@ const StaffManagement = () => {
         phone: formData.phone,
         salary_amount: Number(formData.salary_amount),
         staff_id: formData.staff_id ? formData.staff_id.trim() : selectedStaff.staff_id || '',
+        designation: formData.designation || '',
+        address: formData.address || '',
+        blood_group: formData.blood_group || '',
+        joining_date: formData.joining_date || '',
+        photo_url: formData.photo_url || '',
         updated_at: serverTimestamp()
       });
       setShowEditModal(false);
@@ -476,21 +521,34 @@ const StaffManagement = () => {
   };
 
   const resetForm = () => {
-    setFormData({ name: '', email: '', phone: '', password: '', role: 'staff', salary_amount: 0, staff_id: '' });
+    setFormData({ 
+      name: '', email: '', phone: '', password: '', 
+      role: 'staff', salary_amount: 0, staff_id: '',
+      designation: '', address: '', blood_group: '',
+      joining_date: format(new Date(), 'yyyy-MM-dd'),
+      photo_url: ''
+    });
+    setPhotoPreview(null);
     setSelectedStaff(null);
   };
 
   const openEditModal = (member: any) => {
     setSelectedStaff(member);
     setFormData({
-      name: member.name,
-      email: member.email,
-      phone: member.phone,
+      name: member.name || '',
+      email: member.email || '',
+      phone: member.phone || '',
       password: '',
-      role: 'staff',
+      role: member.role || 'staff',
       salary_amount: member.salary_amount || 0,
-      staff_id: member.staff_id || ''
+      staff_id: member.staff_id || '',
+      designation: member.designation || '',
+      address: member.address || '',
+      blood_group: member.blood_group || '',
+      joining_date: member.joining_date || format(new Date(), 'yyyy-MM-dd'),
+      photo_url: member.photo_url || ''
     });
+    setPhotoPreview(member.photo_url || null);
     setShowEditModal(true);
   };
 
@@ -635,8 +693,12 @@ const StaffManagement = () => {
                       <tr key={item.id} className="hover:bg-slate-700/20 transition-colors group">
                         <td className="p-5">
                             <div className="flex items-center gap-4">
-                              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 to-blue-800 border border-blue-500/30 flex items-center justify-center text-lg font-bold text-white shadow-lg shadow-blue-500/10">
-                                {(item.name || 'S').charAt(0).toUpperCase()}
+                              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 to-blue-800 border border-blue-500/30 flex items-center justify-center text-lg font-bold text-white shadow-lg shadow-blue-500/10 overflow-hidden">
+                                {item.photo_url ? (
+                                  <img src={item.photo_url} alt={item.name} className="w-full h-full object-cover" />
+                                ) : (
+                                  (item.name || 'S').charAt(0).toUpperCase()
+                                )}
                               </div>
                               <div>
                                 <div className="text-slate-200 font-bold text-sm">{item.name || 'Unknown Staff'}</div>
@@ -990,7 +1052,31 @@ const StaffManagement = () => {
                 </div>
 
                 <form onSubmit={showAddModal ? handleAdd : handleEdit} className="space-y-6">
-                  <div className="grid grid-cols-1 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="md:col-span-2 flex flex-col items-center justify-center mb-4">
+                      <div className="relative group">
+                        <div className="w-32 h-32 rounded-3xl bg-slate-800 border-2 border-dashed border-slate-700 flex items-center justify-center overflow-hidden transition-all group-hover:border-blue-500/50">
+                          {isUploadingPhoto ? (
+                            <div className="w-8 h-8 border-3 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                          ) : photoPreview ? (
+                            <img src={photoPreview} alt="Preview" className="w-full h-full object-cover" />
+                          ) : (
+                            <UserCircle size={48} className="text-slate-600" />
+                          )}
+                        </div>
+                        <label className="absolute -bottom-2 -right-2 p-3 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl shadow-xl cursor-pointer transition-all hover:scale-110 active:scale-95 group-hover:rotate-6">
+                          <Camera size={20} />
+                          <input 
+                            type="file" 
+                            accept="image/*" 
+                            onChange={handlePhotoUpload} 
+                            className="hidden" 
+                          />
+                        </label>
+                      </div>
+                      <p className="text-[10px] text-slate-500 mt-4 uppercase font-bold tracking-widest">Profile Photo</p>
+                    </div>
+
                     <div className="space-y-2">
                       <label className="text-[10px] text-slate-500 uppercase font-bold tracking-widest ml-1">Staff ID (Optional)</label>
                       <input 
@@ -1025,6 +1111,43 @@ const StaffManagement = () => {
                         value={formData.phone || ''} onChange={e => setFormData({...formData, phone: e.target.value})}
                         className="w-full px-5 py-3 bg-slate-800/50 border border-slate-700 rounded-2xl text-white focus:border-blue-500 outline-none transition-all"
                         placeholder="+91 9876543210"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] text-slate-500 uppercase font-bold tracking-widest ml-1">Designation</label>
+                      <input 
+                        type="text" 
+                        value={formData.designation || ''} onChange={e => setFormData({...formData, designation: e.target.value})}
+                        className="w-full px-5 py-3 bg-slate-800/50 border border-slate-700 rounded-2xl text-white focus:border-blue-500 outline-none transition-all"
+                        placeholder="e.g. Sales Executive"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] text-slate-500 uppercase font-bold tracking-widest ml-1">Blood Group</label>
+                      <select 
+                        value={formData.blood_group || ''} onChange={e => setFormData({...formData, blood_group: e.target.value})}
+                        className="w-full px-5 py-3 bg-slate-800/50 border border-slate-700 rounded-2xl text-white focus:border-blue-500 outline-none transition-all"
+                      >
+                        <option value="">Select Blood Group</option>
+                        {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map(bg => (
+                          <option key={bg} value={bg}>{bg}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] text-slate-500 uppercase font-bold tracking-widest ml-1">Joining Date</label>
+                      <input 
+                        type="date" 
+                        value={formData.joining_date || ''} onChange={e => setFormData({...formData, joining_date: e.target.value})}
+                        className="w-full px-5 py-3 bg-slate-800/50 border border-slate-700 rounded-2xl text-white focus:border-blue-500 outline-none transition-all"
+                      />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <label className="text-[10px] text-slate-500 uppercase font-bold tracking-widest ml-1">Address</label>
+                      <textarea 
+                        value={formData.address || ''} onChange={e => setFormData({...formData, address: e.target.value})}
+                        className="w-full px-5 py-3 bg-slate-800/50 border border-slate-700 rounded-2xl text-white focus:border-blue-500 outline-none transition-all min-h-[100px]"
+                        placeholder="Enter full address"
                       />
                     </div>
                     <div className="space-y-2">
