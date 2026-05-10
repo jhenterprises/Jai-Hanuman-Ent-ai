@@ -8,6 +8,7 @@ import {
   serverTimestamp, 
   doc, 
   updateDoc, 
+  setDoc,
   where,
   getDocs,
   limit,
@@ -52,9 +53,9 @@ const SupportCenter = () => {
     if (user?.uid) {
       const updatePresence = async () => {
         try {
-          await updateDoc(doc(db, 'users', user.uid), {
+          await setDoc(doc(db, 'users', user.uid), {
             last_active: serverTimestamp()
-          });
+          }, { merge: true });
         } catch (e) {
           console.error("Staff presence update failed", e);
         }

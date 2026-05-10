@@ -145,6 +145,66 @@ expressApp.post("/api/reset-password", isAdmin, async (req, res) => {
   }
 });
 
+// Financial Services Simulator (Dummy APIs for demo)
+expressApp.post("/api/recharge", async (req, res) => {
+  const { type, number, operator, amount } = req.body;
+  console.log(`Processing ${type} recharge for ${number} (${operator}) amount: ${amount}`);
+  setTimeout(() => {
+    res.json({ 
+      success: true, 
+      message: "Recharge successful", 
+      refNo: "REC" + Math.floor(Math.random() * 100000000) 
+    });
+  }, 1000);
+});
+
+expressApp.post("/api/bill-fetch", async (req, res) => {
+  const { category, consumerId, provider } = req.body;
+  console.log(`Fetching bill for ${category} : ${consumerId} (${provider})`);
+  setTimeout(() => {
+    res.json({
+      success: true,
+      customerName: "JH DIGITAL CUSTOMER",
+      billAmount: Math.floor(Math.random() * 5000) + 100,
+      dueDate: new Date(Date.now() + 86400000 * 10).toISOString().split('T')[0],
+      billId: "BBPS" + Math.floor(Math.random() * 1000000)
+    });
+  }, 800);
+});
+
+expressApp.post("/api/bill-pay", async (req, res) => {
+  const { billId, amount } = req.body;
+  setTimeout(() => {
+    res.json({
+      success: true,
+      message: "Bill paid successfully",
+      refNo: "BBPS" + Math.floor(Math.random() * 100000000)
+    });
+  }, 1000);
+});
+
+expressApp.post("/api/dmt-verify", async (req, res) => {
+  const { accountNumber } = req.body;
+  setTimeout(() => {
+    res.json({
+      success: true,
+      accountHolderName: "VERIFIED ACCOUNT HOLDER",
+      isVerified: true
+    });
+  }, 1000);
+});
+
+expressApp.post("/api/dmt-transfer", async (req, res) => {
+  setTimeout(() => {
+    res.json({
+      success: true,
+      message: "Transfer initiated",
+      refNo: "DMT" + Math.floor(Math.random() * 100000000),
+      status: "success"
+    });
+  }, 1500);
+});
+
 // Global Error Handler
 expressApp.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error('Unhandled Error:', err);

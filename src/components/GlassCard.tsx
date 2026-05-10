@@ -5,11 +5,13 @@ interface GlassCardProps {
   children: React.ReactNode;
   className?: string;
   hover?: boolean;
+  onClick?: () => void;
 }
 
-const GlassCard: React.FC<GlassCardProps> = ({ children, className = "", hover = true }) => {
+const GlassCard: React.FC<GlassCardProps> = ({ children, className = "", hover = true, onClick }) => {
   return (
     <motion.div
+      onClick={onClick}
       whileHover={hover ? { 
         y: -10, 
         scale: 1.02,

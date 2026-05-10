@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { auth, db } from '../lib/firebase';
-import { collection, query, where, orderBy, limit, getDocs, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, getDocs, updateDoc, setDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { useConfig } from '../context/ConfigContext';
 import LiveSupport from '../components/LiveSupport';
 import { safeFormat } from '../utils/dateUtils';
@@ -27,7 +27,8 @@ import {
   Trash2, 
   TrendingUp,
   Headphones,
-  IdCard
+  IdCard,
+  CreditCard
 } from 'lucide-react';
 
 const DashboardLayout = () => {
@@ -45,9 +46,11 @@ const DashboardLayout = () => {
     if (user?.uid) {
       const updatePresence = async () => {
         try {
-          await updateDoc(doc(db, 'users', user.uid), {
+          // Use setDoc with merge: true instead of updateDoc to handle cases where 
+          // the user document doesn't exist yet (e.g., first login)
+          await setDoc(doc(db, 'users', user.uid), {
             last_active: serverTimestamp()
-          });
+          }, { merge: true });
         } catch (e) {
           console.error("Presence update failed", e);
         }
@@ -122,6 +125,7 @@ const DashboardLayout = () => {
 
   const navItems = [
     { path: user?.role === 'user' ? '/app/user/dashboard' : (user?.role === 'admin' ? '/app/admin-dashboard' : '/app/dashboard'), label: 'Dashboard', icon: <LayoutDashboard size={20} />, roles: ['admin', 'staff', 'user'] },
+    { path: '/app/financial/hub', label: 'Financial Services', icon: <CreditCard size={20} />, roles: ['admin', 'staff', 'user'] },
     { path: '/app/wallet', label: 'My Wallet', icon: <WalletIcon size={20} />, roles: ['admin', 'staff', 'user'] },
     { path: user?.role === 'user' ? '/app/user/applications' : (user?.role === 'staff' ? '/app/staff/applications' : '/app/applications'), label: user?.role === 'user' ? 'My Applications' : 'User Applications', icon: <FileText size={20} />, roles: ['admin', 'staff', 'user'] },
     { path: user?.role === 'admin' ? '/app/services' : (user?.role === 'staff' ? '/app/staff/apply-service' : '/app/services'), label: 'Apply for Services', icon: <Briefcase size={20} />, roles: ['admin', 'staff', 'user'] },

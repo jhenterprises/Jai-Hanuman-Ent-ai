@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { doc, updateDoc, getDoc } from 'firebase/firestore';
+import { doc, updateDoc, setDoc, getDoc } from 'firebase/firestore';
 import { db, storage, auth } from '../lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
@@ -60,7 +60,7 @@ const ProfileSettings = () => {
         updateData.name = name;
       }
 
-      await updateDoc(doc(db, 'users', user!.uid), updateData);
+      await setDoc(doc(db, 'users', user!.uid), updateData, { merge: true });
       setProfile({ ...profile, ...updateData });
       alert('Profile updated');
     } catch (err) {

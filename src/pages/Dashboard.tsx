@@ -5,9 +5,10 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   FileText, ArrowRight, Plus, Download, Calendar, 
   Loader2, Wallet, ArrowUpRight, History, Activity,
-  CheckCircle2, Clock, AlertCircle
+  CheckCircle2, Clock, AlertCircle,
+  Smartphone, Zap, Send, Fingerprint
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { downloadPDF } from '../utils/pdfGenerator';
 import AcknowledgementReceipt from '../components/AcknowledgementReceipt';
 import { safeFormat } from '../utils/dateUtils';
@@ -91,6 +92,13 @@ const Dashboard = () => {
     }
   };
 
+  const quickServices = [
+    { name: 'Mobile', path: '/app/financial/recharge', icon: <Smartphone />, color: 'bg-blue-500' },
+    { name: 'Bills', path: '/app/financial/bill-pay', icon: <Zap />, color: 'bg-amber-500' },
+    { name: 'Money', path: '/app/financial/dmt', icon: <Send />, color: 'bg-emerald-500' },
+    { name: 'AEPS', path: '/app/financial/aeps', icon: <Fingerprint />, color: 'bg-purple-500' },
+  ];
+
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
@@ -114,7 +122,7 @@ const Dashboard = () => {
 
       {/* Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <GlassCard className="p-8 flex flex-col justify-between bg-blue-600/5 border-blue-500/10">
+        <GlassCard className="p-8 flex flex-col justify-between bg-blue-600/5 border-blue-500/10 h-full">
           <div className="space-y-4">
             <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-600/30">
               <Wallet size={28} />
@@ -134,25 +142,18 @@ const Dashboard = () => {
           </div>
         </GlassCard>
         
-        <GlassCard className="md:col-span-2 p-8 flex flex-col justify-center bg-purple-600/5 border-purple-500/10 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-purple-600/10 blur-[100px] rounded-full -mr-32 -mt-32" />
-          <div className="relative z-10 space-y-4">
-            <h3 className="text-2xl font-black text-white tracking-tight">Welcome back, Citizen!</h3>
-            <p className="text-slate-400 text-sm leading-relaxed max-w-lg">
-              Your digital governance portal is ready. Apply for services, track progress, and manage documents with AI-powered efficiency.
-            </p>
-            <div className="flex items-center gap-4 pt-4">
-              <div className="flex -space-x-3">
-                {[1, 2, 3, 4].map(i => (
-                  <div key={i} className="w-10 h-10 rounded-full border-4 border-slate-950 bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-400">
-                    {String.fromCharCode(64 + i)}
-                  </div>
-                ))}
-              </div>
-              <div className="h-4 w-px bg-white/10" />
-              <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">Verified Platform</p>
-            </div>
-          </div>
+        <GlassCard className="md:col-span-2 p-8 grid grid-cols-2 md:grid-cols-4 gap-4 bg-slate-900/40 border-white/5 h-full">
+           {quickServices.map((service, i) => (
+             <Link key={i} to={service.path} className="group p-4 rounded-3xl bg-white/5 border border-white/5 hover:border-blue-500/30 transition-all text-center space-y-3">
+               <div className={`w-12 h-12 ${service.color}/10 ${service.color.replace('bg-', 'text-')} rounded-2xl mx-auto flex items-center justify-center group-hover:scale-110 transition-transform`}>
+                 {service.icon}
+               </div>
+               <span className="block text-[10px] font-black text-white uppercase tracking-widest">{service.name}</span>
+             </Link>
+           ))}
+           <Link to="/app/financial/hub" className="md:col-span-4 p-4 rounded-2xl bg-blue-600/10 border border-blue-500/20 flex justify-center items-center gap-2 text-blue-400 text-xs font-black uppercase tracking-widest hover:bg-blue-600 hover:text-white transition-all">
+             View All Digital Services <ArrowRight size={14} />
+           </Link>
         </GlassCard>
       </div>
 

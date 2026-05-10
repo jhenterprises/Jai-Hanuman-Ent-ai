@@ -67,7 +67,7 @@ service cloud.firestore {
     
     match /users/{userId} {
       allow get: if isSignedIn() && (request.auth.uid == userId || isBootstrapAdmin() || isStaff());
-      allow list: if isStaff() || isBootstrapAdmin();
+      allow list: if isStaff() || isBootstrapAdmin() || (isSignedIn() && resource.data.get('role', 'user') in ['admin', 'staff']);
       
       allow create: if isSignedIn() && (request.auth.uid == userId || isBootstrapAdmin() || isAdmin());
       allow update: if isSignedIn() && (request.auth.uid == userId || isBootstrapAdmin() || isAdmin());
@@ -157,6 +157,29 @@ service cloud.firestore {
        allow list: if isSignedIn() && (resource.data.user_id == request.auth.uid || isStaff());
        allow create: if isSignedIn();
        allow update, delete: if isAdmin();
+    }
+
+    match /financial_transactions/{txId} {
+      function isValidFinancialTx(data) {
+        return data.userId == request.auth.uid &&
+               data.amount is number && data.amount > 0 &&
+               data.type in ["recharge", "bill_pay", "dmt", "aeps", "wallet_load"] &&
+               data.status in ["pending", "success", "failed", "processing"];
+      }
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isStaff());
+      allow create: if isSignedIn() && isValidFinancialTx(incoming());
+      allow update: if isStaff() || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /wallet_logs/{logId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isStaff());
+      allow write: if isAdmin();
+    }
+
+    match /services_config/{serviceId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
 
     match /counters/{counterId} {
@@ -303,7 +326,7 @@ service cloud.firestore {
       }
 
       allow get: if isSignedIn() && (resource.data.customerId == request.auth.uid || isStaff());
-      allow list: if isSignedIn(); 
+      allow list: if isStaff() || (isSignedIn() && resource.data.customerId == request.auth.uid); 
       allow create: if isSignedIn() && incoming().customerId == request.auth.uid && isValidChat(incoming());
       allow update: if isStaff() || (isSignedIn() && existing().customerId == request.auth.uid && incoming().customerId == existing().customerId);
       allow delete: if isAdmin();

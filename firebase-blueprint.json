@@ -104,9 +104,82 @@
         }
       },
       "required": ["userId", "createdAt", "data"]
+    },
+    "Wallet": {
+      "title": "Wallet",
+      "description": "User wallet balance information",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "balance": { "type": "number" },
+        "status": { "type": "string", "enum": ["active", "frozen"] },
+        "lastUpdated": { "type": "string", "format": "date-time" }
+      }
+    },
+    "FinancialTransaction": {
+      "title": "Financial Transaction",
+      "description": "Records for recharges, bill payments, etc.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "type": { "type": "string", "enum": ["recharge", "bill_pay", "dmt", "aeps", "wallet_load"] },
+        "amount": { "type": "number" },
+        "commission": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "success", "failed", "processing"] },
+        "txId": { "type": "string" },
+        "refNo": { "type": "string" },
+        "operator": { "type": "string" },
+        "number": { "type": "string" },
+        "details": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "ServiceConfig": {
+      "title": "Service Configuration",
+      "description": "Admin settings for different services and commissions",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "isActive": { "type": "boolean" },
+        "commission_type": { "type": "string", "enum": ["flat", "percentage"] },
+        "commission_value": { "type": "number" },
+        "provider": { "type": "string" }
+      }
+    },
+    "WalletLog": {
+      "title": "Wallet Log",
+      "description": "Ledger of all wallet balance changes",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "amount": { "type": "number" },
+        "type": { "type": "string", "enum": ["credit", "debit"] },
+        "previousBalance": { "type": "number" },
+        "newBalance": { "type": "number" },
+        "reason": { "type": "string" },
+        "txId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
     }
   },
   "firestore": {
+    "/wallets/{userId}": {
+      "schema": "Wallet",
+      "description": "User wallet balances"
+    },
+    "/financial_transactions/{txId}": {
+      "schema": "FinancialTransaction",
+      "description": "Consolidated financial transactions"
+    },
+    "/wallet_logs/{logId}": {
+      "schema": "WalletLog",
+      "description": "Audit trail for wallet changes"
+    },
+    "/services_config/{serviceId}": {
+      "schema": "ServiceConfig",
+      "description": "Admin settings for various services"
+    },
     "/users/{userId}": {
       "schema": "User",
       "description": "User profiles and staff data"

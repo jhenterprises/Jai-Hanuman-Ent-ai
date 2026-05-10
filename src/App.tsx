@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'r
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ConfigProvider } from './context/ConfigContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { WalletProvider } from './context/WalletContext';
 import DashboardLayout from './layouts/DashboardLayout';
 import PublicLayout from './layouts/PublicLayout';
 
@@ -38,6 +39,13 @@ const AdminPayments = lazy(() => import('./pages/admin/AdminPayments'));
 const ServiceFormBuilder = lazy(() => import('./pages/admin/ServiceFormBuilder'));
 import LedgerAnalytics from './pages/admin/LedgerAnalytics';
 import LedgerSettings from './pages/admin/LedgerSettings';
+
+// Financial Services
+const ServiceHub = lazy(() => import('./pages/financial/ServiceHub'));
+const Recharge = lazy(() => import('./pages/financial/Recharge'));
+const BillPay = lazy(() => import('./pages/financial/BillPay'));
+const DMT = lazy(() => import('./pages/financial/DMT'));
+const AEPS = lazy(() => import('./pages/financial/AEPS'));
 
 const FullPageLoader = () => (
   <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
@@ -80,7 +88,8 @@ export default function App() {
     <ThemeProvider>
       <ConfigProvider>
         <AuthProvider>
-          <Router>
+          <WalletProvider>
+            <Router>
             <Suspense fallback={<FullPageLoader />}>
               <Routes>
                 <Route element={<PublicLayout />}>
@@ -132,6 +141,14 @@ export default function App() {
                   <Route path="user/applications" element={<ProtectedRoute roles={['user']}><Applications /></ProtectedRoute>} />
                   <Route path="user/apply/:serviceType" element={<ProtectedRoute roles={['user', 'staff', 'admin']}><ApplyService /></ProtectedRoute>} />
                   <Route path="user/support" element={<ProtectedRoute roles={['user']}><Support /></ProtectedRoute>} />
+                  
+                  {/* Financial Services */}
+                  <Route path="financial/hub" element={<ServiceHub />} />
+                  <Route path="financial/recharge" element={<Recharge />} />
+                  <Route path="financial/bill-pay" element={<BillPay />} />
+                  <Route path="financial/dmt" element={<DMT />} />
+                  <Route path="financial/aeps" element={<AEPS />} />
+                  
                   <Route path="settings" element={<ProtectedRoute roles={['admin']}><Settings /></ProtectedRoute>}>
                     <Route path="services" element={<Services />} />
                     <Route path="users" element={<Users />} />
@@ -152,7 +169,8 @@ export default function App() {
                 } />
               </Routes>
             </Suspense>
-          </Router>
+            </Router>
+          </WalletProvider>
         </AuthProvider>
       </ConfigProvider>
     </ThemeProvider>
