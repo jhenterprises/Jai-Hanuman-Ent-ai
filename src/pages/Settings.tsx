@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
-import { Briefcase, Users, Shield, Settings as SettingsIcon, LayoutTemplate, Wallet, FileText, Lock, List, Activity } from 'lucide-react';
+import { Briefcase, Users, Shield, Settings as SettingsIcon, LayoutTemplate, Wallet, FileText, Lock, List, Activity, IdCard, Trash2, Power } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const SettingsLayout = () => {
@@ -10,12 +10,15 @@ const SettingsLayout = () => {
 
   const allModules = [
     { name: 'Branding & Portal', icon: <SettingsIcon size={20} />, path: '/app/settings/portal', roles: ['admin'] },
-    { name: 'User Management', icon: <Users size={20} />, path: '/app/settings/users', roles: ['admin'] },
+    { name: 'User Management', icon: <Users size={20} />, path: '/app/users', roles: ['admin', 'staff'] },
     { name: 'Staff Management', icon: <Users size={20} />, path: '/app/settings/staff', roles: ['admin'] },
-    { name: 'Services Control', icon: <Briefcase size={20} />, path: '/app/settings/services', roles: ['admin'] },
+    { name: 'Service Control', icon: <Power size={20} />, path: '/app/settings/service-control', roles: ['admin'] },
     { name: 'Ledger Settings', icon: <List size={20} />, path: '/app/admin/ledger-settings', roles: ['admin'] },
-    { name: 'Payment & Pricing', icon: <Wallet size={20} />, path: '/app/admin/payments', roles: ['admin'] },
     { name: 'Ledger Analytics', icon: <FileText size={20} />, path: '/app/admin/ledger-analytics', roles: ['admin'] },
+    { name: 'Payment & Pricing', icon: <Wallet size={20} />, path: '/app/admin/payments', roles: ['admin'] },
+    { name: 'Wallet Management', icon: <Wallet size={20} />, path: '/app/admin/wallets', roles: ['admin'] },
+    { name: 'ID Card Designer', icon: <IdCard size={20} />, path: '/app/admin/id-card-designer', roles: ['admin'] },
+    { name: 'Recycle Bin', icon: <Trash2 size={20} />, path: '/app/recycle-bin', roles: ['admin'] },
     { name: 'System Permissions', icon: <Lock size={20} />, path: '/app/settings/permissions', roles: ['admin'] },
     { name: 'Security Controls', icon: <Shield size={20} />, path: '/app/settings/security', roles: ['admin'] }
   ];

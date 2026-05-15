@@ -97,7 +97,7 @@
 
 .dark {
   --color-header-bg: #020617;
-  --futuristic-bg: radial-gradient(circle at 50% 50%, #0f172a 0%, #020617 100%);
+  --futuristic-bg: radial-gradient(circle at 0% 0%, #0f172a 0%, #020617 50%, #020617 100%);
   
   /* Dark mode overrides */
   --color-slate-50: #0f172a;

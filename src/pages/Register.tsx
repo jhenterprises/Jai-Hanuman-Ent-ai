@@ -3,66 +3,65 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useConfig } from '../context/ConfigContext';
 import { motion } from 'motion/react';
-import { UserPlus, Mail, Lock, User, Phone, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { UserPlus, Mail, Lock, User, Phone, AlertCircle, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 
 const Register = () => {
   const { config } = useConfig();
   const [formData, setFormData] = useState({ name: '', email: '', phone: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { signUpWithEmail, loginWithGoogle, loginWithGoogleRedirect } = useAuth();
   const navigate = useNavigate();
 
   const handleGoogleLogin = async () => {
     if (loading) return;
+    const toastId = toast.loading('Connecting to Google...');
     try {
       setLoading(true);
-      setError('');
       await loginWithGoogle();
+      toast.success('Registration successful!', { id: toastId });
       navigate('/app');
     } catch (err: any) {
       console.error('Google registration error:', err);
-      if (err.code === 'auth/popup-blocked') {
-        setError('Popup was blocked by your browser. Please allow popups for this site.');
-      } else if (err.code === 'auth/popup-closed-by-user') {
-        setError('Login popup was closed. If this happened automatically, your browser is blocking it inside the preview. Please open the app in a new tab to login.');
-      } else if (err.code === 'auth/cancelled-popup-request') {
-        setError('A login popup was already open. Please complete that one or wait a moment.');
-      } else if (err.code === 'auth/unauthorized-domain') {
-        setError('This domain is not authorized for Google login. Please add it to your Firebase Console.');
-      } else if (err.code === 'auth/operation-not-allowed') {
-        setError('Google login is not enabled in your Firebase Console.');
-      } else {
-        setError(err.message || 'Google registration failed');
-      }
+      toast.error(err.message || 'Google registration failed', { id: toastId });
     } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleGoogleRedirectLogin = async () => {
-    if (loading) return;
-    try {
-      setLoading(true);
-      setError('');
-      await loginWithGoogleRedirect();
-    } catch (err: any) {
-      console.error('Google redirect login error:', err);
-      setError(err.message || 'Google redirect login failed');
       setLoading(false);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    if (loading) return;
+
+    if (formData.password.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
+    }
+
+    setLoading(true);
+    const toastId = toast.loading('Creating your account...');
     try {
       await signUpWithEmail(formData.email, formData.password, formData.name, formData.phone);
+      toast.success('Account created successfully!', { id: toastId });
       navigate('/app');
     } catch (err: any) {
       console.error('Registration error:', err);
-      setError(err.message || 'Registration failed. Please try again.');
+      toast.error(err.message || 'Registration failed. Please try again.', { id: toastId });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleRedirect = async () => {
+    if (loading) return;
+    try {
+      setLoading(true);
+      await loginWithGoogleRedirect();
+    } catch (err: any) {
+      console.error('Redirect registration error:', err);
+      toast.error(err.message || 'Redirect registration failed');
+      setLoading(false);
     }
   };
 
@@ -80,13 +79,6 @@ const Register = () => {
           <h2 className="text-3xl font-black text-slate-900 dark:text-white">Create Account</h2>
           <p className="text-slate-600 dark:text-slate-500">Join Jharkhand's digital citizen network</p>
         </div>
-
-        {error && (
-          <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-center gap-3 text-red-400 text-sm">
-            <AlertCircle size={18} />
-            {error}
-          </div>
-        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1">
@@ -155,9 +147,10 @@ const Register = () => {
 
           <button 
             type="submit"
-            className="w-full py-4 gold-gradient text-slate-900 font-black rounded-2xl shadow-xl shadow-amber-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all mt-4"
+            disabled={loading}
+            className="w-full py-4 gold-gradient text-slate-900 font-black rounded-2xl shadow-xl shadow-amber-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all mt-4 flex items-center justify-center gap-2"
           >
-            Create Account
+            {loading ? <Loader2 className="animate-spin text-slate-900" /> : 'Create Account'}
           </button>
 
           <div className="relative py-4">
@@ -182,7 +175,7 @@ const Register = () => {
           <div className="text-center mt-2">
             <button
               type="button"
-              onClick={handleGoogleRedirectLogin}
+              onClick={handleGoogleRedirect}
               disabled={loading}
               className="text-xs text-slate-500 hover:text-blue-500 underline"
             >

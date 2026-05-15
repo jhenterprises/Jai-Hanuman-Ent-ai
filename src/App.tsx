@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { ConfigProvider } from './context/ConfigContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { WalletProvider } from './context/WalletContext';
+import { ServiceControlProvider } from './context/ServiceControlContext';
 import DashboardLayout from './layouts/DashboardLayout';
 import PublicLayout from './layouts/PublicLayout';
 
@@ -29,6 +30,7 @@ const SupportCenter = lazy(() => import('./pages/SupportCenter'));
 const Profile = lazy(() => import('./pages/Profile'));
 const Settings = lazy(() => import('./pages/Settings'));
 const PortalConfig = lazy(() => import('./pages/PortalConfig'));
+const ServiceControlSettings = lazy(() => import('./pages/admin/ServiceControlSettings'));
 const IDCardSettings = lazy(() => import('./pages/IDCardSettings'));
 const RecycleBin = lazy(() => import('./pages/RecycleBin'));
 const SecurityControls = lazy(() => import('./pages/admin/SecurityControls'));
@@ -83,14 +85,18 @@ const DefaultRedirect = () => {
   return <Navigate to="/app/dashboard" replace />;
 };
 
+import { Toaster } from 'react-hot-toast';
+
 export default function App() {
   return (
     <ThemeProvider>
+      <Toaster position="top-right" />
       <ConfigProvider>
         <AuthProvider>
           <WalletProvider>
-            <Router>
-            <Suspense fallback={<FullPageLoader />}>
+            <ServiceControlProvider>
+              <Router>
+              <Suspense fallback={<FullPageLoader />}>
               <Routes>
                 <Route element={<PublicLayout />}>
                   <Route path="/" element={<Home />} />
@@ -151,6 +157,7 @@ export default function App() {
                   
                   <Route path="settings" element={<ProtectedRoute roles={['admin']}><Settings /></ProtectedRoute>}>
                     <Route path="services" element={<Services />} />
+                    <Route path="service-control" element={<ServiceControlSettings />} />
                     <Route path="users" element={<Users />} />
                     <Route path="staff" element={<Users />} />
                     <Route path="permissions" element={<SystemPermissions />} />
@@ -170,6 +177,7 @@ export default function App() {
               </Routes>
             </Suspense>
             </Router>
+            </ServiceControlProvider>
           </WalletProvider>
         </AuthProvider>
       </ConfigProvider>

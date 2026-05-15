@@ -1,14 +1,22 @@
 import express from "express";
+import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from 'url';
 import admin from 'firebase-admin';
 import { readFileSync } from 'fs';
-
-import { getFirestore } from 'firebase-admin/firestore';
+import Razorpay from 'razorpay';
+import crypto from 'crypto';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Explicitly load .env file
+dotenv.config({ path: path.resolve(process.cwd(), '.env'), override: true });
+
+import { getFirestore } from 'firebase-admin/firestore';
+
+import fs from 'fs';
 
 // Load config manually to avoid import attribute issues
 const firebaseConfigPath = path.join(__dirname, 'firebase-applet-config.json');
@@ -146,6 +154,68 @@ expressApp.post("/api/reset-password", isAdmin, async (req, res) => {
 });
 
 // Financial Services Simulator (Dummy APIs for demo)
+// Razorpay Integration
+
+expressApp.post("/api/create-order", async (req, res) => {
+  const { amount, currency = 'INR', userId } = req.body;
+  
+  if (!amount || amount < 100) {
+    return res.status(400).json({ error: 'Amount must be at least 100 paise (1 INR)' });
+  }
+
+  try {
+    const rzpOptions = {
+      key_id: (process.env.RAZORPAY_KEY_ID || '').trim(),
+      key_secret: (process.env.RAZORPAY_KEY_SECRET || '').trim(),
+    };
+    
+    console.log("Creating Razorpay Order with Key ID: " + rzpOptions.key_id);
+    
+    if (!rzpOptions.key_id) {
+       console.error("Missing RAZORPAY_KEY_ID in environment after dotenv");
+    }
+
+    const razorpay = new Razorpay(rzpOptions);
+    const options = {
+      amount: Math.round(amount), // amount in the smallest currency unit
+      currency,
+      receipt: `receipt_${Date.now()}_${userId || 'anon'}`.substring(0, 40),
+    };
+
+    const order = await razorpay.orders.create(options);
+    res.json({
+      order_id: order.id,
+      amount: order.amount,
+      currency: order.currency,
+    });
+  } catch (error: any) {
+    console.error("Razorpay Order Error:", error);
+    res.status(500).json({ error: 'Failed to create Razorpay order', message: error.message || error });
+  }
+});
+
+expressApp.post("/api/verify-payment", async (req, res) => {
+  const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+
+  if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+    return res.status(400).json({ error: 'Missing payment details' });
+  }
+
+  const secret = (process.env.RAZORPAY_KEY_SECRET || '').trim();
+
+  const sign = razorpay_order_id + "|" + razorpay_payment_id;
+  const expectedSign = crypto
+    .createHmac("sha256", secret)
+    .update(sign.toString())
+    .digest("hex");
+
+  if (razorpay_signature === expectedSign) {
+    res.json({ success: true, message: "Payment verified successfully" });
+  } else {
+    res.status(400).json({ success: false, message: "Invalid payment signature" });
+  }
+});
+
 expressApp.post("/api/recharge", async (req, res) => {
   const { type, number, operator, amount } = req.body;
   console.log(`Processing ${type} recharge for ${number} (${operator}) amount: ${amount}`);

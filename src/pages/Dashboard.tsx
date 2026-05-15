@@ -6,17 +6,23 @@ import {
   FileText, ArrowRight, Plus, Download, Calendar, 
   Loader2, Wallet, ArrowUpRight, History, Activity,
   CheckCircle2, Clock, AlertCircle,
-  Smartphone, Zap, Send, Fingerprint
+  Smartphone, Zap, Send, Fingerprint, User,
+  LucideIcon, FileJson, Tv, Droplets, Flame, Wifi, CreditCard, UserCheck, Database
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { downloadPDF } from '../utils/pdfGenerator';
 import AcknowledgementReceipt from '../components/AcknowledgementReceipt';
 import { safeFormat } from '../utils/dateUtils';
 import { useConfig } from '../context/ConfigContext';
+import { useAuth } from '../context/AuthContext';
 import GlassCard from '../components/GlassCard';
+import ServiceCard from '../components/ServiceCard';
+import { useServiceControl } from '../context/ServiceControlContext';
 
 const Dashboard = () => {
   const { config } = useConfig();
+  const { user: currentUser } = useAuth();
+  const { services, loading: servicesLoading } = useServiceControl();
   const [applications, setApplications] = useState<any[]>([]);
   const [drafts, setDrafts] = useState<any[]>([]);
   const [walletBalance, setWalletBalance] = useState<number>(0);
@@ -92,12 +98,37 @@ const Dashboard = () => {
     }
   };
 
-  const quickServices = [
-    { name: 'Mobile', path: '/app/financial/recharge', icon: <Smartphone />, color: 'bg-blue-500' },
-    { name: 'Bills', path: '/app/financial/bill-pay', icon: <Zap />, color: 'bg-amber-500' },
-    { name: 'Money', path: '/app/financial/dmt', icon: <Send />, color: 'bg-emerald-500' },
-    { name: 'AEPS', path: '/app/financial/aeps', icon: <Fingerprint />, color: 'bg-purple-500' },
-  ];
+  const ICON_MAP: Record<string, any> = {
+    mobileRecharge: Smartphone,
+    dthRecharge: Tv,
+    electricityBill: Zap,
+    waterBill: Droplets,
+    gasBill: Flame,
+    broadbandBill: Wifi,
+    dmt: Send,
+    aeps: Fingerprint,
+    aadhaarPay: CreditCard,
+    wallet: Wallet,
+    pan: FileJson,
+    aadhaarService: UserCheck,
+    fastag: Database,
+  };
+
+  const COLOR_MAP: Record<string, string> = {
+    mobileRecharge: 'bg-blue-600',
+    dthRecharge: 'bg-indigo-600',
+    electricityBill: 'bg-amber-600',
+    waterBill: 'bg-sky-600',
+    gasBill: 'bg-orange-600',
+    broadbandBill: 'bg-violet-600',
+    dmt: 'bg-emerald-600',
+    aeps: 'bg-purple-600',
+    aadhaarPay: 'bg-pink-600',
+    wallet: 'bg-slate-600',
+    pan: 'bg-rose-600',
+    aadhaarService: 'bg-teal-600',
+    fastag: 'bg-cyan-600',
+  };
 
   return (
     <motion.div 
@@ -106,15 +137,24 @@ const Dashboard = () => {
       className="space-y-10 pb-20"
     >
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-        <div className="space-y-1">
-          <h1 className="text-4xl font-black text-white tracking-tight">User <span className="text-blue-500">Dashboard</span></h1>
-          <p className="text-slate-500">Manage your applications and digital assets.</p>
+        <div className="flex items-center gap-4">
+          <div className="w-16 h-16 rounded-3xl bg-blue-600/10 border border-blue-500/20 p-1">
+            <img 
+              src={currentUser?.photoURL || `https://api.dicebear.com/7.x/initials/svg?seed=${currentUser?.name}`} 
+              alt="Profile" 
+              className="w-full h-full object-cover rounded-2xl shadow-xl"
+            />
+          </div>
+          <div className="space-y-1">
+            <h1 className="text-3xl font-black text-white tracking-tight">Hello, <span className="text-blue-500">{currentUser?.name?.split(' ')[0]}</span></h1>
+            <p className="text-slate-500 text-sm font-medium">Manage your portal services and assets.</p>
+          </div>
         </div>
         <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
-          <Link to="/app/wallet" className="px-6 py-3 glass border-white/5 text-white font-bold rounded-2xl flex items-center justify-center gap-2 hover:bg-white/5 transition-all ripple-effect">
+          <Link to="/app/wallet" className="px-6 py-3 glass-dark border-white/10 text-white font-bold rounded-2xl flex items-center justify-center gap-2 hover:bg-white/5 transition-all">
             <Wallet size={18} className="text-blue-400" /> ₹{(walletBalance || 0).toLocaleString()}
           </Link>
-          <Link to="/" className="px-8 py-3 blue-gradient text-white font-black rounded-2xl flex items-center justify-center gap-2 shadow-xl shadow-blue-500/20 ripple-effect">
+          <Link to="/app/services" className="px-8 py-3 blue-gradient text-white font-black rounded-2xl flex items-center justify-center gap-2 shadow-xl shadow-blue-500/20">
             <Plus size={20} /> New Application
           </Link>
         </div>
@@ -122,38 +162,69 @@ const Dashboard = () => {
 
       {/* Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <GlassCard className="p-8 flex flex-col justify-between bg-blue-600/5 border-blue-500/10 h-full">
+        <GlassCard className="p-8 flex flex-col justify-between bg-blue-600/10 border-blue-500/20 h-full backdrop-blur-3xl shadow-blue-700/5">
           <div className="space-y-4">
-            <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-600/30">
+            <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-600/30 border border-blue-500/40">
               <Wallet size={28} />
             </div>
             <div>
-              <h3 className="text-slate-500 text-xs font-black uppercase tracking-[0.2em]">Wallet Balance</h3>
-              <p className="text-4xl font-black text-white mt-1 tracking-tighter">₹{(walletBalance || 0).toLocaleString()}</p>
+              <h3 className="text-slate-400 text-[10px] font-black uppercase tracking-[0.25em] ml-1">Wallet Balance</h3>
+              <p className="text-5xl font-black text-white mt-1 tracking-tighter">₹{(walletBalance || 0).toLocaleString()}</p>
             </div>
           </div>
-          <div className="flex gap-3 mt-8">
-            <Link to="/app/wallet" className="flex-1 py-3 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-all ripple-effect">
+          <div className="flex gap-3 mt-10">
+            <Link to="/app/wallet" className="flex-1 py-4 bg-blue-600 hover:bg-blue-500 text-white text-xs font-black uppercase tracking-widest rounded-2xl flex items-center justify-center gap-2 transition-all shadow-xl shadow-blue-600/20">
               <ArrowUpRight size={14} /> Add Funds
             </Link>
-            <Link to="/app/wallet" className="flex-1 py-3 glass text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-white/5 transition-all">
+            <Link to="/app/wallet" className="flex-1 py-4 glass-dark text-white text-xs font-black uppercase tracking-widest rounded-2xl flex items-center justify-center gap-2 hover:bg-white/10 transition-all border-white/10">
               <History size={14} /> History
             </Link>
           </div>
         </GlassCard>
         
-        <GlassCard className="md:col-span-2 p-8 grid grid-cols-2 md:grid-cols-4 gap-4 bg-slate-900/40 border-white/5 h-full">
-           {quickServices.map((service, i) => (
-             <Link key={i} to={service.path} className="group p-4 rounded-3xl bg-white/5 border border-white/5 hover:border-blue-500/30 transition-all text-center space-y-3">
-               <div className={`w-12 h-12 ${service.color}/10 ${service.color.replace('bg-', 'text-')} rounded-2xl mx-auto flex items-center justify-center group-hover:scale-110 transition-transform`}>
-                 {service.icon}
+        <GlassCard className="md:col-span-2 p-8 border-white/10 h-full backdrop-blur-3xl bg-slate-900/40 shadow-2xl">
+           <header className="flex items-center justify-between mb-8">
+             <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+               <Zap size={14} className="text-amber-500" /> Digital Services
+             </h3>
+             <Link to="/app/financial/hub" className="text-xs font-bold text-blue-500 hover:underline">View All</Link>
+           </header>
+           
+           <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+             {servicesLoading ? (
+               [1, 2, 3, 4].map(i => <div key={i} className="aspect-square bg-white/5 rounded-3xl animate-pulse" />)
+             ) : (
+               services.slice(0, 4).map((service) => (
+                 <ServiceCard 
+                   key={service.id} 
+                   service={service} 
+                   icon={ICON_MAP[service.serviceKey] || Smartphone} 
+                   color={COLOR_MAP[service.serviceKey] || 'bg-blue-600'} 
+                 />
+               ))
+             )}
+           </div>
+
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+             <div className="p-4 rounded-2xl bg-white/5 border border-white/5 flex items-center gap-4 group hover:bg-white/10 transition-colors cursor-pointer">
+               <div className="w-10 h-10 bg-indigo-500/10 rounded-xl flex items-center justify-center text-indigo-400 border border-indigo-500/20">
+                 <Activity size={20} />
                </div>
-               <span className="block text-[10px] font-black text-white uppercase tracking-widest">{service.name}</span>
-             </Link>
-           ))}
-           <Link to="/app/financial/hub" className="md:col-span-4 p-4 rounded-2xl bg-blue-600/10 border border-blue-500/20 flex justify-center items-center gap-2 text-blue-400 text-xs font-black uppercase tracking-widest hover:bg-blue-600 hover:text-white transition-all">
-             View All Digital Services <ArrowRight size={14} />
-           </Link>
+               <div>
+                 <p className="text-xs font-black text-white uppercase tracking-tight">Active Usage</p>
+                 <p className="text-[10px] text-slate-500 font-bold">2.4k transactions today</p>
+               </div>
+             </div>
+             <div className="p-4 rounded-2xl bg-white/5 border border-white/5 flex items-center gap-4 group hover:bg-white/10 transition-colors cursor-pointer">
+               <div className="w-10 h-10 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-400 border border-emerald-500/20">
+                 <CheckCircle2 size={20} />
+               </div>
+               <div>
+                 <p className="text-xs font-black text-white uppercase tracking-tight">System Status</p>
+                 <p className="text-[10px] text-slate-500 font-bold text-emerald-500">Live & Optimal</p>
+               </div>
+             </div>
+           </div>
         </GlassCard>
       </div>
 
@@ -215,9 +286,9 @@ const Dashboard = () => {
             </div>
             
             {applications.length === 0 ? (
-              <GlassCard className="p-20 text-center space-y-8" hover={false}>
-                <div className="w-24 h-24 bg-slate-900 rounded-[2rem] flex items-center justify-center mx-auto text-slate-700 border border-white/5">
-                  <FileText size={48} />
+              <GlassCard className="p-20 text-center space-y-8 bg-black/20 border-white/10" hover={false}>
+                <div className="w-24 h-24 bg-white/5 rounded-[2.5rem] flex items-center justify-center mx-auto text-slate-600 border border-white/10 shadow-inner">
+                  <FileText size={48} strokeWidth={1} />
                 </div>
                 <div className="space-y-2">
                   <h3 className="text-3xl font-black text-white">No active applications</h3>

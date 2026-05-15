@@ -3,14 +3,14 @@ import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useConfig } from '../context/ConfigContext';
 import { motion } from 'motion/react';
-import { LogIn, Mail, Lock, AlertCircle, ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import { LogIn, Mail, Lock, AlertCircle, ArrowLeft, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 
 const Login = () => {
   const { config } = useConfig();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { loginWithGoogle, loginWithGoogleRedirect, loginWithEmail } = useAuth();
   const navigate = useNavigate();
@@ -20,43 +20,25 @@ const Login = () => {
 
   const handleGoogleLogin = async () => {
     if (loading) return;
+    const toastId = toast.loading('Connecting to Google...');
     try {
       setLoading(true);
-      setError('');
       await loginWithGoogle();
+      toast.success('Signed in successfully!', { id: toastId });
       const from = location.state?.from?.pathname || '/app';
       navigate(from, { replace: true });
     } catch (err: any) {
       console.error('Google login error:', err);
+      let errorMsg = err.message || 'Google login failed';
+      
       if (err.code === 'auth/popup-blocked') {
-        setError('Popup was blocked by your browser. Please allow popups for this site.');
-      } else if (err.code === 'auth/cancelled-popup-request') {
-        setError('A login popup was already open. Please complete that one or wait a moment.');
+        errorMsg = 'Popup blocked by browser. Please allow popups.';
       } else if (err.code === 'auth/popup-closed-by-user') {
-        setError('Login popup was closed. If this happened automatically, your browser is blocking it inside the preview. Please open the app in a new tab to login.');
-      } else if (err.code === 'auth/unauthorized-domain') {
-        setError('This domain is not authorized for Google login. Please add it to your Firebase Console.');
-      } else if (err.code === 'auth/operation-not-allowed') {
-        setError('Google login is not enabled in your Firebase Console.');
-      } else if (err.message && err.message.includes('Pending promise was never set')) {
-        setError('A login attempt is already in progress. Please wait or refresh the page.');
-      } else {
-        setError(err.message || 'Google login failed');
+        errorMsg = 'Login popup was closed.';
       }
+      
+      toast.error(errorMsg, { id: toastId });
     } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleGoogleRedirectLogin = async () => {
-    if (loading) return;
-    try {
-      setLoading(true);
-      setError('');
-      await loginWithGoogleRedirect();
-    } catch (err: any) {
-      console.error('Google redirect login error:', err);
-      setError(err.message || 'Google redirect login failed');
       setLoading(false);
     }
   };
@@ -64,20 +46,29 @@ const Login = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loading) return;
-    setError('');
     setLoading(true);
+    const toastId = toast.loading('Signing you in...');
     try {
       await loginWithEmail(email, password);
+      toast.success('Welcome back!', { id: toastId });
       const from = location.state?.from?.pathname || '/app';
       navigate(from, { replace: true });
     } catch (err: any) {
       console.error('Email login error:', err);
-      if (err.code === 'auth/invalid-credential') {
-        setError('Invalid email or password. If you signed up with Google, please use the "Sign in with Google" button instead.');
-      } else {
-        setError(err.message || 'Login failed. Please check your credentials.');
-      }
+      toast.error(err.message || 'Login failed. Please check credentials.', { id: toastId });
     } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleRedirect = async () => {
+    if (loading) return;
+    try {
+      setLoading(true);
+      await loginWithGoogleRedirect();
+    } catch (err: any) {
+      console.error('Redirect sign in error:', err);
+      toast.error(err.message || 'Redirect login failed');
       setLoading(false);
     }
   };
@@ -97,8 +88,12 @@ const Login = () => {
           <p className="text-slate-600 dark:text-slate-500">Sign in to your digital citizen account</p>
         </div>
 
-        {isLoggedOut && !error && (
-          <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex flex-col items-center gap-4 text-emerald-400 text-sm text-center">
+        {isLoggedOut && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex flex-col items-center gap-4 text-emerald-400 text-sm text-center"
+          >
             <div className="flex items-center gap-3">
               <AlertCircle size={18} />
               You have been successfully signed out.
@@ -106,14 +101,7 @@ const Login = () => {
             <Link to="/" className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2">
               <ArrowLeft size={18} /> Back to Webpage
             </Link>
-          </div>
-        )}
-
-        {error && (
-          <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-center gap-3 text-red-400 text-sm">
-            <AlertCircle size={18} />
-            {error}
-          </div>
+          </motion.div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -189,7 +177,7 @@ const Login = () => {
           <div className="text-center mt-2">
             <button
               type="button"
-              onClick={handleGoogleRedirectLogin}
+              onClick={handleGoogleRedirect}
               disabled={loading}
               className="text-xs text-slate-500 hover:text-blue-500 underline"
             >

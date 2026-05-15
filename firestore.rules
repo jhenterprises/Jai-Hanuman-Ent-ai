@@ -13,9 +13,11 @@ service cloud.firestore {
 
     function isBootstrapAdmin() {
       return isSignedIn() && (
-             request.auth.token.get('email', '').toLowerCase() == "pancardjhc2018@gmail.com" ||
-             request.auth.token.get('email', '').toLowerCase() == "pavan.tr16@gmail.com" ||
-             request.auth.token.get('email', '').toLowerCase() == "admin@jh.com" ||
+             (request.auth.token.email != null && (
+               request.auth.token.email == "pancardjhc2018@gmail.com" ||
+               request.auth.token.email == "pavan.tr16@gmail.com" ||
+               request.auth.token.email == "admin@jh.com"
+             )) ||
              request.auth.uid == "L3ksRUWbvhe7EiB2iuAyraPVUua2" ||
              request.auth.uid == "xjnH8guZgyeWhOSjuCrFwBO3vBq1"
       );
@@ -24,7 +26,7 @@ service cloud.firestore {
     function isVerified() {
       return isSignedIn() && (
         isBootstrapAdmin() ||
-        request.auth.token.get('email_verified', false) == true
+        request.auth.token.email_verified == true
       );
     }
     
@@ -179,6 +181,11 @@ service cloud.firestore {
 
     match /services_config/{serviceId} {
       allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /service_controls/{serviceId} {
+      allow read: if true;
       allow write: if isAdmin();
     }
 

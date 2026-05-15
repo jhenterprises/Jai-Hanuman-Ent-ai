@@ -7,6 +7,8 @@ import {
 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useWallet } from '../../context/WalletContext';
+import { useServiceControl } from '../../context/ServiceControlContext';
+import ServiceUnavailable from '../../components/ServiceUnavailable';
 import GlassCard from '../../components/GlassCard';
 import { db, auth } from '../../lib/firebase';
 import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
@@ -33,7 +35,20 @@ const Recharge = () => {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const { balance, deductBalance } = useWallet();
+  const { getServiceStatus, loading: controlLoading } = useServiceControl();
   const [activeTab, setActiveTab] = useState<'mobile' | 'dth'>(params.get('type') === 'dth' ? 'dth' : 'mobile');
+
+  const mobileStatus = getServiceStatus('mobileRecharge');
+  const dthStatus = getServiceStatus('dthRecharge');
+  const currentStatus = activeTab === 'mobile' ? mobileStatus : dthStatus;
+
+  if (controlLoading) return null;
+  if (currentStatus && (!currentStatus.isLive || currentStatus.maintenanceMode || currentStatus.comingSoon)) {
+    return <ServiceUnavailable 
+      type={currentStatus.comingSoon ? 'coming-soon' : (currentStatus.maintenanceMode ? 'maintenance' : 'disabled')} 
+      serviceName={currentStatus.serviceName} 
+    />;
+  }
   
   const [mobile, setMobile] = useState('');
   const [customerId, setCustomerId] = useState('');

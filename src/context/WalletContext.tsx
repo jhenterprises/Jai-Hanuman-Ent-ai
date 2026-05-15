@@ -81,14 +81,16 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const user = auth.currentUser;
     if (!user) throw new Error("User not authenticated");
 
+    const q = query(collection(db, 'wallets'), where('user_id', '==', user.uid));
+    const walletSnap = await getDocs(q);
+    if (walletSnap.empty) throw new Error("Wallet not found");
+    const walletRef = doc(db, 'wallets', walletSnap.docs[0].id);
+
     return await runTransaction(db, async (transaction) => {
-      const q = query(collection(db, 'wallets'), where('user_id', '==', user.uid));
-      const walletSnap = await getDocs(q);
+      const walletDoc = await transaction.get(walletRef);
+      if (!walletDoc.exists()) throw new Error("Wallet not found");
       
-      if (walletSnap.empty) throw new Error("Wallet not found");
-      
-      const walletDoc = walletSnap.docs[0];
-      const currentBalance = walletDoc.data().balance || 0;
+      const currentBalance = walletDoc.data()?.balance || 0;
       
       if (currentBalance < amount) {
         throw new Error("Insufficient wallet balance");
@@ -97,7 +99,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const newBalance = currentBalance - amount;
       
       // Update wallet
-      transaction.update(doc(db, 'wallets', walletDoc.id), {
+      transaction.update(walletRef, {
         balance: newBalance,
         updated_at: serverTimestamp()
       });
@@ -135,29 +137,30 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const user = auth.currentUser;
     if (!user) throw new Error("User not authenticated");
 
-    return await runTransaction(db, async (transaction) => {
-      const q = query(collection(db, 'wallets'), where('user_id', '==', user.uid));
-      const walletSnap = await getDocs(q);
-      
-      let walletDocId;
-      let currentBalance = 0;
+    const q = query(collection(db, 'wallets'), where('user_id', '==', user.uid));
+    const walletSnap = await getDocs(q);
+    
+    let walletRef = walletSnap.empty ? doc(collection(db, 'wallets')) : doc(db, 'wallets', walletSnap.docs[0].id);
+    const isNewWallet = walletSnap.empty;
 
-      if (walletSnap.empty) {
-        const newWalletRef = doc(collection(db, 'wallets'));
-        transaction.set(newWalletRef, {
+    return await runTransaction(db, async (transaction) => {
+      let currentBalance = 0;
+      
+      if (!isNewWallet) {
+        const walletDoc = await transaction.get(walletRef);
+        if (walletDoc.exists()) {
+          currentBalance = walletDoc.data()?.balance || 0;
+          transaction.update(walletRef, {
+            balance: currentBalance + amount,
+            updated_at: serverTimestamp()
+          });
+        }
+      } else {
+        transaction.set(walletRef, {
             user_id: user.uid,
             balance: amount,
             created_at: serverTimestamp(),
             updated_at: serverTimestamp()
-        });
-        walletDocId = newWalletRef.id;
-      } else {
-        const walletDoc = walletSnap.docs[0];
-        walletDocId = walletDoc.id;
-        currentBalance = walletDoc.data().balance || 0;
-        transaction.update(doc(db, 'wallets', walletDocId), {
-          balance: currentBalance + amount,
-          updated_at: serverTimestamp()
         });
       }
 

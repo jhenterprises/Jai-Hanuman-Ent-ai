@@ -8,14 +8,36 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useWallet } from '../../context/WalletContext';
+import { useServiceControl } from '../../context/ServiceControlContext';
+import ServiceUnavailable from '../../components/ServiceUnavailable';
 import GlassCard from '../../components/GlassCard';
 import { db, auth } from '../../lib/firebase';
+import { toast } from 'react-hot-toast';
 import { collection, query, where, getDocs, orderBy, limit, addDoc, serverTimestamp } from 'firebase/firestore';
+
+const BANKS = [
+  "State Bank of India", "Punjab National Bank", "Bank of Baroda",
+  "Canara Bank", "Union Bank of India", "HDFC Bank", "ICICI Bank",
+  "Axis Bank", "Kotak Mahindra Bank", "IndusInd Bank", "Bank of India",
+  "Central Bank of India", "Indian Bank", "Indian Overseas Bank",
+  "UCO Bank", "Punjab & Sind Bank", "IDBI Bank", "Yes Bank"
+].sort();
 
 const DMT = () => {
   const navigate = useNavigate();
   const { balance, deductBalance } = useWallet();
+  const { getServiceStatus, loading: controlLoading } = useServiceControl();
   const [activeStep, setActiveStep] = useState<'beneficiaries' | 'transfer' | 'add'>('beneficiaries');
+
+  const status = getServiceStatus('dmt');
+
+  if (controlLoading) return null;
+  if (status && (!status.isLive || status.maintenanceMode || status.comingSoon)) {
+    return <ServiceUnavailable 
+      type={status.comingSoon ? 'coming-soon' : (status.maintenanceMode ? 'maintenance' : 'disabled')} 
+      serviceName={status.serviceName} 
+    />;
+  }
   
   const [beneficiaries, setBeneficiaries] = useState<any[]>([]);
   const [selectedBene, setSelectedBene] = useState<any>(null);

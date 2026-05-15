@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { collection, getDocs, updateDoc, doc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, getDocs, updateDoc, doc, getDoc, serverTimestamp, query, where } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { ArrowLeft, Plus, Trash2, Save, Eye, GripVertical, Settings, Type, Hash, Calendar, List, AlignLeft, Upload, CheckSquare, CircleDot, Minus, Heading } from 'lucide-react';
 import ModernButton from '../../components/ModernButton';
@@ -45,6 +45,22 @@ const FIELD_TYPES = [
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
+const parseOptions = (opts: any): string[] => {
+  if (!opts) return [];
+  if (Array.isArray(opts)) return opts;
+  if (typeof opts === 'string') {
+    try {
+      const parsed = JSON.parse(opts);
+      if (Array.isArray(parsed)) return parsed;
+    } catch (e) {
+      if (opts.includes('\n')) return opts.split('\n').map(s => s.trim()).filter(Boolean);
+      if (opts.includes(',')) return opts.split(',').map(s => s.trim()).filter(Boolean);
+    }
+    return [opts];
+  }
+  return [];
+};
+
 const ServiceFormBuilder = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -65,9 +81,18 @@ const ServiceFormBuilder = () => {
   const [draggedItem, setDraggedItem] = useState<{ type: 'new_field', fieldType: string } | { type: 'existing_field', sectionId: string, fieldIndex: number } | null>(null);
   const [dragOverInfo, setDragOverInfo] = useState<{ sectionId: string, index: number } | null>(null);
 
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
   useEffect(() => {
     fetchData();
   }, [id]);
+
+  useEffect(() => {
+    if (schema && id && !isLoading) {
+      // Autosave draft locally
+      localStorage.setItem(`form_draft_${id}`, JSON.stringify(schema));
+    }
+  }, [schema, id, isLoading]);
 
   const fetchData = async () => {
     if (!id) return;
@@ -79,9 +104,32 @@ const ServiceFormBuilder = () => {
       if (serviceSnap.exists()) {
         const data = serviceSnap.data();
         setService({ id: serviceSnap.id, ...data });
-        if (data.form_schema) {
-          setSchema(data.form_schema);
-        } else if (data.form_fields) {
+        
+        const hasFields = (s: any) => s && Array.isArray(s.sections) && s.sections.some((sec: any) => Array.isArray(sec.fields) && sec.fields.length > 0);
+        
+        const draftStr = localStorage.getItem(`form_draft_${id}`);
+        let draftSchema = null;
+        if (draftStr) {
+          try {
+            draftSchema = JSON.parse(draftStr);
+          } catch (e) {
+            console.error('Failed to parse draft', e);
+          }
+        }
+
+        const cleanSchema = (s: any) => ({
+          sections: (s.sections || []).map((sec: any) => ({
+            ...sec,
+            fields: (sec.fields || []).map((f: any) => ({
+              ...f,
+              options: parseOptions(f.options)
+            }))
+          }))
+        });
+
+        if (data.form_schema && Array.isArray(data.form_schema.sections)) {
+          setSchema(cleanSchema(data.form_schema));
+        } else if (data.form_fields && data.form_fields.length > 0) {
           // Fallback if they were stored in form_fields array
           const sectionsMap: Record<string, Field[]> = {};
           data.form_fields.forEach((f: any) => {
@@ -94,7 +142,7 @@ const ServiceFormBuilder = () => {
               name: f.label.toLowerCase().replace(/[^a-z0-9]/g, '_'),
               placeholder: f.placeholder,
               required: f.required === 1 || f.required === true,
-              options: f.options ? (typeof f.options === 'string' ? JSON.parse(f.options) : f.options) : []
+              options: parseOptions(f.options)
             });
           });
           
@@ -104,6 +152,28 @@ const ServiceFormBuilder = () => {
             fields: sectionsMap[title]
           }));
           setSchema({ sections: newSections });
+        } else {
+          // Check 'service_inputs' collection for legacy inputs
+          const q = query(collection(db, 'service_inputs'), where('service_id', '==', id));
+          const snapshot = await getDocs(q);
+          if (!snapshot.empty) {
+            const fields: Field[] = snapshot.docs.map(doc => {
+              const f = doc.data();
+              return {
+                id: doc.id || generateId(),
+                type: f.input_type || 'text',
+                label: f.input_label || 'Input',
+                name: (f.input_label || 'Input').toLowerCase().replace(/[^a-z0-9]/g, '_'),
+                required: f.required === 1 || f.required === true,
+                options: parseOptions(f.options),
+              };
+            });
+            setSchema({
+               sections: [{ id: generateId(), title: 'General Details', fields }]
+            });
+          } else if (draftSchema && Array.isArray(draftSchema.sections)) {
+             setSchema(cleanSchema(draftSchema));
+          }
         }
       }
     } catch (err) {
@@ -117,11 +187,29 @@ const ServiceFormBuilder = () => {
     if (!id) return;
     try {
       setIsSaving(true);
+      
+      // Clean up empty options before saving
+      const cleanedSchema = {
+        sections: schema.sections.map(section => ({
+          ...section,
+          fields: section.fields.map(field => {
+            if (field.options) {
+              return { ...field, options: field.options.filter(o => o.trim() !== '') };
+            }
+            return field;
+          })
+        }))
+      };
+      
       const serviceRef = doc(db, 'services', id);
       await updateDoc(serviceRef, { 
-        form_schema: schema,
+        form_schema: cleanedSchema,
         updated_at: serverTimestamp()
       });
+      
+      setSchema(cleanedSchema);
+      setHasUnsavedChanges(false);
+      localStorage.removeItem(`form_draft_${id}`);
       alert('Form configuration saved successfully!');
     } catch (err) {
       console.error('Error saving:', err);
@@ -132,23 +220,35 @@ const ServiceFormBuilder = () => {
   };
 
   const addSection = () => {
-    setSchema(prev => ({
-      sections: [...prev.sections, { id: generateId(), title: 'New Section', fields: [] }]
-    }));
+    setSchema(prev => {
+      setHasUnsavedChanges(true);
+      return {
+        ...prev,
+        sections: [...prev.sections, { id: generateId(), title: 'New Section', fields: [] }]
+      };
+    });
   };
 
   const removeSection = (sectionId: string) => {
-    setSchema(prev => ({
-      sections: prev.sections.filter(s => s.id !== sectionId)
-    }));
+    setSchema(prev => {
+      setHasUnsavedChanges(true);
+      return {
+        ...prev,
+        sections: prev.sections.filter(s => s.id !== sectionId)
+      };
+    });
     if (selectedSection === sectionId) setSelectedSection(null);
     if (selectedField?.sectionId === sectionId) setSelectedField(null);
   };
 
   const updateSectionTitle = (sectionId: string, title: string) => {
-    setSchema(prev => ({
-      sections: prev.sections.map(s => s.id === sectionId ? { ...s, title } : s)
-    }));
+    setSchema(prev => {
+      setHasUnsavedChanges(true);
+      return {
+        ...prev,
+        sections: prev.sections.map(s => s.id === sectionId ? { ...s, title } : s)
+      };
+    });
   };
 
   const handleDragStartNew = (e: React.DragEvent, fieldType: string) => {
@@ -174,7 +274,8 @@ const ServiceFormBuilder = () => {
     if (!draggedItem) return;
 
     setSchema(prev => {
-      const newSections = JSON.parse(JSON.stringify(prev.sections)) as Section[];
+      setHasUnsavedChanges(true);
+      const newSections = structuredClone(prev.sections) as Section[];
       const targetSection = newSections.find(s => s.id === targetSectionId);
       if (!targetSection) return prev;
 
@@ -197,7 +298,6 @@ const ServiceFormBuilder = () => {
         
         const [movedField] = sourceSection.fields.splice(draggedItem.fieldIndex, 1);
         
-        // Adjust target index if dropping in the same section and after the removed item
         let adjustedTargetIndex = targetIndex;
         if (draggedItem.sectionId === targetSectionId && draggedItem.fieldIndex < targetIndex) {
           adjustedTargetIndex--;
@@ -206,7 +306,7 @@ const ServiceFormBuilder = () => {
         targetSection.fields.splice(adjustedTargetIndex, 0, movedField);
       }
       
-      return { sections: newSections };
+      return { ...prev, sections: newSections };
     });
     setDraggedItem(null);
   };
@@ -217,34 +317,45 @@ const ServiceFormBuilder = () => {
   };
 
   const updateField = (sectionId: string, fieldId: string, updates: Partial<Field>) => {
-    setSchema(prev => ({
-      sections: prev.sections.map(s => s.id === sectionId ? {
-        ...s,
-        fields: s.fields.map(f => f.id === fieldId ? { ...f, ...updates } : f)
-      } : s)
-    }));
+    setSchema(prev => {
+      setHasUnsavedChanges(true);
+      return {
+        ...prev,
+        sections: prev.sections.map(s => s.id === sectionId ? {
+          ...s,
+          fields: s.fields.map(f => f.id === fieldId ? { ...f, ...updates } : f)
+        } : s)
+      };
+    });
   };
 
   const removeField = (sectionId: string, fieldId: string) => {
-    setSchema(prev => ({
-      sections: prev.sections.map(s => s.id === sectionId ? {
-        ...s,
-        fields: s.fields.filter(f => f.id !== fieldId)
-      } : s)
-    }));
+    setSchema(prev => {
+      setHasUnsavedChanges(true);
+      return {
+        ...prev,
+        sections: prev.sections.map(s => s.id === sectionId ? {
+          ...s,
+          fields: s.fields.filter(f => f.id !== fieldId)
+        } : s)
+      };
+    });
     if (selectedField?.fieldId === fieldId) setSelectedField(null);
   };
 
   const duplicateField = (sectionId: string, fieldIndex: number) => {
     setSchema(prev => {
-      const newSections = JSON.parse(JSON.stringify(prev.sections)) as Section[];
+      setHasUnsavedChanges(true);
+      const newSections = structuredClone(prev.sections) as Section[];
       const section = newSections.find(s => s.id === sectionId);
       if (section) {
         const fieldToDuplicate = section.fields[fieldIndex];
-        const newField = { ...fieldToDuplicate, id: generateId(), name: `${fieldToDuplicate.name}_copy` };
+        const newField = structuredClone(fieldToDuplicate);
+        newField.id = generateId();
+        newField.name = `${fieldToDuplicate.name}_copy`;
         section.fields.splice(fieldIndex + 1, 0, newField);
       }
-      return { sections: newSections };
+      return { ...prev, sections: newSections };
     });
   };
 
@@ -411,7 +522,10 @@ const ServiceFormBuilder = () => {
             <ArrowLeft size={20} />
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-white">Form Builder</h1>
+            <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+              Form Builder
+              {hasUnsavedChanges && <span className="text-[10px] bg-amber-500/20 text-amber-500 px-2 py-0.5 rounded-full uppercase tracking-widest font-bold">Unsaved Draft</span>}
+            </h1>
             <p className="text-slate-400 text-sm">Configuring: <span className="text-blue-400 font-medium">{service?.service_name}</span></p>
           </div>
         </div>
@@ -635,7 +749,7 @@ const ServiceFormBuilder = () => {
                       <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Options</label>
                       <textarea 
                         value={selectedFieldData.options?.join('\n') || ''}
-                        onChange={(e) => updateField(selectedField.sectionId, selectedField.fieldId, { options: e.target.value.split('\n').filter(o => o.trim()) })}
+                        onChange={(e) => updateField(selectedField.sectionId, selectedField.fieldId, { options: e.target.value.split('\n') })}
                         placeholder="One option per line"
                         className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-xl text-sm text-white focus:border-blue-500 outline-none h-32 resize-none"
                       />

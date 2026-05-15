@@ -28,7 +28,8 @@ import {
   TrendingUp,
   Headphones,
   IdCard,
-  CreditCard
+  CreditCard,
+  Power
 } from 'lucide-react';
 
 const DashboardLayout = () => {
@@ -130,16 +131,9 @@ const DashboardLayout = () => {
     { path: user?.role === 'user' ? '/app/user/applications' : (user?.role === 'staff' ? '/app/staff/applications' : '/app/applications'), label: user?.role === 'user' ? 'My Applications' : 'User Applications', icon: <FileText size={20} />, roles: ['admin', 'staff', 'user'] },
     { path: user?.role === 'admin' ? '/app/services' : (user?.role === 'staff' ? '/app/staff/apply-service' : '/app/services'), label: 'Apply for Services', icon: <Briefcase size={20} />, roles: ['admin', 'staff', 'user'] },
     { path: '/app/ledger', label: 'Ledger', icon: <FileText size={20} />, roles: ['admin', 'staff'] },
-    { path: '/app/admin/ledger-settings', label: 'Ledger Settings', icon: <Settings size={20} />, roles: ['admin'] },
-    { path: '/app/admin/ledger-analytics', label: 'Ledger Analytics', icon: <TrendingUp size={20} />, roles: ['admin'] },
-    { path: '/app/users', label: 'Users List', icon: <Users size={20} />, roles: ['admin', 'staff'] },
     { path: '/app/staff-management', label: 'Staff Management', icon: <Users size={20} />, roles: ['admin'] },
-    { path: '/app/admin/id-card-designer', label: 'ID Card Designer', icon: <IdCard size={20} />, roles: ['admin'] },
-    { path: '/app/admin/wallets', label: 'Wallet Management', icon: <WalletIcon size={20} />, roles: ['admin'] },
     { path: '/app/support', label: 'Ticket Support', icon: <MessageSquare size={20} />, roles: ['admin', 'staff', 'user'] },
     { path: '/app/support-center', label: 'Live Chat Support', icon: <Headphones size={20} />, roles: ['admin', 'staff'] },
-    { path: '/app/recycle-bin', label: 'Recycle Bin', icon: <Trash2 size={20} />, roles: ['admin'] },
-    { path: '/app/settings/portal', label: 'Portal Config', icon: <Settings size={20} />, roles: ['admin'] },
     { path: '/app/settings', label: 'Settings', icon: <Settings size={20} />, roles: ['admin', 'staff', 'user'] },
     { path: '/', label: 'Public Site', icon: <Home size={20} />, roles: ['admin', 'staff', 'user'] },
   ];

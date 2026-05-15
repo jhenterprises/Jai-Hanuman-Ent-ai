@@ -5,9 +5,20 @@ import {
   ShieldCheck, Loader2, CheckCircle2, AlertCircle,
   Smartphone, ArrowLeft, History, Info, Scan
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useWallet } from '../../context/WalletContext';
+import { useServiceControl } from '../../context/ServiceControlContext';
+import ServiceUnavailable from '../../components/ServiceUnavailable';
 import GlassCard from '../../components/GlassCard';
+import { toast } from 'react-hot-toast';
+
+const BANKS = [
+  "State Bank of India", "Punjab National Bank", "Bank of Baroda",
+  "Canara Bank", "Union Bank of India", "HDFC Bank", "ICICI Bank",
+  "Axis Bank", "Kotak Mahindra Bank", "IndusInd Bank", "Bank of India",
+  "Central Bank of India", "Indian Bank", "Indian Overseas Bank",
+  "UCO Bank", "Punjab & Sind Bank", "IDBI Bank", "Yes Bank"
+].sort();
 
 const AEPS_TYPES = [
   { id: 'withdrawal', name: 'Cash Withdrawal', icon: <Landmark />, desc: 'Withdraw cash from bank account' },
@@ -20,7 +31,22 @@ function SearchIcon() { return <svg width="24" height="24" viewBox="0 0 24 24" f
 
 const AEPS = () => {
   const navigate = useNavigate();
-  const [activeType, setActiveType] = useState('withdrawal');
+  const [params] = useSearchParams();
+  const { balance } = useWallet();
+  const { getServiceStatus, loading: controlLoading } = useServiceControl();
+  const [activeType, setActiveType] = useState(params.get('type') === 'pay' ? 'pay' : 'withdrawal');
+
+  const aepsStatus = getServiceStatus('aeps');
+  const payStatus = getServiceStatus('aadhaarPay');
+  const currentStatus = activeType === 'pay' ? payStatus : aepsStatus;
+
+  if (controlLoading) return null;
+  if (currentStatus && (!currentStatus.isLive || currentStatus.maintenanceMode || currentStatus.comingSoon)) {
+    return <ServiceUnavailable 
+      type={currentStatus.comingSoon ? 'coming-soon' : (currentStatus.maintenanceMode ? 'maintenance' : 'disabled')} 
+      serviceName={currentStatus.serviceName} 
+    />;
+  }
   const [aadhaar, setAadhaar] = useState('');
   const [bank, setBank] = useState('');
   const [amount, setAmount] = useState('');
@@ -128,37 +154,9 @@ const AEPS = () => {
                           className="w-full bg-slate-950/50 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-white font-bold h-14 appearance-none cursor-pointer"
                         >
                           <option value="">Choose Bank</option>
-                          <option value="SBI">State Bank of India</option>
-                          <option value="HDFC">HDFC Bank</option>
-                          <option value="ICICI">ICICI Bank</option>
-                          <option value="AXIS">Axis Bank</option>
-                          <option value="KOTAK">Kotak Mahindra Bank</option>
-                          <option value="PNB">Punjab National Bank</option>
-                          <option value="BOB">Bank of Baroda</option>
-                          <option value="CANARA">Canara Bank</option>
-                          <option value="UNION">Union Bank of India</option>
-                          <option value="IDBI">IDBI Bank</option>
-                          <option value="INDUSIND">IndusInd Bank</option>
-                          <option value="YES">YES Bank</option>
-                          <option value="BOI">Bank of India</option>
-                          <option value="CBI">Central Bank of India</option>
-                          <option value="IOB">Indian Overseas Bank</option>
-                          <option value="BANDHAN">Bandhan Bank</option>
-                          <option value="IDFC">IDFC First Bank</option>
-                          <option value="UCO">UCO Bank</option>
-                          <option value="BOM">Bank of Maharashtra</option>
-                          <option value="FEDERAL">Federal Bank</option>
-                          <option value="SOUTH">South Indian Bank</option>
-                          <option value="KARNATAKA">Karnataka Bank</option>
-                          <option value="RBL">RBL Bank</option>
-                          <option value="HSBC">HSBC Bank</option>
-                          <option value="STANDARD">Standard Chartered</option>
-                          <option value="IPPB">India Post Payments Bank (IPPB)</option>
-                          <option value="AIRTEL">Airtel Payments Bank</option>
-                          <option value="PAYTM">Paytm Payments Bank</option>
-                          <option value="JIO">Jio Payments Bank</option>
-                          <option value="AU">AU Small Finance Bank</option>
-                          <option value="EQUITS">Equitas Small Finance Bank</option>
+                          {BANKS.map(b => (
+                            <option key={b} value={b}>{b}</option>
+                          ))}
                         </select>
                      </div>
                   </div>

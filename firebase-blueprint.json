@@ -147,6 +147,26 @@
         "provider": { "type": "string" }
       }
     },
+    "ServiceControl": {
+      "title": "Service Control",
+      "description": "Availability control for financial services",
+      "type": "object",
+      "properties": {
+        "serviceKey": { "type": "string" },
+        "serviceName": { "type": "string" },
+        "isLive": { "type": "boolean" },
+        "maintenanceMode": { "type": "boolean" },
+        "comingSoon": { "type": "boolean" },
+        "bannerMessage": { "type": "string" },
+        "icon": { "type": "string" },
+        "order": { "type": "number" },
+        "apiStatus": { "type": "string", "enum": ["connected", "disconnected", "maintenance"] },
+        "lastChecked": { "type": "string", "format": "date-time" },
+        "provider": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["serviceKey", "serviceName", "isLive", "updatedAt"]
+    },
     "WalletLog": {
       "title": "Wallet Log",
       "description": "Ledger of all wallet balance changes",
@@ -179,6 +199,10 @@
     "/services_config/{serviceId}": {
       "schema": "ServiceConfig",
       "description": "Admin settings for various services"
+    },
+    "/service_controls/{serviceId}": {
+      "schema": "ServiceControl",
+      "description": "Live control and status for financial services"
     },
     "/users/{userId}": {
       "schema": "User",

@@ -6,6 +6,8 @@ import { safeFormat } from '../utils/dateUtils';
 import { getRazorpayKey } from '../utils/razorpayUtils';
 import { db } from '../lib/firebase';
 import { collection, query, where, getDocs, orderBy, limit, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { initializePayment } from '../services/razorpayService';
+import { toast } from 'react-hot-toast';
 
 interface Transaction {
   id: string;
@@ -80,75 +82,58 @@ const Wallet = () => {
 
     setProcessing(true);
     try {
-      // In serverless, we'd traditionally use a server to create the Razorpay order
-      // For this demo, let's assume we can complete the payment and update the ledger.
-      // NOTE: Real production apps MUST use Cloud Functions for order creation and verification.
-      
-      const rzpOptions = {
-        key: getRazorpayKey(),
-        amount: numAmount * 100,
-        currency: 'INR',
-        name: 'Digital Services Portal',
-        description: 'Add money to wallet',
-        handler: async (response: any) => {
-          try {
-            // Log successful payment in ledger
-            const ledgerRef = collection(db, 'ledger');
-            await addDoc(ledgerRef, {
-              user_id: user?.uid,
-              amount: numAmount,
-              type: 'credit',
-              description: 'Wallet top-up (Razorpay)',
-              payment_id: response.razorpay_payment_id,
-              status: 'success',
-              created_at: serverTimestamp()
-            });
+      const response: any = await initializePayment(numAmount, user?.uid || 'anon', {
+        name: user?.name,
+        email: user?.email,
+      });
 
-            // Update wallet balance
-            const walletSnap = await getDocs(query(collection(db, 'wallets'), where('user_id', '==', user?.uid || '')));
-            if (!walletSnap.empty) {
-              const walletDoc = walletSnap.docs[0];
-              await updateDoc(doc(db, 'wallets', walletDoc.id), {
-                balance: (walletDoc.data().balance || 0) + numAmount,
-                updated_at: serverTimestamp()
-              });
-            } else {
-              await addDoc(collection(db, 'wallets'), {
-                user_id: user?.uid,
-                balance: numAmount,
-                updated_at: serverTimestamp(),
-                created_at: serverTimestamp()
-              });
-            }
+      // If we reach here, verification was successful on the backend
+      // Now update the ledger and wallet balance
+      try {
+        // Log successful payment in ledger
+        const ledgerRef = collection(db, 'ledger');
+        await addDoc(ledgerRef, {
+          user_id: user?.uid,
+          amount: numAmount,
+          type: 'credit',
+          description: 'Wallet top-up (Razorpay)',
+          payment_id: response.razorpay_payment_id,
+          order_id: response.razorpay_order_id,
+          status: 'success',
+          created_at: serverTimestamp()
+        });
 
-            setMessage({ type: 'success', text: 'Money added successfully!' });
-            setShowAddMoney(false);
-            setAmount('');
-            fetchWalletData();
-          } catch (err) {
-            console.error('Finalization error:', err);
-            setMessage({ type: 'error', text: 'Failed to update wallet after payment' });
-          }
-        },
-        prefill: {
-          name: user?.name,
-          email: user?.email,
-        },
-        theme: {
-          color: '#3b82f6',
-        },
-      };
+        // Update wallet balance
+        const walletSnap = await getDocs(query(collection(db, 'wallets'), where('user_id', '==', user?.uid || '')));
+        if (!walletSnap.empty) {
+          const walletDoc = walletSnap.docs[0];
+          await updateDoc(doc(db, 'wallets', walletDoc.id), {
+            balance: (walletDoc.data().balance || 0) + numAmount,
+            updated_at: serverTimestamp()
+          });
+        } else {
+          await addDoc(collection(db, 'wallets'), {
+            user_id: user?.uid,
+            balance: numAmount,
+            updated_at: serverTimestamp(),
+            created_at: serverTimestamp()
+          });
+        }
 
-      if (!(window as any).Razorpay) {
-        setMessage({ type: 'error', text: 'Razorpay SDK failed to load. Please check your internet connection.' });
-        return;
+        toast.success('Money added successfully!');
+        setMessage({ type: 'success', text: 'Money added successfully!' });
+        setShowAddMoney(false);
+        setAmount('');
+        fetchWalletData();
+      } catch (err) {
+        console.error('Finalization error:', err);
+        toast.error('Payment verified but wallet update failed. Please contact support.');
+        setMessage({ type: 'error', text: 'Failed to update wallet after payment' });
       }
-
-      const rzp = new (window as any).Razorpay(rzpOptions);
-      rzp.open();
     } catch (err: any) {
       console.error('Add money failed:', err);
-      setMessage({ type: 'error', text: 'Failed to initiate payment' });
+      toast.error(err.message || 'Failed to initiate payment');
+      setMessage({ type: 'error', text: err.message || 'Failed to initiate payment' });
     } finally {
       setProcessing(false);
     }
