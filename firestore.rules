@@ -320,6 +320,35 @@ service cloud.firestore {
     }
 
     // -------------------------------------------------------------------------
+    // WALLET TRANSACTIONS & AUDIT & NEW MODULES
+    // -------------------------------------------------------------------------
+    
+    match /walletTransactions/{txId} {
+      function isValidWalletTx(data) {
+        return data.keys().hasAll(['txId', 'walletId', 'type', 'amount', 'balanceAfter', 'reason', 'createdBy', 'createdAt']) &&
+               data.txId is string && data.walletId is string &&
+               data.type in ['credit', 'debit', 'reverse'] &&
+               data.amount is number && data.amount > 0 &&
+               data.balanceAfter is number &&
+               data.reason is string &&
+               data.createdBy is string &&
+               data.createdAt is string;
+      }
+      allow read: if isSignedIn() && (resource.data.walletId == request.auth.uid || isStaff());
+      allow create, update, delete: if false; 
+    }
+
+    match /bbpsTransactions/{txId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isStaff());
+      allow write: if false;
+    }
+
+    match /auditLogs/{logId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // -------------------------------------------------------------------------
     // CHATS & MESSAGES
     // -------------------------------------------------------------------------
 

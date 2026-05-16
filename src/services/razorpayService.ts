@@ -1,4 +1,5 @@
 import { getRazorpayKey } from '../utils/razorpayUtils';
+import { auth } from '../lib/firebase';
 
 interface RazorpayOptions {
   key: string;
@@ -45,11 +46,15 @@ export const loadRazorpay = () => {
 
 export const initializePayment = async (amountInRupees: number, userId: string, userInfo: any) => {
   try {
-    const response = await fetch('/api/create-order', {
+    const token = await auth.currentUser?.getIdToken();
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    };
+
+    const response = await fetch('/api/payments/create-order', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify({
         amount: amountInRupees * 100, // Convert to paise
         userId,
@@ -58,6 +63,31 @@ export const initializePayment = async (amountInRupees: number, userId: string, 
 
     const orderData = await response.json();
     if (!response.ok) throw new Error(orderData.error || 'Failed to create order');
+
+    if (orderData.is_mock) {
+      // Simulate payment delay when no Razorpay keys are configured
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          resolve({
+            razorpay_order_id: orderData.order_id,
+            razorpay_payment_id: `mock_pay_${Date.now()}`,
+            razorpay_signature: `mock_sign_${Date.now()}`
+          });
+        }, 1500);
+      }).then(async (response: any) => {
+        const verifyRes = await fetch('/api/payments/verify-payment', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(response)
+        });
+        const verifyData = await verifyRes.json();
+        if (verifyRes.ok && verifyData.success) {
+          return response;
+        } else {
+          throw new Error('Payment verification failed');
+        }
+      });
+    }
 
     return new Promise((resolve, reject) => {
       const options: RazorpayOptions = {
@@ -69,11 +99,9 @@ export const initializePayment = async (amountInRupees: number, userId: string, 
         order_id: orderData.order_id,
         handler: async (response: any) => {
           try {
-            const verifyRes = await fetch('/api/verify-payment', {
+            const verifyRes = await fetch('/api/payments/verify-payment', {
               method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
+              headers,
               body: JSON.stringify({
                 razorpay_order_id: response.razorpay_order_id,
                 razorpay_payment_id: response.razorpay_payment_id,

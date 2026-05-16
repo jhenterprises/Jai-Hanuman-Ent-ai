@@ -1,64 +1,39 @@
 import express from "express";
-import dotenv from "dotenv";
+import cors from "cors";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import { createServer as createViteServer } from "vite";
 import path from "path";
-import { fileURLToPath } from 'url';
-import admin from 'firebase-admin';
-import { readFileSync } from 'fs';
-import Razorpay from 'razorpay';
-import crypto from 'crypto';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Explicitly load .env file
-dotenv.config({ path: path.resolve(process.cwd(), '.env'), override: true });
-
-import { getFirestore } from 'firebase-admin/firestore';
-
-import fs from 'fs';
-
-// Load config manually to avoid import attribute issues
-const firebaseConfigPath = path.join(__dirname, 'firebase-applet-config.json');
-const firebaseConfig = JSON.parse(readFileSync(firebaseConfigPath, 'utf8'));
-
-// Initialize Firebase Admin
-let credential;
-try {
-  if (process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
-    let privateKey = process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n');
-    privateKey = privateKey.replace(/^"|"$/g, '');
-    credential = admin.credential.cert({
-      projectId: process.env.FIREBASE_PROJECT_ID || firebaseConfig.projectId,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey,
-    });
-  } else {
-    // If we're in AI Studio, it might not have application default credentials set up correctly for local dev
-    // but initializeApp might still work if it's already been set up by the environment.
-    credential = admin.credential.applicationDefault();
-  }
-} catch (e) {
-  console.error('Error setting up Firebase credential:', e);
-}
-
-const firebaseApp = admin.initializeApp({
-  credential,
-  projectId: process.env.FIREBASE_PROJECT_ID || firebaseConfig.projectId,
-}, 'admin-app'); 
-
-const dbId = firebaseConfig.firestoreDatabaseId || process.env.FIREBASE_DATABASE_ID;
-const db = getFirestore(firebaseApp, dbId);
-const auth = admin.auth(firebaseApp);
+import apiRouter from "./api/index.js";
+import { errorHandler } from "./middleware/error.js";
+import { env } from "./config/env.js";
+import { logger } from "./loggers/index.js";
+import morgan from "morgan";
 
 const expressApp = express();
-expressApp.use(express.json());
 
-// Global logging middleware
-expressApp.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} ${req.method} ${req.url}`);
-  next();
+// Security and utility Middlewares
+expressApp.use(helmet({
+  contentSecurityPolicy: false, // disabled for vite dev
+}));
+expressApp.use(cors({ origin: true, credentials: true }));
+expressApp.use(express.json());
+expressApp.set('trust proxy', 1);
+
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100, // Limit each IP to 100 requests per `window`
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' }
 });
+
+expressApp.use('/api', apiLimiter);
+
+// Logger
+expressApp.use(morgan('combined', {
+  stream: { write: (message) => logger.info(message.trim()) }
+}));
 
 // Proxy image route to bypass CORS
 expressApp.get("/api/proxy-image", async (req, res) => {
@@ -71,221 +46,26 @@ expressApp.get("/api/proxy-image", async (req, res) => {
     
     const contentType = response.headers.get("content-type");
     if (contentType) res.setHeader("Content-Type", contentType);
-    
-    // Set caching headers for better performance
     res.setHeader("Cache-Control", "public, max-age=3600");
     
     const arrayBuffer = await response.arrayBuffer();
     res.send(Buffer.from(arrayBuffer));
   } catch (error: any) {
-    console.error("Proxy image error:", error);
+    logger.error("Proxy image error:", error);
     res.status(500).send("Failed to proxy image: " + error.message);
   }
 });
 
-// API health check
-expressApp.get("/api/health", (req, res) => {
-  res.json({ status: "ok", env: process.env.NODE_ENV, vercel: !!process.env.VERCEL });
-});
-
-// Middleware to check Admin role from Firestore
-const isAdmin = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Missing or invalid Authorization header' });
-  }
-  const token = authHeader.split(' ')[1];
-  try {
-    const decoded = await auth.verifyIdToken(token);
-    
-    // Check role in Firestore
-    const userDoc = await db.collection('users').doc(decoded.uid).get();
-    const userData = userDoc.data();
-    const role = userData?.role;
-    const email = decoded.email?.toLowerCase();
-
-    // Hardcoded Admin Emails (from AuthContext.tsx)
-    const adminEmails = ['pancardjhc2018@gmail.com', 'pavan.tr16@gmail.com', 'admin@jh.com'];
-
-    if (role === 'admin' || (email && adminEmails.includes(email))) {
-      return next();
-    }
-    
-    console.warn(`User ${decoded.uid} (${email}) attempted admin action but has role ${role}`);
-    return res.status(403).json({ error: 'Permission denied: Admin role required' });
-    
-  } catch (e: any) {
-    console.error('Admin middleware error:', e.message);
-    return res.status(401).json({ error: 'Authentication failed' });
-  }
-};
-
-// API route to reset user password
-expressApp.post("/api/reset-password", isAdmin, async (req, res) => {
-  const { uid, newPassword } = req.body;
-  if (!uid || !newPassword) return res.status(400).json({ error: 'User ID and password are required' });
-  if (newPassword.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
-  
-  try {
-    // Attempt to update user. Note: uid must be the Firebase Auth UID.
-    await auth.updateUser(uid, { password: newPassword });
-    res.status(200).json({ message: 'Password updated successfully' });
-  } catch (e: any) {
-    console.error('Password reset error:', e);
-    
-    // If UID not found, try to find by email if this is a manually added user
-    if (e.code === 'auth/user-not-found') {
-      try {
-        const userDoc = await db.collection('users').doc(uid).get();
-        const email = userDoc.data()?.email;
-        if (email) {
-          const userRecord = await auth.getUserByEmail(email);
-          await auth.updateUser(userRecord.uid, { password: newPassword });
-          return res.status(200).json({ message: 'Password updated via email lookup' });
-        }
-      } catch (innerError: any) {
-        console.error('Secondary password reset attempt failed:', innerError);
-      }
-      return res.status(404).json({ error: 'Firebase Auth user not found. User must register first if added manually.' });
-    }
-    
-    res.status(500).json({ error: 'Internal server error while resetting password' });
-  }
-});
-
-// Financial Services Simulator (Dummy APIs for demo)
-// Razorpay Integration
-
-expressApp.post("/api/create-order", async (req, res) => {
-  const { amount, currency = 'INR', userId } = req.body;
-  
-  if (!amount || amount < 100) {
-    return res.status(400).json({ error: 'Amount must be at least 100 paise (1 INR)' });
-  }
-
-  try {
-    const rzpOptions = {
-      key_id: (process.env.RAZORPAY_KEY_ID || '').trim(),
-      key_secret: (process.env.RAZORPAY_KEY_SECRET || '').trim(),
-    };
-    
-    console.log("Creating Razorpay Order with Key ID: " + rzpOptions.key_id);
-    
-    if (!rzpOptions.key_id) {
-       console.error("Missing RAZORPAY_KEY_ID in environment after dotenv");
-    }
-
-    const razorpay = new Razorpay(rzpOptions);
-    const options = {
-      amount: Math.round(amount), // amount in the smallest currency unit
-      currency,
-      receipt: `receipt_${Date.now()}_${userId || 'anon'}`.substring(0, 40),
-    };
-
-    const order = await razorpay.orders.create(options);
-    res.json({
-      order_id: order.id,
-      amount: order.amount,
-      currency: order.currency,
-    });
-  } catch (error: any) {
-    console.error("Razorpay Order Error:", error);
-    res.status(500).json({ error: 'Failed to create Razorpay order', message: error.message || error });
-  }
-});
-
-expressApp.post("/api/verify-payment", async (req, res) => {
-  const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
-
-  if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
-    return res.status(400).json({ error: 'Missing payment details' });
-  }
-
-  const secret = (process.env.RAZORPAY_KEY_SECRET || '').trim();
-
-  const sign = razorpay_order_id + "|" + razorpay_payment_id;
-  const expectedSign = crypto
-    .createHmac("sha256", secret)
-    .update(sign.toString())
-    .digest("hex");
-
-  if (razorpay_signature === expectedSign) {
-    res.json({ success: true, message: "Payment verified successfully" });
-  } else {
-    res.status(400).json({ success: false, message: "Invalid payment signature" });
-  }
-});
-
-expressApp.post("/api/recharge", async (req, res) => {
-  const { type, number, operator, amount } = req.body;
-  console.log(`Processing ${type} recharge for ${number} (${operator}) amount: ${amount}`);
-  setTimeout(() => {
-    res.json({ 
-      success: true, 
-      message: "Recharge successful", 
-      refNo: "REC" + Math.floor(Math.random() * 100000000) 
-    });
-  }, 1000);
-});
-
-expressApp.post("/api/bill-fetch", async (req, res) => {
-  const { category, consumerId, provider } = req.body;
-  console.log(`Fetching bill for ${category} : ${consumerId} (${provider})`);
-  setTimeout(() => {
-    res.json({
-      success: true,
-      customerName: "JH DIGITAL CUSTOMER",
-      billAmount: Math.floor(Math.random() * 5000) + 100,
-      dueDate: new Date(Date.now() + 86400000 * 10).toISOString().split('T')[0],
-      billId: "BBPS" + Math.floor(Math.random() * 1000000)
-    });
-  }, 800);
-});
-
-expressApp.post("/api/bill-pay", async (req, res) => {
-  const { billId, amount } = req.body;
-  setTimeout(() => {
-    res.json({
-      success: true,
-      message: "Bill paid successfully",
-      refNo: "BBPS" + Math.floor(Math.random() * 100000000)
-    });
-  }, 1000);
-});
-
-expressApp.post("/api/dmt-verify", async (req, res) => {
-  const { accountNumber } = req.body;
-  setTimeout(() => {
-    res.json({
-      success: true,
-      accountHolderName: "VERIFIED ACCOUNT HOLDER",
-      isVerified: true
-    });
-  }, 1000);
-});
-
-expressApp.post("/api/dmt-transfer", async (req, res) => {
-  setTimeout(() => {
-    res.json({
-      success: true,
-      message: "Transfer initiated",
-      refNo: "DMT" + Math.floor(Math.random() * 100000000),
-      status: "success"
-    });
-  }, 1500);
-});
+// Modular Routers
+expressApp.use('/api', apiRouter);
 
 // Global Error Handler
-expressApp.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('Unhandled Error:', err);
-  res.status(500).json({ error: 'Internal Server Error', message: err.message });
-});
+expressApp.use(errorHandler);
 
 async function startServer() {
-  const PORT = 3000;
+  const PORT = Number(env.PORT || 3000);
 
-  // Vite middleware for development
-  if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
+  if (env.NODE_ENV !== "production" && !process.env.VERCEL) {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
@@ -301,7 +81,7 @@ async function startServer() {
 
   if (!process.env.VERCEL) {
     expressApp.listen(PORT, "0.0.0.0", () => {
-      console.log(`Server running on http://localhost:${PORT}`);
+      logger.info(`Server running on http://localhost:${PORT}`);
     });
   }
 }

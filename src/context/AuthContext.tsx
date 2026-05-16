@@ -10,7 +10,7 @@ import {
   signInWithEmailAndPassword,
   User as FirebaseUser
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp, getDocFromServer, enableNetwork, onSnapshot } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, getDocFromServer, enableNetwork, onSnapshot } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 
 interface User {
@@ -39,61 +39,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check for redirect error on load
     getRedirectResult(auth).catch((error) => {
       console.error('Redirect sign in error:', error);
     });
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      console.log('Auth state changed:', firebaseUser);
       if (firebaseUser) {
         setLoading(true);
-        console.log('User is authenticated:', firebaseUser.uid);
         
-        // Security: Only allow verified Google accounts if requested
         if (firebaseUser.providerData.some(p => p.providerId === 'google.com') && !firebaseUser.emailVerified) {
-          console.log('Unverified Google account blocked in state listener');
           await signOut(auth);
           setUser(null);
           setLoading(false);
           return;
         }
 
-        const userPath = `users/${firebaseUser.uid}`;
-        console.log('Setting up user document listener:', userPath);
-        
         let isMounted = true;
         const unsubscribeUser = onSnapshot(doc(db, 'users', firebaseUser.uid), async (userDoc) => {
           if (!isMounted) return;
           
           try {
-            console.log('User document update received:', userDoc.exists() ? 'Found' : 'Not Found');
-            
             if (userDoc.exists()) {
               const userData = userDoc.data() as User;
-              // Ensure uid is set from firebaseUser as it might be missing in document
               userData.uid = firebaseUser.uid;
-              
-              // Force admin role for primary emails
-              const adminEmails = ['pancardjhc2018@gmail.com', 'pavan.tr16@gmail.com', 'admin@jh.com'];
-              if (firebaseUser.email && adminEmails.includes(firebaseUser.email)) {
-                userData.role = 'admin';
-              }
-              
               setUser(userData);
               setLoading(false);
             } else {
-              // This case handles Google login where doc might not exist yet
-              const adminEmails = ['pancardjhc2018@gmail.com', 'pavan.tr16@gmail.com', 'admin@jh.com'];
               const newUser: User = {
                 uid: firebaseUser.uid,
                 name: firebaseUser.displayName || 'User',
                 email: firebaseUser.email || '',
                 photoURL: firebaseUser.photoURL || undefined,
-                role: (firebaseUser.email && adminEmails.includes(firebaseUser.email)) ? 'admin' : 'user'
+                role: 'user'
               };
               
-              console.log('Creating new user document:', newUser);
               try {
                 await setDoc(doc(db, 'users', firebaseUser.uid), {
                   ...newUser,
@@ -111,21 +90,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }, (err) => {
           if (!isMounted) return;
           console.error('Permission error on user listener:', err);
-          
-          // Emergency Fallback for Bootstrap Admins
-          const adminEmails = ['pancardjhc2018@gmail.com', 'pavan.tr16@gmail.com', 'admin@jh.com'];
-          const userEmail = firebaseUser.email?.toLowerCase();
-          if (userEmail && adminEmails.includes(userEmail)) {
-            console.warn('Bootstrap Admin permission bypass triggered');
-            setUser({
-              uid: firebaseUser.uid,
-              name: firebaseUser.displayName || 'Admin (Bypass)',
-              email: firebaseUser.email || '',
-              role: 'admin'
-            });
-          } else {
-            handleFirestoreError(err, OperationType.GET, `users/${firebaseUser.uid}`);
-          }
+          handleFirestoreError(err, OperationType.GET, `users/${firebaseUser.uid}`);
           setLoading(false);
         });
 
@@ -134,7 +99,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           unsubscribeUser();
         };
       } else {
-        console.log('User is not authenticated');
         setUser(null);
         setLoading(false);
       }
@@ -173,9 +137,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       await signInWithEmailAndPassword(auth, email, password);
     } catch (error: any) {
-      console.error('Email login failed:', error);
       const errorCode = error?.code || '';
-      console.log('Error code detected:', errorCode);
       
       if (errorCode === 'auth/invalid-credential' || 
           errorCode === 'auth/wrong-password' || 
@@ -186,8 +148,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error('Too many failed attempts. Please try again later or reset your password.');
       } else if (errorCode === 'auth/user-disabled') {
         throw new Error('This account has been disabled. Please contact support.');
-      } else if (errorCode === 'auth/visibility-check-was-unavailable' || error.message?.includes('visibility-check-was-unavailable')) {
-        throw new Error('Login failed due to a temporary browser restriction. Please try refreshing the page or using a different browser.');
       }
       
       throw new Error(error.message || 'Login failed. Please check your credentials.');
@@ -219,7 +179,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       setUser(newUser);
     } catch (error: any) {
-      console.error('Sign up failed:', error);
       if (error.code === 'auth/email-already-in-use') {
         throw new Error('This email is already registered. Please log in.');
       } else if (error.code === 'auth/weak-password') {
