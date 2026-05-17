@@ -35,7 +35,7 @@ export const requireAuth = async (req: AuthenticatedRequest, res: Response, next
 
     next();
   } catch (error: any) {
-    logger.warn(`Auth failed: ${error.message}`);
+    logger.warn(`Auth failed: ${error.message}`, error);
     res.status(401).json({ error: 'Authentication failed' });
   }
 };

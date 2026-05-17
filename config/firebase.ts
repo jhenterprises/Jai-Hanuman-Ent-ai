@@ -37,5 +37,7 @@ if (!admin.apps.length) {
 }
 
 export const firebaseAdmin = admin.app('admin-app');
-export const db = getFirestore(firebaseAdmin, env.FIREBASE_DATABASE_ID || firebaseConfig.firestoreDatabaseId);
+const dbId = firebaseConfig.firestoreDatabaseId || env.FIREBASE_DATABASE_ID;
+console.log('Initializing Firestore with DB ID:', dbId);
+export const db = getFirestore(firebaseAdmin, dbId);
 export const auth = admin.auth(firebaseAdmin);

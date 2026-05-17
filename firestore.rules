@@ -69,7 +69,7 @@ service cloud.firestore {
     
     match /users/{userId} {
       allow get: if isSignedIn() && (request.auth.uid == userId || isBootstrapAdmin() || isStaff());
-      allow list: if isStaff() || isBootstrapAdmin() || (isSignedIn() && resource.data.get('role', 'user') in ['admin', 'staff']);
+      allow list: if isStaff() || isBootstrapAdmin() || (isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') in ['admin', 'staff']);
       
       allow create: if isSignedIn() && (request.auth.uid == userId || isBootstrapAdmin() || isAdmin());
       allow update: if isSignedIn() && (request.auth.uid == userId || isBootstrapAdmin() || isAdmin());
