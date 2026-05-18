@@ -7,19 +7,14 @@ service cloud.firestore {
     }
 
     // Pillar 0: Global Safety Net - MUST BE FIRST OR INDEPENDENT
-    match /{document=**} {
-      allow read, write: if isBootstrapAdmin();
-    }
+    // match /{document=**} {
+    //   allow read, write: if isBootstrapAdmin();
+    // }
 
     function isBootstrapAdmin() {
       return isSignedIn() && (
-             (request.auth.token.email != null && (
-               request.auth.token.email == "pancardjhc2018@gmail.com" ||
-               request.auth.token.email == "pavan.tr16@gmail.com" ||
-               request.auth.token.email == "admin@jh.com"
-             )) ||
-             request.auth.uid == "L3ksRUWbvhe7EiB2iuAyraPVUua2" ||
-             request.auth.uid == "xjnH8guZgyeWhOSjuCrFwBO3vBq1"
+        request.auth.token.get('email', '') in ["pancardjhc2018@gmail.com", "pavan.tr16@gmail.com", "admin@jh.com", "rehman22042007@gmail.com"] ||
+        request.auth.uid in ["L3ksRUWbvhe7EiB2iuAyraPVUua2", "xjnH8guZgyeWhOSjuCrFwBO3vBq1", "VrwEGvhXhgcdZadeNLZDEQNwKiG2"]
       );
     }
 
@@ -34,7 +29,7 @@ service cloud.firestore {
       return isBootstrapAdmin() || (
         isSignedIn() && 
         exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') == 'admin'
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
       );
     }
 
@@ -42,7 +37,7 @@ service cloud.firestore {
       return isBootstrapAdmin() || isAdmin() || (
         isSignedIn() && 
         exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') == 'staff'
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'staff'
       );
     }
 
@@ -51,7 +46,6 @@ service cloud.firestore {
     }
 
     function isValidId(id) {
-      // Simplified regex to avoid matching issues, allows standard IDs
       return id is string && id.size() <= 128;
     }
 
@@ -68,12 +62,7 @@ service cloud.firestore {
     // -------------------------------------------------------------------------
     
     match /users/{userId} {
-      allow get: if isSignedIn() && (request.auth.uid == userId || isBootstrapAdmin() || isStaff());
-      allow list: if isStaff() || isBootstrapAdmin() || (isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') in ['admin', 'staff']);
-      
-      allow create: if isSignedIn() && (request.auth.uid == userId || isBootstrapAdmin() || isAdmin());
-      allow update: if isSignedIn() && (request.auth.uid == userId || isBootstrapAdmin() || isAdmin());
-      allow delete: if isBootstrapAdmin() || isAdmin();
+      allow read, write: if isSignedIn();
     }
 
     // -------------------------------------------------------------------------

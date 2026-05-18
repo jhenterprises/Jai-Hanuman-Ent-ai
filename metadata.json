@@ -1,5 +1,6 @@
 {
   "name": "JH Digital Seva Kendra",
   "description": "Centralized portal for government services in Jharkhand with AI document automation, payment gateway, and multi-user dashboards.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
