@@ -2,8 +2,89 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    match /{document=**} {
-      allow read, write: if true;
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Explicitly bootstrap the admin emails so they cannot be locked out.
+    function isBootstrapAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'shahisthabanu78@gmail.com' || 
+        request.auth.token.email == 'pancardjhc2018@gmail.com'
+      );
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isStaff() {
+      return isBootstrapAdmin() || (
+        isSignedIn() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+        getUserData().role in ['staff', 'admin']
+      );
+    }
+
+    function isAdmin() {
+      return isBootstrapAdmin() || (
+        isSignedIn() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+        getUserData().role == 'admin'
+      );
+    }
+
+    // --- Users ---
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+    }
+
+    // --- Support System ---
+    match /supportChats/{chatId} {
+      allow read: if isSignedIn() && (resource.data.customerId == request.auth.uid || isStaff());
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && (resource.data.customerId == request.auth.uid || isStaff());
+      allow delete: if isAdmin();
+    }
+
+    match /supportMessages/{messageId} {
+      function getChat(chatId) {
+        return get(/databases/$(database)/documents/supportChats/$(chatId)).data;
+      }
+      allow read: if isSignedIn() && (getChat(resource.data.chatId).customerId == request.auth.uid || isStaff());
+      allow create: if isSignedIn() && (getChat(request.resource.data.chatId).customerId == request.auth.uid || isStaff());
+      allow update: if isSignedIn() && (isStaff() || resource.data.senderId == request.auth.uid);
+      allow delete: if isAdmin();
+    }
+
+    match /quickReplies/{replyId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // --- Ledger System ---
+    match /ledger/{docId} {
+      // Staff can read all. Users can read their own entries.
+      allow read: if isStaff() || (isSignedIn() && resource.data.user_id == request.auth.uid);
+      // Staff can create. Users can create if they attribute it to themselves.
+      allow create: if isStaff() || (isSignedIn() && request.resource.data.user_id == request.auth.uid);
+      allow update: if isStaff();
+      allow delete: if isAdmin();
+    }
+
+    // --- Core Wallets ---
+    match /wallets/{docId} {
+      allow read: if isStaff() || (isSignedIn() && resource.data.user_id == request.auth.uid);
+      // Users can manage their wallet entries.
+      allow create, update: if isStaff() || (isSignedIn() && request.resource.data.user_id == request.auth.uid);
+      allow delete: if isAdmin();
+    }
+
+    // --- Allow Other Collections (Standard Fallback) ---
+    match /{collectionName}/{docId} {
+      allow read: if true;
+      allow write: if isStaff() || (isSignedIn() && request.resource.data.user_id == request.auth.uid);
     }
   }
 }

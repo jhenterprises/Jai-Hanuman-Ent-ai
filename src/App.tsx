@@ -87,6 +87,8 @@ const DefaultRedirect = () => {
 
 import { Toaster } from 'react-hot-toast';
 
+import { ChatWidget } from './components/support/ChatWidget';
+
 export default function App() {
   return (
     <ThemeProvider>
@@ -175,6 +177,7 @@ export default function App() {
                   </div>
                 } />
               </Routes>
+              <ChatWidget />
             </Suspense>
             </Router>
             </ServiceControlProvider>
