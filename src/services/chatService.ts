@@ -73,19 +73,21 @@ export const chatService = {
   }) {
     const { chatId, senderId, senderName, senderRole, message, messageType = 'text', fileUrl, fileName } = params;
 
-    const messageData: Omit<Message, 'id'> = {
+    const baseMessageData: Partial<Message> = {
       chatId,
       senderId,
       senderName,
       senderRole,
       message,
       messageType,
-      fileUrl,
-      fileName,
       isAutoReply: false,
       seen: false,
       createdAt: Timestamp.now(),
     };
+    if (fileUrl !== undefined) baseMessageData.fileUrl = fileUrl;
+    if (fileName !== undefined) baseMessageData.fileName = fileName;
+
+    const messageData = baseMessageData as Omit<Message, 'id'>;
 
     // Use transaction to update chat and message atomically
     await runTransaction(db, async (transaction) => {

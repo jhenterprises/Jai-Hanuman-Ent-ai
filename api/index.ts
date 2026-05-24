@@ -4,6 +4,7 @@ import walletRouter from './wallet.js';
 import bbpsRouter from './bbps.js';
 import rechargeRouter from './recharge.js';
 import paymentRouter from './payments.js';
+import aiRouter from './ai.js';
 
 const router = Router();
 
@@ -16,5 +17,6 @@ router.use('/wallet', walletRouter);
 router.use('/bbps', bbpsRouter);
 router.use('/recharge', rechargeRouter);
 router.use('/payments', paymentRouter);
+router.use('/ai', aiRouter);
 
 export default router;

@@ -88,6 +88,7 @@ const DefaultRedirect = () => {
 import { Toaster } from 'react-hot-toast';
 
 import { ChatWidget } from './components/support/ChatWidget';
+import { AIChatWidget } from './components/AIChatWidget';
 
 export default function App() {
   return (
@@ -96,7 +97,7 @@ export default function App() {
       <ConfigProvider>
         <AuthProvider>
           <WalletProvider>
-            <ServiceControlProvider>
+             <ServiceControlProvider>
               <Router>
               <Suspense fallback={<FullPageLoader />}>
               <Routes>
@@ -177,6 +178,7 @@ export default function App() {
                   </div>
                 } />
               </Routes>
+              <AIChatWidget />
               <ChatWidget />
             </Suspense>
             </Router>
