@@ -37,6 +37,10 @@ const checkApplicationStatus = {
 
 router.post('/chat', async (req, res) => {
   try {
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(500).json({ error: 'GEMINI_API_KEY is not configured on the server.' });
+    }
+
     const { history } = req.body;
     
     // We send an array of contents. 
@@ -52,7 +56,7 @@ router.post('/chat', async (req, res) => {
     };
 
     let response = await ai.models.generateContent({
-      model: "gemini-3.5-flash", 
+      model: "gemini-2.0-flash", 
       contents: history,
       config
     });
@@ -94,7 +98,7 @@ router.post('/chat', async (req, res) => {
 
         // Call again with the tool response
         response = await ai.models.generateContent({
-          model: "gemini-3.5-flash",
+          model: "gemini-2.0-flash",
           contents: history,
           config
         });
