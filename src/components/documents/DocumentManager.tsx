@@ -21,6 +21,7 @@ const DocumentManager: React.FC = () => {
   const [folderPath, setFolderPath] = useState<{ id: string | null; name: string }[]>([{ id: null, name: 'Home' }]);
   const [folders, setFolders] = useState<DocumentFolder[]>([]);
   const [files, setFiles] = useState<DocumentFile[]>([]);
+  const [softwaresFolderId, setSoftwaresFolderId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -38,27 +39,51 @@ const DocumentManager: React.FC = () => {
     if (!user) return;
     setLoading(true);
     try {
+      // 1. Ensure Softwares folder exists at root level globally
+      let sId = softwaresFolderId;
+      if (!sId) {
+         // Query root folders to find 'Softwares'
+         const ownerQuery = isGlobalContext ? 'all' : user.uid;
+         const rootFolders = await getFolders(ownerQuery, null);
+         const sFolder = rootFolders.find(f => f.name.toLowerCase() === 'softwares');
+         if (sFolder) {
+            sId = sFolder.id;
+         } else if (isGlobalContext) {
+            sId = await createFolder({
+               name: 'Softwares',
+               parentId: null,
+               ownerId: 'global',
+               type: 'general'
+            });
+         }
+         if (sId) setSoftwaresFolderId(sId);
+      }
+
+      // 2. Load requested contents
+      let currentFolders: DocumentFolder[] = [];
+      let currentFiles: DocumentFile[] = [];
+
       if (searchTerm.length > 2) {
          const ownerQuery = isGlobalContext ? 'all' : user.uid;
          const res = await searchFoldersAndFiles(searchTerm, ownerQuery);
-         setFolders(res.folders);
-         setFiles(res.files);
+         currentFolders = res.folders;
+         currentFiles = res.files;
       } else {
          const ownerQuery = isGlobalContext ? 'all' : user.uid;
-         const f = await getFolders(ownerQuery, currentFolder);
-         // If a user is staff/admin they can see "all", but we might just show global + their own for now,
-         // wait 'all' passes down and queries correctly. 
-         const fls = await getFiles(currentFolder || 'root', ownerQuery);
-         setFolders(f);
-         setFiles(fls);
+         currentFolders = await getFolders(ownerQuery, currentFolder);
+         currentFiles = await getFiles(currentFolder || 'root', ownerQuery);
       }
+
+      setFolders(currentFolders);
+      setFiles(currentFiles);
+
     } catch (e) {
       console.error(e);
       toast.error('Failed to load documents');
     } finally {
       setLoading(false);
     }
-  }, [user, currentFolder, searchTerm, isGlobalContext]);
+  }, [user, currentFolder, searchTerm, isGlobalContext, softwaresFolderId]);
 
   useEffect(() => {
     const delay = setTimeout(() => {
@@ -72,6 +97,20 @@ const DocumentManager: React.FC = () => {
     setCurrentFolder(folder.id);
     setFolderPath([...folderPath, { id: folder.id, name: folder.name }]);
   };
+
+  const displayedFolders = useMemo(() => {
+    if (user?.role === 'user') {
+       return folders.filter(f => f.name.toLowerCase() !== 'softwares');
+    }
+    return folders;
+  }, [folders, user?.role]);
+
+  const displayedFiles = useMemo(() => {
+    if (user?.role === 'user' && softwaresFolderId) {
+       return files.filter(f => f.folderId !== softwaresFolderId);
+    }
+    return files;
+  }, [files, user?.role, softwaresFolderId]);
 
   const handleBreadcrumbClick = (id: string | null, index: number) => {
     setSearchTerm('');
@@ -221,11 +260,11 @@ const DocumentManager: React.FC = () => {
           <div className="space-y-8">
             
             {/* Folders */}
-            {folders.length > 0 && (
+            {displayedFolders.length > 0 && (
               <section>
                 <h3 className="text-sm font-semibold text-slate-900 mb-4 px-1">Folders</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {folders.map(folder => (
+                  {displayedFolders.map(folder => (
                     <motion.div
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
@@ -251,18 +290,18 @@ const DocumentManager: React.FC = () => {
             )}
 
             {/* Files */}
-            {(files.length > 0 || folders.length === 0) && (
+            {(displayedFiles.length > 0 || displayedFolders.length === 0) && (
               <section>
                 <div className="flex items-center justify-between mb-4 px-1">
                     <h3 className="text-sm font-semibold text-slate-900">Files</h3>
-                    {files.length > 0 && (
+                    {displayedFiles.length > 0 && (
                        <button onClick={downloadFolderAsZip} className="text-xs font-medium text-blue-600 hover:text-blue-800 flex items-center gap-1 bg-blue-50 px-2 py-1 rounded-md">
                           <FileArchiveIcon className="w-4 h-4"/> Download All ZIP
                        </button>
                     )}
                 </div>
                 
-                {files.length === 0 ? (
+                {displayedFiles.length === 0 ? (
                    <div className="flex flex-col items-center justify-center p-12 border-2 border-dashed border-slate-200 rounded-3xl bg-slate-50">
                         <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-sm mb-4">
                             <UploadCloudIcon className="w-10 h-10 text-slate-400" />
@@ -281,7 +320,7 @@ const DocumentManager: React.FC = () => {
                 ) : (
                     <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
                        <ul className="divide-y divide-slate-100">
-                           {files.map(file => (
+                           {displayedFiles.map(file => (
                                <li key={file.id} className="group flex items-center justify-between p-4 hover:bg-slate-50 transition-colors">
                                   <div className="flex items-center space-x-4 cursor-pointer flex-1 overflow-hidden" onClick={() => setPreviewFile(file)}>
                                      <div className="p-3 bg-slate-100 rounded-xl group-hover:bg-white group-hover:shadow-sm transition-all">
