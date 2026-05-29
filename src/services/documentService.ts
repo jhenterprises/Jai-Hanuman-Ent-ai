@@ -34,7 +34,7 @@ export const getFolders = async (ownerId?: string, parentId: string | null = nul
   return snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) } as DocumentFolder));
 };
 
-export const searchFoldersAndFiles = async (searchTerm: string, ownerId?: string) => {
+export const searchFoldersAndFiles = async (searchTerm: string, ownerId?: string, excludeFolderId?: string | null) => {
     // Basic prefix matching or use frontend filtering
     // In Firestore, true full text search requires an external service, 
     // so we will query more broadly and filter in memory since we are building a simple drive.
@@ -51,14 +51,35 @@ export const searchFoldersAndFiles = async (searchTerm: string, ownerId?: string
 
     const [folderSnap, fileSnap] = await Promise.all([getDocs(foldersQ), getDocs(filesQ)]);
     
+    // Build full array of folders
+    const allFolders = folderSnap.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) } as DocumentFolder));
+    
+    // Exclude descendants if provided
+    let excludedSet = new Set<string>();
+    if (excludeFolderId) {
+        excludedSet.add(excludeFolderId);
+        // Build exclusion tree recursively (since we have all folders in memory)
+        let addedNew = true;
+        while(addedNew) {
+            addedNew = false;
+            for (const f of allFolders) {
+                if (f.parentId && excludedSet.has(f.parentId) && !excludedSet.has(f.id)) {
+                    excludedSet.add(f.id);
+                    addedNew = true;
+                }
+            }
+        }
+    }
+    
     const term = searchTerm.toLowerCase();
     
-    const folders = folderSnap.docs
-        .map(doc => ({ id: doc.id, ...(doc.data() as any) } as DocumentFolder))
+    const folders = allFolders
+        .filter(f => !excludedSet.has(f.id))
         .filter(f => f.name.toLowerCase().includes(term));
         
     const files = fileSnap.docs
         .map(doc => ({ id: doc.id, ...(doc.data() as any) } as DocumentFile))
+        .filter(f => !excludedSet.has(f.folderId))
         .filter(f => f.fileName.toLowerCase().includes(term));
         
     return { folders, files };

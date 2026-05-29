@@ -45,7 +45,7 @@ const DocumentManager: React.FC = () => {
          // Query root folders to find 'Softwares'
          const ownerQuery = isGlobalContext ? 'all' : user.uid;
          const rootFolders = await getFolders(ownerQuery, null);
-         const sFolder = rootFolders.find(f => f.name.toLowerCase() === 'softwares');
+         const sFolder = rootFolders.find(f => f.name.toLowerCase() === 'softwares' || f.name.toLowerCase() === 'software');
          if (sFolder) {
             sId = sFolder.id;
          } else if (isGlobalContext) {
@@ -65,7 +65,8 @@ const DocumentManager: React.FC = () => {
 
       if (searchTerm.length > 2) {
          const ownerQuery = isGlobalContext ? 'all' : user.uid;
-         const res = await searchFoldersAndFiles(searchTerm, ownerQuery);
+         const excludeForUser = user.role === 'user' ? sId : null;
+         const res = await searchFoldersAndFiles(searchTerm, ownerQuery, excludeForUser);
          currentFolders = res.folders;
          currentFiles = res.files;
       } else {
@@ -100,7 +101,7 @@ const DocumentManager: React.FC = () => {
 
   const displayedFolders = useMemo(() => {
     if (user?.role === 'user') {
-       return folders.filter(f => f.name.toLowerCase() !== 'softwares');
+       return folders.filter(f => f.name.toLowerCase() !== 'softwares' && f.name.toLowerCase() !== 'software');
     }
     return folders;
   }, [folders, user?.role]);
