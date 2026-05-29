@@ -40,6 +40,17 @@ service firebase.storage {
                       request.resource.size < 10 * 1024 * 1024 &&
                       (request.resource.contentType.matches('image/.*') || request.resource.contentType == 'application/pdf');
     }
+
+    // Document Management System
+    match /documents/{ownerId}/{folderId}/{fileName} {
+      allow read: if isSignedIn() && (request.auth.uid == ownerId || ownerId == 'global' || isAdmin() ||
+                    firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'staff');
+      allow write: if isSignedIn() && (request.auth.uid == ownerId || isAdmin() ||
+                    firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'staff') &&
+                      request.resource.size < 20 * 1024 * 1024; // 20 MB max file
+      allow delete: if isSignedIn() && (request.auth.uid == ownerId || isAdmin() ||
+                    firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'staff');
+    }
   }
 }
 

@@ -56,7 +56,29 @@ expressApp.get("/api/proxy-image", async (req, res) => {
   }
 });
 
-// Modular Routers
+// Proxy file route to bypass CORS and force inline display
+expressApp.get("/api/proxy-file", async (req, res) => {
+  const fileUrl = req.query.url as string;
+  if (!fileUrl) return res.status(400).send("URL is required");
+
+  try {
+    const response = await fetch(fileUrl);
+    if (!response.ok) throw new Error(`Failed to fetch file: ${response.statusText}`);
+    
+    const contentType = response.headers.get("content-type");
+    if (contentType) res.setHeader("Content-Type", contentType);
+    res.setHeader("Cache-Control", "public, max-age=3600");
+    // Force inline display
+    res.setHeader("Content-Disposition", "inline");
+    
+    // Instead of array buffer for huge files, we can stream, but arrayBuffer is safe for small PDFs
+    const arrayBuffer = await response.arrayBuffer();
+    res.send(Buffer.from(arrayBuffer));
+  } catch (error: any) {
+    logger.error("Proxy file error:", error);
+    res.status(500).send("Failed to proxy file: " + error.message);
+  }
+});
 expressApp.use('/api', apiRouter);
 
 // Global Error Handler

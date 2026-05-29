@@ -33,6 +33,7 @@ const PortalConfig = lazy(() => import('./pages/PortalConfig'));
 const ServiceControlSettings = lazy(() => import('./pages/admin/ServiceControlSettings'));
 const IDCardSettings = lazy(() => import('./pages/IDCardSettings'));
 const RecycleBin = lazy(() => import('./pages/RecycleBin'));
+const Documents = lazy(() => import('./pages/Documents'));
 const SecurityControls = lazy(() => import('./pages/admin/SecurityControls'));
 const SystemPermissions = lazy(() => import('./pages/admin/SystemPermissions'));
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
@@ -138,6 +139,7 @@ export default function App() {
                   <Route path="support-center" element={<ProtectedRoute roles={['admin', 'staff']}><SupportCenter /></ProtectedRoute>} />
                   <Route path="recycle-bin" element={<ProtectedRoute roles={['admin']}><RecycleBin /></ProtectedRoute>} />
                   <Route path="wallet" element={<Wallet />} />
+                  <Route path="documents" element={<ProtectedRoute><Documents /></ProtectedRoute>} />
                   <Route path="profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                   
                   {/* Staff Specific Routes */}
