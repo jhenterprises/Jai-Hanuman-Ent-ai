@@ -1009,6 +1009,13 @@ const ApplyService = () => {
 
   return (
     <div className="max-w-5xl mx-auto space-y-8 pb-20 px-4 sm:px-6 lg:px-8 overflow-x-hidden">
+      {/* Back Button */}
+      <div className="flex items-center">
+         <button onClick={() => navigate(-1)} className="flex items-center text-slate-500 hover:text-slate-900 transition-colors gap-2 text-sm font-medium">
+             <ArrowLeft size={16} /> Back
+         </button>
+      </div>
+
       {/* Header */}
       <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-200 flex flex-col md:flex-row items-center gap-6">
         <div className="w-20 h-20 bg-white p-1 rounded-2xl flex items-center justify-center border border-slate-200 shadow-sm overflow-hidden">
