@@ -18,6 +18,9 @@ const Login = () => {
   
   const isLoggedOut = new URLSearchParams(location.search).get('loggedOut') === 'true';
 
+  const [loginMethod, setLoginMethod] = useState<'password' | 'pin'>('password');
+  const [pin, setPin] = useState('');
+
   const handleGoogleLogin = async () => {
     if (loading) return;
     const toastId = toast.loading('Connecting to Google...');
@@ -46,10 +49,17 @@ const Login = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loading) return;
+    
+    if (loginMethod === 'pin' && pin.length !== 6) {
+      toast.error('PIN must be exactly 6 digits');
+      return;
+    }
+
     setLoading(true);
     const toastId = toast.loading('Signing you in...');
     try {
-      await loginWithEmail(email, password);
+      const authPassword = loginMethod === 'pin' ? pin : password;
+      await loginWithEmail(email, authPassword);
       toast.success('Welcome back!', { id: toastId });
       const from = location.state?.from?.pathname || '/app';
       navigate(from, { replace: true });
@@ -105,6 +115,31 @@ const Login = () => {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="flex bg-slate-100 dark:bg-slate-800/50 p-1 rounded-2xl">
+            <button
+              type="button"
+              onClick={() => setLoginMethod('password')}
+              className={`flex-1 py-2 text-sm font-bold rounded-xl transition-all ${
+                loginMethod === 'password' 
+                  ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-white' 
+                  : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+              }`}
+            >
+              Password
+            </button>
+            <button
+              type="button"
+              onClick={() => setLoginMethod('pin')}
+              className={`flex-1 py-2 text-sm font-bold rounded-xl transition-all ${
+                loginMethod === 'pin' 
+                  ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-white' 
+                  : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+              }`}
+            >
+              6-Digit PIN
+            </button>
+          </div>
+
           <div className="space-y-2">
             <label className="text-xs font-bold uppercase tracking-widest text-slate-500 ml-1">Email Address</label>
             <div className="relative">
@@ -120,32 +155,61 @@ const Login = () => {
             </div>
           </div>
 
-          <div className="space-y-2">
-            <div className="flex items-center justify-between ml-1">
-              <label className="text-xs font-bold uppercase tracking-widest text-slate-500">Password</label>
-              <Link to="/forgot-password" className="text-xs font-bold text-blue-500 hover:text-blue-400 transition-colors">
-                Forgot Password?
-              </Link>
+          {loginMethod === 'password' ? (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between ml-1">
+                <label className="text-xs font-bold uppercase tracking-widest text-slate-500">Password</label>
+                <Link to="/forgot-password" className="text-xs font-bold text-blue-500 hover:text-blue-400 transition-colors">
+                  Forgot Password?
+                </Link>
+              </div>
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                <input 
+                  type={showPassword ? "text" : "password"}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-white/10 rounded-2xl py-4 pl-12 pr-12 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors"
+                  placeholder="••••••••"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </div>
-            <div className="relative">
-              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-              <input 
-                type={showPassword ? "text" : "password"}
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-white/10 rounded-2xl py-4 pl-12 pr-12 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors"
-                placeholder="••••••••"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
-              >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
+          ) : (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between ml-1">
+                <label className="text-xs font-bold uppercase tracking-widest text-slate-500">6-Digit PIN</label>
+              </div>
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                <input 
+                  type={showPassword ? "text" : "password"}
+                  required
+                  maxLength={6}
+                  inputMode="numeric"
+                  pattern="\d{6}"
+                  value={pin}
+                  onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  className="w-full bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-white/10 rounded-2xl py-4 pl-12 pr-12 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 font-mono tracking-[0.5em] text-center transition-colors"
+                  placeholder="••••••"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
           <button 
             type="submit"

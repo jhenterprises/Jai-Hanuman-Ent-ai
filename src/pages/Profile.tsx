@@ -135,6 +135,44 @@ const ProfileSettings = () => {
     }
   };
 
+  const [pinPassword, setPinPassword] = useState('');
+  const [newPin, setNewPin] = useState('');
+  const [pinLoading, setPinLoading] = useState(false);
+
+  const handlePinChange = async () => {
+    if (!pinPassword) {
+      toast.error('Current password is required to set a PIN');
+      return;
+    }
+    if (newPin.length !== 6 || isNaN(Number(newPin))) {
+      toast.error('PIN must be exactly 6 digits');
+      return;
+    }
+
+    setPinLoading(true);
+    const toastId = toast.loading('Setting up 6-Digit PIN...');
+    const currentUser = auth.currentUser;
+    if (!currentUser || !currentUser.email) return;
+    
+    const credential = EmailAuthProvider.credential(currentUser.email, pinPassword);
+    try {
+      await reauthenticateWithCredential(currentUser, credential);
+      await updatePassword(currentUser, newPin); // Set password to the 6-digit PIN
+      toast.success('PIN set successfully! You can now log in using this PIN.', { id: toastId });
+      setPinPassword('');
+      setNewPin('');
+    } catch (err: any) {
+      console.error(err);
+      let msg = 'Failed to set PIN. Check your current password.';
+      if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+        msg = 'Incorrect current password.';
+      }
+      toast.error(msg, { id: toastId });
+    } finally {
+      setPinLoading(false);
+    }
+  };
+
   if (!profile) return (
     <div className="min-h-[60vh] flex flex-col items-center justify-center text-slate-400 space-y-4">
       <Loader2 className="animate-spin text-blue-500" size={48} />
@@ -266,7 +304,7 @@ const ProfileSettings = () => {
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">New Password</label>
                 <input 
-                  type="password" 
+                  type="password"
                   value={newPassword} 
                   onChange={e => setNewPassword(e.target.value)} 
                   className="w-full p-4 bg-white/5 border border-white/5 rounded-2xl text-white outline-none focus:ring-2 ring-amber-500 transition-all font-bold" 
@@ -282,6 +320,53 @@ const ProfileSettings = () => {
                 className="w-full py-5 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl font-black uppercase tracking-widest text-xs transition-all border border-white/10"
               >
                 {passwordLoading ? <Loader2 className="animate-spin mx-auto" /> : 'Update Password'}
+              </motion.button>
+            </div>
+          </GlassCard>
+
+          <GlassCard className="p-8 space-y-8">
+            <h3 className="text-xl font-bold text-white flex items-center gap-3">
+              <div className="w-10 h-10 bg-emerald-500/20 rounded-xl flex items-center justify-center text-emerald-500 border border-emerald-500/20">
+                <Lock size={20} />
+              </div>
+              Setup 6-Digit Login PIN
+            </h3>
+            
+            <div className="space-y-6">
+              <p className="text-xs text-slate-400">Set a 6-digit PIN to use as an alternative way to log in. Note: This will replace your current password with the PIN.</p>
+              
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Current Password</label>
+                <input 
+                  type="password" 
+                  value={pinPassword} 
+                  onChange={e => setPinPassword(e.target.value)} 
+                  className="w-full p-4 bg-white/5 border border-white/5 rounded-2xl text-white outline-none focus:ring-2 ring-emerald-500 transition-all font-bold" 
+                  placeholder="••••••••" 
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">6-Digit PIN</label>
+                <input 
+                  type="password"
+                  value={newPin} 
+                  maxLength={6}
+                  inputMode="numeric"
+                  onChange={e => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  className="w-full p-4 bg-white/5 border border-white/5 rounded-2xl text-white outline-none focus:ring-2 ring-emerald-500 transition-all font-bold font-mono tracking-[0.5em] text-center" 
+                  placeholder="••••••" 
+                />
+              </div>
+
+              <motion.button 
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.99 }}
+                onClick={handlePinChange} 
+                disabled={pinLoading}
+                className="w-full py-5 bg-slate-800 hover:bg-slate-700 text-emerald-400 rounded-2xl font-black uppercase tracking-widest text-xs transition-all border border-emerald-500/20 hover:border-emerald-500/40"
+              >
+                {pinLoading ? <Loader2 className="animate-spin mx-auto" /> : 'Set 6-Digit PIN'}
               </motion.button>
             </div>
           </GlassCard>

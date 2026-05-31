@@ -203,7 +203,7 @@ const DashboardLayout = () => {
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-800 via-slate-900 to-black">
         {/* Topbar */}
-        <header className="h-16 flex items-center justify-between px-6 bg-slate-800/40 backdrop-blur-md border-b border-slate-700/50 z-10">
+        <header className="relative h-16 flex items-center justify-between px-6 bg-slate-800/40 backdrop-blur-md border-b border-slate-700/50 z-20">
           <div className="flex items-center">
             <button
               onClick={() => setSidebarOpen(true)}
@@ -215,9 +215,13 @@ const DashboardLayout = () => {
 
           {/* User Name in Center */}
           <div className="hidden md:flex items-center gap-3 px-4 py-1.5 rounded-full bg-slate-800/50 border border-slate-700/50">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-gold-500 flex items-center justify-center font-bold text-xs text-white shadow-lg shadow-blue-500/20">
-              {user?.name.charAt(0).toUpperCase()}
-            </div>
+            {user?.photoURL ? (
+              <img src={user.photoURL} alt={user.name} className="w-8 h-8 rounded-full object-cover border border-slate-600" />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-gold-500 flex items-center justify-center font-bold text-xs text-white shadow-lg shadow-blue-500/20">
+                {user?.name?.charAt(0).toUpperCase()}
+              </div>
+            )}
             <div className="flex flex-col">
               <span className="text-sm font-bold text-white leading-none">{user?.name}</span>
               <span className="text-[10px] text-slate-400 uppercase tracking-wider font-medium">{user?.role}</span>
@@ -285,7 +289,11 @@ const DashboardLayout = () => {
             >
               {isDark ? <Sun size={20} /> : <Moon size={20} />}
             </button>
-            <button className="text-slate-400 hover:text-white transition-colors p-2 rounded-full hover:bg-slate-700/50">
+            <button 
+              onClick={() => navigate('/app/profile')}
+              className="text-slate-400 hover:text-white transition-colors p-2 rounded-full hover:bg-slate-700/50"
+              title="Settings"
+            >
               <Settings size={20} />
             </button>
             <button 

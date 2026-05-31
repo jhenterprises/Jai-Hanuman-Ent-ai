@@ -43,6 +43,9 @@ export default defineConfig(({ mode }) => {
       emptyOutDir: true,
       sourcemap: false
     },
+    optimizeDeps: {
+      include: ['recharts']
+    },
     define: {
       'import.meta.env.VITE_FIREBASE_API_KEY': JSON.stringify(getEnv('VITE_FIREBASE_API_KEY') || getEnv('FIREBASE_API_KEY')),
       'import.meta.env.VITE_FIREBASE_AUTH_DOMAIN': JSON.stringify(getEnv('VITE_FIREBASE_AUTH_DOMAIN') || getEnv('FIREBASE_AUTH_DOMAIN')),
