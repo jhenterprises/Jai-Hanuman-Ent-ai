@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
+console.log('Home page loaded');
 import { 
   ArrowRight, ShieldCheck, Zap, Globe as GlobeIcon, FileText, 
   Fingerprint, CreditCard, UserCheck, Rocket, Cpu, 

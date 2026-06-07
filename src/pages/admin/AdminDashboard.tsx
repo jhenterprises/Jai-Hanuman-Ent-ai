@@ -73,7 +73,7 @@ const AdminDashboard = () => {
         if (approvedStatuses.includes(status)) approved++;
         if (status === 'Rejected') rejected++;
         
-        const createdAt = data.created_at?.toDate?.() || (data.created_at ? new Date(data.created_at) : null);
+        const createdAt = (data.created_at && typeof data.created_at.toDate === 'function') ? data.created_at.toDate() : (data.created_at ? new Date(data.created_at) : null);
         if (createdAt && createdAt >= sevenDaysAgo) {
           const date = createdAt.toISOString().split('T')[0];
           dailyAppsMap.set(date, (dailyAppsMap.get(date) || 0) + 1);
@@ -100,8 +100,8 @@ const AdminDashboard = () => {
 
       const recentApplications = activeApps
         .sort((a: any, b: any) => {
-          const timeA = a.data().created_at?.toDate?.()?.getTime() || new Date(a.data().created_at || 0).getTime();
-          const timeB = b.data().created_at?.toDate?.()?.getTime() || new Date(b.data().created_at || 0).getTime();
+          const timeA = a.data().created_at && typeof a.data().created_at.toDate === 'function' ? a.data().created_at.toDate().getTime() : (a.data().created_at ? new Date(a.data().created_at).getTime() : 0);
+          const timeB = b.data().created_at && typeof b.data().created_at.toDate === 'function' ? b.data().created_at.toDate().getTime() : (b.data().created_at ? new Date(b.data().created_at).getTime() : 0);
           return timeB - timeA;
         })
         .slice(0, 5)

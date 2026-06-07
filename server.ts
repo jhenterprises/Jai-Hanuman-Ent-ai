@@ -15,6 +15,8 @@ const expressApp = express();
 // Security and utility Middlewares
 expressApp.use(helmet({
   contentSecurityPolicy: false, // disabled for vite dev
+  crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: false,
 }));
 expressApp.use(cors({ origin: true, credentials: true }));
 expressApp.use(express.json());

@@ -61,8 +61,8 @@ const Wallet = () => {
         
         // Sort manually by date desc (Firestore needs index for orderBy)
         transList.sort((a, b) => {
-          const dateA = a.created_at?.toDate ? a.created_at.toDate() : new Date(a.created_at);
-          const dateB = b.created_at?.toDate ? b.created_at.toDate() : new Date(b.created_at);
+          const dateA = a.created_at && typeof a.created_at.toDate === 'function' ? a.created_at.toDate() : new Date(a.created_at || 0);
+          const dateB = b.created_at && typeof b.created_at.toDate === 'function' ? b.created_at.toDate() : new Date(b.created_at || 0);
           return dateB - dateA;
         });
 

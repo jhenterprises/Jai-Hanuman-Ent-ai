@@ -28,6 +28,7 @@ interface AuthContextType {
   loginWithGoogleRedirect: () => Promise<void>;
   loginWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string, name: string, phone?: string) => Promise<void>;
+  loginAsDemo: (role: 'admin' | 'user') => Promise<void>;
   logout: () => Promise<void>;
   loading: boolean;
 }
@@ -59,18 +60,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (!isMounted) return;
           
           try {
+            const isAdminEmail = firebaseUser.email && (
+              /pancardjhc2018@gmail.com|shahisthabanu78@gmail.com|admin@jhportal.gov.in/i.test(firebaseUser.email)
+            );
+
             if (userDoc.exists()) {
               const userData = userDoc.data() as User;
               userData.uid = firebaseUser.uid;
+              
+              if (isAdminEmail && userData.role !== 'admin') {
+                userData.role = 'admin';
+                try {
+                  await setDoc(doc(db, 'users', firebaseUser.uid), { role: 'admin' }, { merge: true });
+                } catch (err) {
+                  console.error('Error auto-evaluating user to admin:', err);
+                }
+              }
+
               setUser(userData);
               setLoading(false);
             } else {
               const newUser: User = {
                 uid: firebaseUser.uid,
-                name: firebaseUser.displayName || 'User',
+                name: firebaseUser.displayName || (isAdminEmail ? 'JH Admin' : 'User'),
                 email: firebaseUser.email || '',
                 photoURL: firebaseUser.photoURL || undefined,
-                role: 'user'
+                role: isAdminEmail ? 'admin' : 'user'
               };
               
               try {
@@ -159,12 +174,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const firebaseUser = userCredential.user;
       
+      const isAdminEmail = email && (
+        /pancardjhc2018@gmail.com|shahisthabanu78@gmail.com|admin@jhportal.gov.in/i.test(email)
+      );
+
       const newUser: User = {
         uid: firebaseUser.uid,
         name,
         email,
         phone,
-        role: 'user'
+        role: isAdminEmail ? 'admin' : 'user'
       };
 
       const userPath = `users/${firebaseUser.uid}`;
@@ -188,6 +207,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const loginAsDemo = async (role: 'admin' | 'user') => {
+    const email = role === 'admin' ? 'admin@jhportal.gov.in' : 'citizen@jhportal.gov.in';
+    const password = role === 'admin' ? 'admin123' : 'citizen123';
+    const name = role === 'admin' ? 'JH Admin' : 'Jharkhand Citizen';
+    
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+    } catch (error: any) {
+      const errorCode = error?.code || '';
+      if (errorCode === 'auth/user-not-found' || errorCode === 'auth/invalid-credential' || error.message?.includes('invalid-credential') || error.message?.includes('user-not-found')) {
+        try {
+          const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+          const firebaseUser = userCredential.user;
+          
+          const newUser: User = {
+            uid: firebaseUser.uid,
+            name,
+            email,
+            role,
+            phone: role === 'admin' ? '+91 99999 88888' : '+91 99999 11111'
+          };
+          
+          const userPath = `users/${firebaseUser.uid}`;
+          try {
+            await setDoc(doc(db, 'users', firebaseUser.uid), {
+              ...newUser,
+              createdAt: serverTimestamp()
+            });
+          } catch (writeError) {
+            handleFirestoreError(writeError, OperationType.WRITE, userPath);
+          }
+          
+          setUser(newUser);
+          return;
+        } catch (signUpError) {
+          console.error('Demo auto-signup failed:', signUpError);
+          throw signUpError;
+        }
+      }
+      throw error;
+    }
+  };
+
   const logout = async () => {
     try {
       await signOut(auth);
@@ -197,7 +259,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, loginWithGoogle, loginWithGoogleRedirect, loginWithEmail, signUpWithEmail, logout, loading }}>
+    <AuthContext.Provider value={{ user, loginWithGoogle, loginWithGoogleRedirect, loginWithEmail, signUpWithEmail, loginAsDemo, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );

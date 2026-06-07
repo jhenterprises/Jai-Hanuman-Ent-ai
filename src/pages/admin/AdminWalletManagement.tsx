@@ -100,7 +100,7 @@ const AdminWalletManagement = () => {
           totalRevenue,
           totalWalletBalance,
           dailyTransactions: transactions.filter(t => {
-            const date = t.created_at?.toDate ? t.created_at.toDate() : new Date(t.created_at);
+            const date = t.created_at && typeof t.created_at.toDate === 'function' ? t.created_at.toDate() : new Date(t.created_at || 0);
             return date.toDateString() === new Date().toDateString();
           }).length,
           topPayingUsers: [] // Would need more complex grouping

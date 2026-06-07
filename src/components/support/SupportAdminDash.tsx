@@ -207,7 +207,7 @@ export const SupportAdminDash: React.FC = () => {
             >
               <div className="flex flex-col items-center py-4 mb-4">
                 <div className="px-3 py-1 bg-white border border-gray-100 rounded-full shadow-sm text-[10px] text-gray-500 font-medium uppercase tracking-widest flex items-center gap-2">
-                  <Calendar className="w-3 h-3" /> {format(selectedChat.createdAt.toDate(), 'MMMM dd, yyyy')}
+                  <Calendar className="w-3 h-3" /> {selectedChat.createdAt ? format(selectedChat.createdAt.toDate(), 'MMMM dd, yyyy') : ''}
                 </div>
               </div>
 
@@ -240,7 +240,7 @@ export const SupportAdminDash: React.FC = () => {
                       {msg.message}
                     </div>
                     <div className="flex items-center gap-1.5 mt-1.5 px-1 text-[10px] text-gray-400 font-medium">
-                      {format(msg.createdAt.toDate(), 'HH:mm')}
+                      {msg.createdAt ? format(msg.createdAt.toDate(), 'HH:mm') : ''}
                       {isMe && (
                         msg.seen ? <CheckCheck className="w-3 h-3 text-blue-500" /> : <Check className="w-3 h-3" />
                       )}
@@ -312,6 +312,7 @@ export const SupportAdminDash: React.FC = () => {
                   onChange={(e) => setInputMessage(e.target.value)}
                   placeholder="Type a response or use '/' for shortcuts..."
                   className="w-full bg-transparent px-4 py-3 text-sm focus:outline-none"
+                  style={{ backgroundColor: '#ffffff', color: '#5e656b' }}
                 />
                 <div className="flex items-center justify-between border-t border-gray-100 pt-2 px-2">
                   <div className="flex items-center gap-1">
@@ -412,7 +413,7 @@ export const SupportAdminDash: React.FC = () => {
                   <div className="w-8 h-8 bg-white border border-gray-100 text-gray-400 rounded-lg flex items-center justify-center group-hover:text-green-500 group-hover:border-green-100 transition-all"><Clock className="w-4 h-4" /></div>
                   <div className="flex-1 min-w-0">
                     <div className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">First Contact</div>
-                    <div className="text-xs font-semibold text-gray-700 truncate">{format(selectedChat.createdAt.toDate(), 'dd MMM yyyy')}</div>
+                    <div className="text-xs font-semibold text-gray-700 truncate">{selectedChat.createdAt ? format(selectedChat.createdAt.toDate(), 'dd MMM yyyy') : ''}</div>
                   </div>
                 </div>
               </div>

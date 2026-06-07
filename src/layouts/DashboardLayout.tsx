@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { auth, db } from '../lib/firebase';
 import { collection, query, where, orderBy, limit, getDocs, updateDoc, setDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { useConfig } from '../context/ConfigContext';
+import { useWallet } from '../context/WalletContext';
 import LiveSupport from '../components/LiveSupport';
 import { safeFormat } from '../utils/dateUtils';
 import { 
@@ -34,6 +35,7 @@ import {
 
 const DashboardLayout = () => {
   const { user, logout } = useAuth();
+  const { balance: walletBalance } = useWallet();
   const { config } = useConfig();
   const navigate = useNavigate();
   const location = useLocation();
@@ -47,8 +49,6 @@ const DashboardLayout = () => {
     if (user?.uid) {
       const updatePresence = async () => {
         try {
-          // Use setDoc with merge: true instead of updateDoc to handle cases where 
-          // the user document doesn't exist yet (e.g., first login)
           await setDoc(doc(db, 'users', user.uid), {
             last_active: serverTimestamp()
           }, { merge: true });
@@ -126,11 +126,10 @@ const DashboardLayout = () => {
 
   const navItems = [
     { path: user?.role === 'user' ? '/app/user/dashboard' : (user?.role === 'admin' ? '/app/admin-dashboard' : '/app/dashboard'), label: 'Dashboard', icon: <LayoutDashboard size={20} />, roles: ['admin', 'staff', 'user'] },
+    { path: user?.role === 'admin' ? '/app/services' : (user?.role === 'staff' ? '/app/staff/apply-service' : '/app/services'), label: 'Apply for Services', icon: <Briefcase size={20} />, roles: ['admin', 'staff', 'user'] },
     { path: '/app/financial/hub', label: 'Financial Services', icon: <CreditCard size={20} />, roles: ['admin', 'staff', 'user'] },
-    { path: '/app/wallet', label: 'My Wallet', icon: <WalletIcon size={20} />, roles: ['admin', 'staff', 'user'] },
     { path: user?.role === 'user' ? '/app/user/applications' : (user?.role === 'staff' ? '/app/staff/applications' : '/app/applications'), label: user?.role === 'user' ? 'My Applications' : 'User Applications', icon: <FileText size={20} />, roles: ['admin', 'staff', 'user'] },
     { path: '/app/documents', label: 'Documents', icon: <FileText size={20} />, roles: ['admin', 'staff', 'user'] },
-    { path: user?.role === 'admin' ? '/app/services' : (user?.role === 'staff' ? '/app/staff/apply-service' : '/app/services'), label: 'Apply for Services', icon: <Briefcase size={20} />, roles: ['admin', 'staff', 'user'] },
     { path: '/app/ledger', label: 'Ledger', icon: <FileText size={20} />, roles: ['admin', 'staff'] },
     { path: '/app/staff-management', label: 'Staff Management', icon: <Users size={20} />, roles: ['admin'] },
     { path: '/app/support', label: 'Ticket Support', icon: <MessageSquare size={20} />, roles: ['admin', 'staff', 'user'] },
@@ -229,6 +228,19 @@ const DashboardLayout = () => {
           </div>
           
           <div className="flex items-center gap-4">
+            {/* Wallet Balance */}
+            <Link 
+              to="/app/wallet"
+              className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 transition-all text-blue-400 group"
+              title="My Wallet"
+            >
+              <WalletIcon size={16} className="group-hover:scale-110 transition-transform" />
+              <div className="flex flex-col">
+                <span className="text-[9px] uppercase tracking-wider font-black leading-none opacity-80">Wallet</span>
+                <span className="text-sm font-bold leading-none">₹{walletBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+              </div>
+            </Link>
+
             {/* Notifications */}
             <div className="relative">
               <button 

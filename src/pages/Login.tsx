@@ -12,7 +12,7 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const { loginWithGoogle, loginWithGoogleRedirect, loginWithEmail } = useAuth();
+  const { loginWithGoogle, loginWithGoogleRedirect, loginWithEmail, loginAsDemo } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   
@@ -246,6 +246,61 @@ const Login = () => {
               className="text-xs text-slate-500 hover:text-blue-500 underline"
             >
               Having popup issues? Login with Google (Redirect)
+            </button>
+          </div>
+
+          <div className="relative py-4">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-slate-200 dark:border-white/10"></div>
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-white dark:bg-slate-900 px-2 text-slate-500 dark:text-slate-500 font-bold tracking-widest">Quick Sandbox Access</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <button
+              type="button"
+              disabled={loading}
+              onClick={async () => {
+                const toastId = toast.loading('Logging in as Demo Admin...');
+                try {
+                  setLoading(true);
+                  await loginAsDemo('admin');
+                  toast.success('Welcome Back, Admin!', { id: toastId });
+                  navigate('/app', { replace: true });
+                } catch (err: any) {
+                  toast.error(err.message || 'Demo login failed', { id: toastId });
+                } finally {
+                  setLoading(false);
+                }
+              }}
+              className="py-3 px-4 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 font-bold rounded-2xl transition-all border border-red-500/20 text-xs flex flex-col items-center gap-1"
+            >
+              <span className="font-extrabold uppercase tracking-wide">Demo Admin</span>
+              <span className="text-[10px] text-slate-500 font-medium">Full Access</span>
+            </button>
+            
+            <button
+              type="button"
+              disabled={loading}
+              onClick={async () => {
+                const toastId = toast.loading('Logging in as Demo Citizen...');
+                try {
+                  setLoading(true);
+                  await loginAsDemo('user');
+                  toast.success('Welcome Back, Citizen!', { id: toastId });
+                  navigate('/app', { replace: true });
+                } catch (err: any) {
+                  toast.error(err.message || 'Demo login failed', { id: toastId });
+                } finally {
+                  setLoading(false);
+                }
+              }}
+              className="py-3 px-4 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold rounded-2xl transition-all border border-emerald-500/20 text-xs flex flex-col items-center gap-1"
+            >
+              <span className="font-extrabold uppercase tracking-wide">Demo Citizen</span>
+              <span className="text-[10px] text-slate-500 font-medium font-bold">Standard Access</span>
             </button>
           </div>
         </form>

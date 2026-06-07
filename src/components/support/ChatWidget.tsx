@@ -138,7 +138,7 @@ export const ChatWidget: React.FC = () => {
                         {msg.message}
                       </div>
                       <div className="flex items-center gap-1 mt-1 text-[10px] text-gray-400">
-                        {format(msg.createdAt.toDate(), 'HH:mm')}
+                        {msg.createdAt ? format(msg.createdAt.toDate(), 'HH:mm') : ''}
                         {isMe && (
                           msg.seen ? <CheckCheck className="w-3 h-3 text-blue-500" /> : <Check className="w-3 h-3" />
                         )}

@@ -348,7 +348,7 @@ const Ledger = () => {
     filtered.forEach(item => {
       worksheet.addRow({
         sn: item.serial_number,
-        date: item.created_at?.toDate()?.toLocaleString() || '',
+        date: item.created_at && typeof item.created_at.toDate === 'function' ? item.created_at.toDate().toLocaleString() : (item.created_at ? new Date(item.created_at).toLocaleString() : ''),
         customer: item.customer_name,
         service: item.service_name,
         principal: item.principle_amount,
@@ -449,7 +449,7 @@ const Ledger = () => {
     const tableColumn = ["SN", "Date", "Customer", "Service", "Principal", "Profit", "Total", "Balance"];
     const tableRows = filtered.map(item => [
       item.serial_number,
-      item.created_at?.toDate()?.toLocaleDateString() || '',
+      item.created_at && typeof item.created_at.toDate === 'function' ? item.created_at.toDate().toLocaleDateString() : (item.created_at ? new Date(item.created_at).toLocaleDateString() : ''),
       item.customer_name,
       item.service_name,
       item.principle_amount,
@@ -583,7 +583,7 @@ const Ledger = () => {
     currentY += 5;
     docInvoice.setFont("helvetica", "normal");
     docInvoice.setFontSize(8);
-    const dateStr = item.created_at?.toDate()?.toLocaleString() || new Date().toLocaleString();
+    const dateStr = item.created_at && typeof item.created_at.toDate === 'function' ? item.created_at.toDate().toLocaleString() : (item.created_at ? new Date(item.created_at).toLocaleString() : new Date().toLocaleString());
     docInvoice.text(`Date & Time: ${dateStr}`, centerX, currentY, { align: 'center' });
     
     currentY += 7;
@@ -888,8 +888,8 @@ const Ledger = () => {
                 <tr key={item.id} className={`${index % 2 === 0 ? 'bg-transparent' : 'bg-slate-700/10'} hover:bg-slate-700/20 transition-colors group`}>
                   <td className="p-4 text-sm font-mono text-slate-500 ">{item.serial_number}</td>
                   <td className="p-4 text-xs text-slate-400">
-                    {item.created_at?.toDate()?.toLocaleDateString()}<br/>
-                    <span className="text-slate-600">{item.created_at?.toDate()?.toLocaleTimeString()}</span>
+                    {item.created_at && typeof item.created_at.toDate === 'function' ? item.created_at.toDate().toLocaleDateString() : (item.created_at ? new Date(item.created_at).toLocaleDateString() : 'N/A')}<br/>
+                    <span className="text-slate-600">{item.created_at && typeof item.created_at.toDate === 'function' ? item.created_at.toDate().toLocaleTimeString() : (item.created_at ? new Date(item.created_at).toLocaleTimeString() : '')}</span>
                   </td>
                   <td className="p-4">
                     <span className="text-sm font-medium text-slate-200">{item.customer_name}</span>

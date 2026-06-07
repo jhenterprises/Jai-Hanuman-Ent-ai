@@ -210,7 +210,7 @@ const LiveSupport = () => {
                 }`}>
                   <p className="leading-relaxed">{msg.text}</p>
                   <p className={`text-[10px] mt-1 opacity-70 text-right ${msg.senderId === user.uid ? 'text-green-100' : 'text-slate-400'}`}>
-                    {msg.timestamp?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {msg.timestamp?.toDate ? msg.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                   </p>
                 </div>
               </div>

@@ -71,7 +71,7 @@ export const ChatList: React.FC<ChatListProps> = ({ chats, selectedChatId, onSel
                     {chat.customerName}
                   </h4>
                   <span className="text-[10px] text-gray-400 uppercase font-medium">
-                    {format(chat.updatedAt.toDate(), 'HH:mm')}
+                    {chat.updatedAt ? format(chat.updatedAt.toDate(), 'HH:mm') : ''}
                   </span>
                 </div>
                 <p className={cn(
