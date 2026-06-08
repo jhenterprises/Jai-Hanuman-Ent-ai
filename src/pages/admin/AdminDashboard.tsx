@@ -1,6 +1,7 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
+import toast from 'react-hot-toast';
 import { 
   Users, UserCheck, FileText, Clock, CheckCircle, XCircle, 
   IndianRupee, Activity, Plus, FileSpreadsheet, Server, Database,
@@ -28,7 +29,33 @@ const AdminDashboard = () => {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [openActionMenuId, setOpenActionMenuId] = useState<string | null>(null);
+  const [activeMonth, setActiveMonth] = useState<string>(() => {
+    const today = new Date();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    return `${today.getFullYear()}-${mm}`;
+  });
+  const [showMonthModal, setShowMonthModal] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
+
+  const availableMonths = useMemo(() => {
+    const monthsSet = new Set<string>();
+    
+    // 1. Add from record keys
+    if (stats?.monthlyStats) {
+      Object.keys(stats.monthlyStats).forEach(m => monthsSet.add(m));
+    }
+    
+    // 2. Add last 12 calendar months to guarantee presence
+    const today = new Date();
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      monthsSet.add(`${yyyy}-${mm}`);
+    }
+    
+    return Array.from(monthsSet).sort((a, b) => b.localeCompare(a));
+  }, [stats?.monthlyStats]);
 
   useEffect(() => {
     // 1. Live Clock Interval
@@ -138,22 +165,51 @@ const AdminDashboard = () => {
       const activeLedger = snap.docs.filter((doc: any) => !doc.data().deleted_at);
       let totalRev = 0;
       let serviceRev = 0;
+      
+      const monthlyDataMap: Record<string, { serviceRevenue: number; totalRevenue: number; count: number }> = {};
 
       activeLedger.forEach((doc: any) => {
         const data = doc.data();
-        const principle = data.principle_amount || data.amount || 0;
-        const profit = data.profit_amount || data.profit || data.fee || 0;
+        const principle = parseFloat(data.principle_amount || data.amount || 0) || 0;
+        const profit = parseFloat(data.profit_amount || data.profit || data.fee || 0) || 0;
         const sType = data.serviceType || data.service_type || data.type || '';
         const isDebit = sType === 'Cash Withdrawal' || sType === 'Withdrawal' || data.type === 'withdrawal';
         
+        let itemTotal = 0;
+        let itemService = 0;
         if (!isDebit) {
-          totalRev += (principle + profit);
-          serviceRev += profit;
+          itemTotal = principle + profit;
+          itemService = profit;
         } else {
-          // For withdrawals, the "profit" is the fee collected (inflow)
-          totalRev += profit;
-          serviceRev += profit;
+          itemTotal = profit;
+          itemService = profit;
         }
+
+        totalRev += itemTotal;
+        serviceRev += itemService;
+
+        // Group by month
+        let monthStr = '';
+        if (data.date_string && typeof data.date_string === 'string' && data.date_string.includes('-')) {
+          monthStr = data.date_string.substring(0, 7); // YYYY-MM
+        } else {
+          const createdAt = (data.created_at && typeof data.created_at.toDate === 'function') ? data.created_at.toDate() : (data.created_at ? new Date(data.created_at) : null);
+          if (createdAt) {
+            const mm = String(createdAt.getMonth() + 1).padStart(2, '0');
+            monthStr = `${createdAt.getFullYear()}-${mm}`;
+          } else {
+            const today = new Date();
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            monthStr = `${today.getFullYear()}-${mm}`;
+          }
+        }
+
+        if (!monthlyDataMap[monthStr]) {
+          monthlyDataMap[monthStr] = { serviceRevenue: 0, totalRevenue: 0, count: 0 };
+        }
+        monthlyDataMap[monthStr].serviceRevenue += itemService;
+        monthlyDataMap[monthStr].totalRevenue += itemTotal;
+        monthlyDataMap[monthStr].count += 1;
       });
 
       setStats((prev: any) => ({
@@ -162,7 +218,8 @@ const AdminDashboard = () => {
           ...(prev?.overview || {}),
           totalRevenue: totalRev,
           serviceRevenue: serviceRev
-        }
+        },
+        monthlyStats: monthlyDataMap
       }));
     }, (err) => setError('Ledger: ' + err.message));
 
@@ -235,15 +292,44 @@ const AdminDashboard = () => {
     systemNotifications = []
   } = stats || {};
 
+  const formatMonthKey = (key: string) => {
+    if (!key || !key.includes('-')) return key;
+    const [year, month] = key.split('-');
+    const monthNames = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    const mIndex = parseInt(month, 10) - 1;
+    return `${monthNames[mIndex] || month} ${year}`;
+  };
+
+  const currentMonthStats = stats?.monthlyStats?.[activeMonth] || { serviceRevenue: 0, totalRevenue: 0, count: 0 };
+
   const statCards = [
-    { title: 'Total Users', value: overview.totalUsers || 0, icon: <Users size={24} />, color: 'bg-blue-500', trend: '+12% this week' },
+    { title: 'Total Users', value: overview.totalUsers || 0, icon: <Users size={24} />, color: 'bg-blue-500', trend: 'Active' },
     { title: 'Total Staff', value: overview.totalStaff || 0, icon: <UserCheck size={24} />, color: 'bg-indigo-500', trend: 'Active' },
-    { title: 'Total Applications', value: overview.totalApplications || 0, icon: <FileText size={24} />, color: 'bg-purple-500', trend: '+5% today' },
+    { title: 'Total Applications', value: overview.totalApplications || 0, icon: <FileText size={24} />, color: 'bg-purple-500', trend: 'All-time' },
     { title: 'Pending Applications', value: overview.pendingApplications || 0, icon: <Clock size={24} />, color: 'bg-amber-500', trend: 'Needs attention' },
     { title: 'Approved Applications', value: overview.approvedApplications || 0, icon: <CheckCircle size={24} />, color: 'bg-emerald-500', trend: 'Completed' },
     { title: 'Rejected Applications', value: overview.rejectedApplications || 0, icon: <XCircle size={24} />, color: 'bg-rose-500', trend: 'Action required' },
-    { title: 'Service Revenue', value: `₹${(overview.serviceRevenue || 0).toLocaleString()}`, icon: <IndianRupee size={24} />, color: 'bg-blue-600', trend: 'From Paid Services' },
-    { title: 'Total Revenue', value: `₹${(overview.totalRevenue || 0).toLocaleString()}`, icon: <IndianRupee size={24} />, color: 'bg-amber-400', trend: '+15% this month' },
+    { 
+      title: `Service Revenue (${formatMonthKey(activeMonth)})`, 
+      value: `₹${(currentMonthStats.serviceRevenue).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 
+      icon: <IndianRupee size={24} />, 
+      color: 'bg-blue-600', 
+      trend: `${currentMonthStats.count} txns`,
+      isClickable: true,
+      onClick: () => setShowMonthModal(true)
+    },
+    { 
+      title: `Total Revenue (${formatMonthKey(activeMonth)})`, 
+      value: `₹${(currentMonthStats.totalRevenue).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 
+      icon: <IndianRupee size={24} />, 
+      color: 'bg-amber-400', 
+      trend: 'Month-wise',
+      isClickable: true,
+      onClick: () => setShowMonthModal(true)
+    },
   ];
 
   const getStatusColor = (status: string) => {
@@ -341,26 +427,41 @@ const AdminDashboard = () => {
 
       {/* Overview Statistics Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {statCards.map((card, idx) => (
-          <motion.div 
-            key={idx}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: idx * 0.05 }}
-            className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between"
-          >
-            <div className="flex justify-between items-start mb-4">
-              <div className={`p-3 rounded-xl text-white ${card.color} shadow-sm`}>
-                {card.icon}
+        {statCards.map((card: any, idx) => {
+          const isClickable = !!card.isClickable;
+          return (
+            <motion.div 
+              key={idx}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: idx * 0.05 }}
+              onClick={isClickable ? card.onClick : undefined}
+              className={`bg-white p-5 rounded-2xl shadow-sm border transition-all flex flex-col justify-between ${
+                isClickable 
+                  ? 'border-blue-200 hover:border-blue-500 hover:shadow-md cursor-pointer active:scale-[0.99] group' 
+                  : 'border-slate-200'
+              }`}
+            >
+              <div className="flex justify-between items-start mb-4">
+                <div className={`p-3 rounded-xl text-white ${card.color} shadow-sm transition-transform ${isClickable ? 'group-hover:scale-110' : ''}`}>
+                  {card.icon}
+                </div>
+                <span className={`text-xs font-medium px-2 py-1 rounded-lg ${isClickable ? 'bg-blue-50 text-blue-600 font-semibold' : 'bg-slate-100 text-slate-500'}`}>
+                  {card.trend}
+                </span>
               </div>
-              <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded-lg">{card.trend}</span>
-            </div>
-            <div>
-              <h3 className="text-slate-500 text-sm font-medium mb-1">{card.title}</h3>
-              <p className="text-2xl font-bold text-slate-900">{card.value}</p>
-            </div>
-          </motion.div>
-        ))}
+              <div>
+                <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                  {card.title}
+                  {isClickable && (
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500 animate-ping" />
+                  )}
+                </h3>
+                <p className="text-2xl font-bold text-slate-900 tracking-tight">{card.value}</p>
+              </div>
+            </motion.div>
+          );
+        })}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -656,6 +757,120 @@ const AdminDashboard = () => {
           </div>
         </div>
       </div>
+
+      {/* Month-wise Revenue Breakdown Modal */}
+      <AnimatePresence>
+        {showMonthModal && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white rounded-3xl p-6 shadow-2xl border border-slate-200 max-w-lg w-full overflow-hidden flex flex-col max-h-[85vh]"
+            >
+              <div className="flex justify-between items-center pb-4 border-b border-slate-100 shrink-0">
+                <div>
+                  <h3 className="text-xl font-bold text-slate-900">Revenue Breakdown</h3>
+                  <p className="text-sm text-slate-500 mt-1">Select a month to filter Dashboard overview stats</p>
+                </div>
+                <button 
+                  onClick={() => setShowMonthModal(false)}
+                  className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Monthly List */}
+              <div className="flex-1 overflow-y-auto py-4 space-y-3 pr-1">
+                {availableMonths.map((mStr) => {
+                  const mStats = stats?.monthlyStats?.[mStr] || { serviceRevenue: 0, totalRevenue: 0, count: 0 };
+                  const isActive = activeMonth === mStr;
+                  const isCurrent = (() => {
+                    const now = new Date();
+                    const mm = String(now.getMonth() + 1).padStart(2, '0');
+                    return `${now.getFullYear()}-${mm}` === mStr;
+                  })();
+
+                  return (
+                    <div 
+                      key={mStr}
+                      onClick={() => {
+                        setActiveMonth(mStr);
+                        setShowMonthModal(false);
+                        toast.success(`Flipped dashboard statistics to ${formatMonthKey(mStr)}`);
+                      }}
+                      className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${
+                        isActive 
+                          ? 'border-blue-500 bg-blue-50/20 shadow-sm' 
+                          : 'border-slate-100 hover:border-slate-300 bg-slate-50/50 hover:bg-white'
+                      }`}
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-slate-900">{formatMonthKey(mStr)}</span>
+                          {isCurrent && (
+                            <span className="text-[10px] bg-blue-100 text-blue-700 font-bold px-2 py-0.5 rounded-full uppercase">Current</span>
+                          )}
+                          {isActive && (
+                            <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full uppercase">Viewing</span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-500 flex items-center gap-1">
+                          <Activity size={12} /> {mStats.count} Ledger transactions logged
+                        </p>
+                      </div>
+
+                      <div className="flex md:flex-col items-end gap-x-4 gap-y-1 w-full md:w-auto border-t md:border-t-0 pt-2 md:pt-0 border-slate-100">
+                        <div className="text-right">
+                          <span className="text-[10px] uppercase text-slate-400 font-bold tracking-wider block">Service Revenue</span>
+                          <span className="text-sm font-extrabold text-blue-600">
+                            ₹{(mStats.serviceRevenue).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                        <div className="text-right ml-auto md:ml-0">
+                          <span className="text-[10px] uppercase text-slate-400 font-bold tracking-wider block">Total Revenue</span>
+                          <span className="text-sm font-bold text-slate-700">
+                            ₹{(mStats.totalRevenue).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Close Button Panel */}
+              <div className="pt-4 border-t border-slate-100 flex justify-end shrink-0 gap-3">
+                {activeMonth !== (() => {
+                  const today = new Date();
+                  const mm = String(today.getMonth() + 1).padStart(2, '0');
+                  return `${today.getFullYear()}-${mm}`;
+                })() && (
+                  <button
+                    onClick={() => {
+                      const today = new Date();
+                      const mm = String(today.getMonth() + 1).padStart(2, '0');
+                      setActiveMonth(`${today.getFullYear()}-${mm}`);
+                      setShowMonthModal(false);
+                      toast.success("Reset dashboard stats to current month");
+                    }}
+                    className="px-4 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 font-bold rounded-xl transition-all text-xs uppercase"
+                  >
+                    Reset Current Month
+                  </button>
+                )}
+                <button
+                  onClick={() => setShowMonthModal(false)}
+                  className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl transition-all text-xs uppercase"
+                >
+                  Close
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
