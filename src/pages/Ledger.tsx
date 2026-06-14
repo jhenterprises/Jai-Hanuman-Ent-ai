@@ -78,13 +78,18 @@ const Ledger = () => {
       const q = query(
         collection(db, 'ledger'), 
         where('date_string', '>=', dateRange.from),
-        where('date_string', '<=', dateRange.to),
-        orderBy('created_at', 'asc')
+        where('date_string', '<=', dateRange.to)
       );
       
       const [snapshot] = await Promise.all([getDocs(q)]);
       
-      const ledgerData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const ledgerData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any }));
+      // Sort records chronologically in-memory to bypass composite index constraints
+      ledgerData.sort((a, b) => {
+        const timeA = a.created_at?.toMillis ? a.created_at.toMillis() : (a.created_at ? new Date(a.created_at).getTime() : 0);
+        const timeB = b.created_at?.toMillis ? b.created_at.toMillis() : (b.created_at ? new Date(b.created_at).getTime() : 0);
+        return timeA - timeB;
+      });
       setLedger(ledgerData);
     } catch (err: any) {
       handleFirestoreError(err, OperationType.LIST, 'ledger');

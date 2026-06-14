@@ -10,7 +10,7 @@ import {
   signInWithEmailAndPassword,
   User as FirebaseUser
 } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp, getDocFromServer, enableNetwork, onSnapshot } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, getDocFromServer, enableNetwork, onSnapshot, collection, query, where, getDocs, deleteDoc } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 
 interface User {
@@ -80,21 +80,67 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               setUser(userData);
               setLoading(false);
             } else {
-              const newUser: User = {
+              // No user document exists under this UID. Let's look for a pre-created (orphan) user doc with this email.
+              let existingData: any = null;
+              let existingDocId: string | null = null;
+
+              if (firebaseUser.email) {
+                try {
+                  const q = query(collection(db, 'users'), where('email', '==', firebaseUser.email));
+                  const querySnap = await getDocs(q);
+                  const match = querySnap.docs.find(d => d.id !== firebaseUser.uid);
+                  if (match) {
+                    existingData = match.data();
+                    existingDocId = match.id;
+                  }
+                } catch (err) {
+                  console.error('Error querying pre-existing user email:', err);
+                }
+              }
+
+              const newUser: any = {
                 uid: firebaseUser.uid,
-                name: firebaseUser.displayName || (isAdminEmail ? 'JH Admin' : 'User'),
+                name: existingData?.name || firebaseUser.displayName || (isAdminEmail ? 'JH Admin' : 'User'),
                 email: firebaseUser.email || '',
                 photoURL: firebaseUser.photoURL || undefined,
-                role: isAdminEmail ? 'admin' : 'user'
+                role: existingData?.role || (isAdminEmail ? 'admin' : 'user'),
+                phone: existingData?.phone || '',
+                status: existingData?.status || 'active',
+                staff_id: existingData?.staff_id || undefined,
+                salary_amount: existingData?.salary_amount || undefined,
+                designation: existingData?.designation || undefined,
+                address: existingData?.address || undefined,
+                blood_group: existingData?.blood_group || undefined,
+                joining_date: existingData?.joining_date || undefined,
               };
               
               try {
+                // Save under user's actual Auth UID so everything is tied to their account!
                 await setDoc(doc(db, 'users', firebaseUser.uid), {
                   ...newUser,
-                  createdAt: serverTimestamp()
+                  createdAt: existingData?.created_at || existingData?.createdAt || serverTimestamp(),
+                  updated_at: serverTimestamp()
                 }, { merge: true });
+
+                // Delete or clear the pre-created orphan document
+                if (existingDocId) {
+                  try {
+                    await deleteDoc(doc(db, 'users', existingDocId));
+                  } catch (deleteErr) {
+                    console.warn('Could not delete migration source doc, attempting overwrite/mark instead:', deleteErr);
+                    try {
+                      await setDoc(doc(db, 'users', existingDocId), {
+                        email: `migrated_${Date.now()}_${existingData.email}`,
+                        migrated_to: firebaseUser.uid,
+                        status: 'disabled'
+                      }, { merge: true });
+                    } catch (updateErr) {
+                      console.error('Failed to clear migration source doc:', updateErr);
+                    }
+                  }
+                }
               } catch (e) {
-                console.warn('Could not create user doc yet, listener will pick it up when online');
+                console.warn('Could not create user doc yet, listener will pick it up when online:', e);
               }
               setUser(newUser);
               setLoading(false);

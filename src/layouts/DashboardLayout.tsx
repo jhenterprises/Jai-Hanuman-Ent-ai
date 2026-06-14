@@ -125,11 +125,12 @@ const DashboardLayout = () => {
     { path: user?.role === 'user' ? '/app/user/dashboard' : (user?.role === 'admin' ? '/app/admin-dashboard' : '/app/dashboard'), label: 'Dashboard', icon: <LayoutDashboard size={20} />, roles: ['admin', 'staff', 'user'] },
     { path: user?.role === 'admin' ? '/app/services' : (user?.role === 'staff' ? '/app/staff/apply-service' : '/app/services'), label: 'Apply for Services', icon: <Briefcase size={20} />, roles: ['admin', 'staff', 'user'] },
     { path: user?.role === 'user' ? '/app/user/applications' : (user?.role === 'staff' ? '/app/staff/applications' : '/app/applications'), label: user?.role === 'user' ? 'My Applications' : 'User Applications', icon: <FileText size={20} />, roles: ['admin', 'staff', 'user'] },
+    { path: '/app/ledger', label: 'Ledger', icon: <FileText size={20} />, roles: ['admin', 'staff'] },
     { path: '/app/documents', label: 'Documents', icon: <FileText size={20} />, roles: ['admin', 'staff', 'user'] },
     { path: '/app/staff-management', label: 'Staff Management', icon: <Users size={20} />, roles: ['admin'] },
     { path: '/app/support', label: 'Ticket Support', icon: <MessageSquare size={20} />, roles: ['admin', 'staff', 'user'] },
     { path: '/app/support-center', label: 'Live Chat Support', icon: <Headphones size={20} />, roles: ['admin', 'staff'] },
-    { path: '/app/settings', label: 'Settings', icon: <Settings size={20} />, roles: ['admin', 'staff', 'user'] },
+    { path: '/app/settings', label: 'Settings', icon: <Settings size={20} />, roles: ['admin'] },
     { path: '/', label: 'Public Site', icon: <Home size={20} />, roles: ['admin', 'staff', 'user'] },
   ];
 

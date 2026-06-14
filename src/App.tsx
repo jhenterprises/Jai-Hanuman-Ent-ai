@@ -36,6 +36,7 @@ const SecurityControls = lazy(() => import('./pages/admin/SecurityControls'));
 const SystemPermissions = lazy(() => import('./pages/admin/SystemPermissions'));
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
 const ServiceFormBuilder = lazy(() => import('./pages/admin/ServiceFormBuilder'));
+const Ledger = lazy(() => import('./pages/Ledger'));
 
 const FullPageLoader = () => (
   <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
@@ -110,6 +111,7 @@ export default function App() {
                 <Route path="/app" element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
                   <Route index element={<DefaultRedirect />} />
                   <Route path="dashboard" element={<ProtectedRoute roles={['admin', 'staff']}><Dashboard /></ProtectedRoute>} />
+                  <Route path="ledger" element={<ProtectedRoute roles={['admin', 'staff']}><Ledger /></ProtectedRoute>} />
                   <Route path="admin-dashboard" element={<ProtectedRoute roles={['admin']}><AdminDashboard /></ProtectedRoute>} />
                   <Route path="services" element={<Services />} />
                   <Route path="services/:id/builder" element={<ProtectedRoute roles={['admin']}><ServiceFormBuilder /></ProtectedRoute>} />

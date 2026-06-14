@@ -45,8 +45,8 @@ service cloud.firestore {
     match /users/{userId} {
       allow read, get: if isSignedIn();
       allow list: if isStaff();
-      allow create, update: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      allow delete: if isAdmin();
+      allow create, update: if isSignedIn() && (request.auth.uid == userId || isAdmin() || request.auth.token.email == resource.data.email);
+      allow delete: if isAdmin() || (isSignedIn() && request.auth.token.email == resource.data.email);
     }
 
     // --- Support Chats & Messages (supportChats & supportMessages) ---
