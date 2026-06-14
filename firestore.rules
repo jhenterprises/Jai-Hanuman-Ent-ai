@@ -2,6 +2,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
+    // --- Global Helpers ---
     function isSignedIn() {
       return request.auth != null;
     }
@@ -10,7 +11,8 @@ service cloud.firestore {
     function isBootstrapAdmin() {
       return isSignedIn() && (
         request.auth.token.email == 'shahisthabanu78@gmail.com' || 
-        request.auth.token.email == 'pancardjhc2018@gmail.com'
+        request.auth.token.email == 'pancardjhc2018@gmail.com' ||
+        request.auth.token.email == 'admin@jhportal.gov.in'
       );
     }
 
@@ -34,13 +36,20 @@ service cloud.firestore {
       );
     }
 
-    // --- Users ---
-    match /users/{userId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+    // --- Default Catch-All ---
+    match /{document=**} {
+      allow read, write: if false;
     }
 
-    // --- Support System ---
+    // --- Users ---
+    match /users/{userId} {
+      allow read, get: if isSignedIn();
+      allow list: if isStaff();
+      allow create, update: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // --- Support Chats & Messages (supportChats & supportMessages) ---
     match /supportChats/{chatId} {
       allow read: if isSignedIn() && (resource.data.customerId == request.auth.uid || isStaff());
       allow create: if isSignedIn();
@@ -49,13 +58,33 @@ service cloud.firestore {
     }
 
     match /supportMessages/{messageId} {
-      function getChat(chatId) {
-        return get(/databases/$(database)/documents/supportChats/$(chatId)).data;
-      }
-      allow read: if isSignedIn() && (getChat(resource.data.chatId).customerId == request.auth.uid || isStaff());
-      allow create: if isSignedIn() && (getChat(request.resource.data.chatId).customerId == request.auth.uid || isStaff());
-      allow update: if isSignedIn() && (isStaff() || resource.data.senderId == request.auth.uid);
+      allow read: if isSignedIn() && (
+        resource == null || 
+        resource.data.senderId == request.auth.uid || 
+        isStaff()
+      );
+      allow create: if isSignedIn() && (
+        request.resource.data.senderId == request.auth.uid || 
+        isStaff()
+      );
+      allow update: if isSignedIn() && (
+        resource.data.senderId == request.auth.uid || 
+        isStaff()
+      );
       allow delete: if isAdmin();
+    }
+
+    // --- Chats / Messages Support System (Legacy Chats Path) ---
+    match /chats/{chatId} {
+      allow read: if isSignedIn() && (chatId == request.auth.uid || isStaff());
+      allow create, update: if isSignedIn() && (chatId == request.auth.uid || isStaff());
+      allow delete: if isAdmin();
+
+      match /messages/{messageId} {
+        allow read: if isSignedIn() && (chatId == request.auth.uid || isStaff());
+        allow create, update: if isSignedIn() && (chatId == request.auth.uid || isStaff());
+        allow delete: if isAdmin();
+      }
     }
 
     match /quickReplies/{replyId} {
@@ -94,10 +123,22 @@ service cloud.firestore {
       allow update, delete: if isSignedIn() && (isStaff() || resource.data.ownerId == request.auth.uid);
     }
 
-    // --- Allow Other Collections (Standard Fallback) ---
+    // --- Notifications ---
+    match /notifications/{docId} {
+      allow read: if isSignedIn() && (resource.data.user_id == request.auth.uid || isStaff());
+      allow create: if isStaff();
+      allow update: if isSignedIn() && (resource.data.user_id == request.auth.uid || isStaff());
+      allow delete: if isAdmin();
+    }
+
+    // --- Standard Fallback matching one-level Collections ---
     match /{collectionName}/{docId} {
-      allow read: if true;
-      allow write: if isStaff() || (isSignedIn() && request.resource.data.user_id == request.auth.uid);
+      allow read: if isSignedIn();
+      allow write: if isStaff() || (isSignedIn() && (
+        request.resource.data.user_id == request.auth.uid || 
+        request.resource.data.userId == request.auth.uid ||
+        request.resource.data.customerId == request.auth.uid
+      ));
     }
   }
 }
