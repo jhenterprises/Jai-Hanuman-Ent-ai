@@ -19,11 +19,9 @@ const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Services = lazy(() => import('./pages/Services'));
-const Ledger = lazy(() => import('./pages/Ledger'));
 import Users from './pages/Users';
 const Applications = lazy(() => import('./pages/Applications'));
 const ApplyService = lazy(() => import('./pages/ApplyService'));
-const Wallet = lazy(() => import('./pages/Wallet'));
 const Support = lazy(() => import('./pages/Support'));
 const StaffManagement = lazy(() => import('./pages/StaffManagement'));
 const SupportCenter = lazy(() => import('./pages/SupportCenter'));
@@ -37,18 +35,7 @@ const Documents = lazy(() => import('./pages/Documents'));
 const SecurityControls = lazy(() => import('./pages/admin/SecurityControls'));
 const SystemPermissions = lazy(() => import('./pages/admin/SystemPermissions'));
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
-const AdminWalletManagement = lazy(() => import('./pages/admin/AdminWalletManagement'));
-const AdminPayments = lazy(() => import('./pages/admin/AdminPayments'));
 const ServiceFormBuilder = lazy(() => import('./pages/admin/ServiceFormBuilder'));
-import LedgerAnalytics from './pages/admin/LedgerAnalytics';
-import LedgerSettings from './pages/admin/LedgerSettings';
-
-// Financial Services
-const ServiceHub = lazy(() => import('./pages/financial/ServiceHub'));
-const Recharge = lazy(() => import('./pages/financial/Recharge'));
-const BillPay = lazy(() => import('./pages/financial/BillPay'));
-const DMT = lazy(() => import('./pages/financial/DMT'));
-const AEPS = lazy(() => import('./pages/financial/AEPS'));
 
 const FullPageLoader = () => (
   <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
@@ -124,13 +111,8 @@ export default function App() {
                   <Route index element={<DefaultRedirect />} />
                   <Route path="dashboard" element={<ProtectedRoute roles={['admin', 'staff']}><Dashboard /></ProtectedRoute>} />
                   <Route path="admin-dashboard" element={<ProtectedRoute roles={['admin']}><AdminDashboard /></ProtectedRoute>} />
-                  <Route path="admin/wallets" element={<ProtectedRoute roles={['admin']}><AdminWalletManagement /></ProtectedRoute>} />
-                  <Route path="admin/payments" element={<ProtectedRoute roles={['admin']}><AdminPayments /></ProtectedRoute>} />
-                  <Route path="admin/ledger-analytics" element={<ProtectedRoute roles={['admin']}><LedgerAnalytics /></ProtectedRoute>} />
-                  <Route path="admin/ledger-settings" element={<ProtectedRoute roles={['admin']}><LedgerSettings /></ProtectedRoute>} />
                   <Route path="services" element={<Services />} />
                   <Route path="services/:id/builder" element={<ProtectedRoute roles={['admin']}><ServiceFormBuilder /></ProtectedRoute>} />
-                  <Route path="ledger" element={<ProtectedRoute roles={['admin', 'staff']}><Ledger /></ProtectedRoute>} />
                   <Route path="users" element={<ProtectedRoute roles={['admin']}><Users /></ProtectedRoute>} />
                   <Route path="staff-management" element={<ProtectedRoute roles={['admin']}><StaffManagement /></ProtectedRoute>} />
                   <Route path="admin/id-card-designer" element={<ProtectedRoute roles={['admin']}><IDCardSettings /></ProtectedRoute>} />
@@ -138,7 +120,6 @@ export default function App() {
                   <Route path="support" element={<ProtectedRoute roles={['admin', 'staff']}><Support /></ProtectedRoute>} />
                   <Route path="support-center" element={<ProtectedRoute roles={['admin', 'staff']}><SupportCenter /></ProtectedRoute>} />
                   <Route path="recycle-bin" element={<ProtectedRoute roles={['admin']}><RecycleBin /></ProtectedRoute>} />
-                  <Route path="wallet" element={<Wallet />} />
                   <Route path="documents" element={<ProtectedRoute><Documents /></ProtectedRoute>} />
                   <Route path="profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                   
@@ -152,13 +133,6 @@ export default function App() {
                   <Route path="user/applications" element={<ProtectedRoute roles={['user']}><Applications /></ProtectedRoute>} />
                   <Route path="user/apply/:serviceType" element={<ProtectedRoute roles={['user', 'staff', 'admin']}><ApplyService /></ProtectedRoute>} />
                   <Route path="user/support" element={<ProtectedRoute roles={['user']}><Support /></ProtectedRoute>} />
-                  
-                  {/* Financial Services */}
-                  <Route path="financial/hub" element={<ServiceHub />} />
-                  <Route path="financial/recharge" element={<Recharge />} />
-                  <Route path="financial/bill-pay" element={<BillPay />} />
-                  <Route path="financial/dmt" element={<DMT />} />
-                  <Route path="financial/aeps" element={<AEPS />} />
                   
                   <Route path="settings" element={<ProtectedRoute roles={['admin']}><Settings /></ProtectedRoute>}>
                     <Route path="services" element={<Services />} />

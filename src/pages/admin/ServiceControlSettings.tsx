@@ -116,19 +116,8 @@ const ServiceControlSettings = () => {
     if (!window.confirm('This will initialize all standard service controls. Existing ones will be kept. Proceed?')) return;
     
     const defaults = [
-      { key: 'mobileRecharge', name: 'Mobile Recharge', order: 1 },
-      { key: 'dthRecharge', name: 'DTH Recharge', order: 2 },
-      { key: 'electricityBill', name: 'Electricity Bill', order: 3 },
-      { key: 'waterBill', name: 'Water Bill', order: 4 },
-      { key: 'gasBill', name: 'Gas Bill', order: 5 },
-      { key: 'broadbandBill', name: 'Broadband Bill', order: 6 },
-      { key: 'fastag', name: 'Fastag Recharge', order: 7 },
-      { key: 'dmt', name: 'Money Transfer (DMT)', order: 8 },
-      { key: 'aeps', name: 'AEPS Banking', order: 9 },
-      { key: 'aadhaarPay', name: 'Aadhaar Pay', order: 10 },
-      { key: 'pan', name: 'PAN Services', order: 11 },
-      { key: 'aadhaarService', name: 'Aadhaar Services', order: 12 },
-      { key: 'wallet', name: 'Wallet Load', order: 13 },
+      { key: 'pan', name: 'PAN Services', order: 1 },
+      { key: 'aadhaarService', name: 'Aadhaar Services', order: 2 },
     ];
 
     const toastId = toast.loading('Seeding services...');

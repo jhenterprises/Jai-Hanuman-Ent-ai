@@ -25,7 +25,6 @@ const Dashboard = () => {
   const { services, loading: servicesLoading } = useServiceControl();
   const [applications, setApplications] = useState<any[]>([]);
   const [drafts, setDrafts] = useState<any[]>([]);
-  const [walletBalance, setWalletBalance] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
@@ -43,13 +42,6 @@ const Dashboard = () => {
         const appSnap = await getDocs(q);
         const apps = appSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setApplications(apps);
-
-        if (user?.uid) {
-          const walletDoc = await getDocs(query(collection(db, 'wallets'), where('user_id', '==', user?.uid || '')));
-          if (!walletDoc.empty) {
-            setWalletBalance(walletDoc.docs[0].data().balance || 0);
-          }
-        }
 
         // Fetch drafts from Firestore
         const draftSnap = await getDocs(query(
@@ -151,9 +143,6 @@ const Dashboard = () => {
           </div>
         </div>
         <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
-          <Link to="/app/wallet" className="px-6 py-3 glass-dark border-white/10 text-white font-bold rounded-2xl flex items-center justify-center gap-2 hover:bg-white/5 transition-all">
-            <Wallet size={18} className="text-blue-400" /> ₹{(walletBalance || 0).toLocaleString()}
-          </Link>
           <Link to="/app/services" className="px-8 py-3 blue-gradient text-white font-black rounded-2xl flex items-center justify-center gap-2 shadow-xl shadow-blue-500/20">
             <Plus size={20} /> New Application
           </Link>
@@ -161,33 +150,13 @@ const Dashboard = () => {
       </header>
 
       {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <GlassCard className="p-8 flex flex-col justify-between bg-blue-600/10 border-blue-500/20 h-full backdrop-blur-3xl shadow-blue-700/5">
-          <div className="space-y-4">
-            <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-600/30 border border-blue-500/40">
-              <Wallet size={28} />
-            </div>
-            <div>
-              <h3 className="text-slate-400 text-[10px] font-black uppercase tracking-[0.25em] ml-1">Wallet Balance</h3>
-              <p className="text-5xl font-black text-white mt-1 tracking-tighter">₹{(walletBalance || 0).toLocaleString()}</p>
-            </div>
-          </div>
-          <div className="flex gap-3 mt-10">
-            <Link to="/app/wallet" className="flex-1 py-4 bg-blue-600 hover:bg-blue-500 text-white text-xs font-black uppercase tracking-widest rounded-2xl flex items-center justify-center gap-2 transition-all shadow-xl shadow-blue-600/20">
-              <ArrowUpRight size={14} /> Add Funds
-            </Link>
-            <Link to="/app/wallet" className="flex-1 py-4 glass-dark text-white text-xs font-black uppercase tracking-widest rounded-2xl flex items-center justify-center gap-2 hover:bg-white/10 transition-all border-white/10">
-              <History size={14} /> History
-            </Link>
-          </div>
-        </GlassCard>
-        
-        <GlassCard className="md:col-span-2 p-8 border-white/10 h-full backdrop-blur-3xl bg-slate-900/40 shadow-2xl">
+      <div className="space-y-6">
+        <GlassCard className="p-8 border-white/10 h-full backdrop-blur-3xl bg-slate-900/40 shadow-2xl">
            <header className="flex items-center justify-between mb-8">
              <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
                <Zap size={14} className="text-amber-500" /> Digital Services
              </h3>
-             <Link to="/app/financial/hub" className="text-xs font-bold text-blue-500 hover:underline">View All</Link>
+             <Link to="/app/services" className="text-xs font-bold text-blue-500 hover:underline">View All</Link>
            </header>
            
            <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

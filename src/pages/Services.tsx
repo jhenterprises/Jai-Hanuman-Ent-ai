@@ -658,31 +658,7 @@ const Services = () => {
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-xs text-slate-400 font-medium">Service Price (₹) - For Users</label>
-                <input 
-                  type="number" placeholder="0" 
-                  value={formData.service_price} onChange={e => setFormData({...formData, service_price: parseFloat(e.target.value) || 0})}
-                  className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 focus:border-blue-500 outline-none"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs text-slate-400 font-medium">Wallet Fee (₹) - For Staff/Admin</label>
-                <input 
-                  type="number" placeholder="0" 
-                  value={formData.fee} onChange={e => setFormData({...formData, fee: parseFloat(e.target.value) || 0})}
-                  className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 focus:border-blue-500 outline-none"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs text-slate-400 font-medium">Staff Commission (₹)</label>
-                <input 
-                  type="number" placeholder="0" 
-                  value={formData.staff_commission} onChange={e => setFormData({...formData, staff_commission: parseFloat(e.target.value) || 0})}
-                  className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 focus:border-blue-500 outline-none"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs text-slate-400 font-medium">Icon Name (FontAwesome Class)</label>
+                <label className="text-xs text-slate-400 font-medium font-bold">Icon Name (FontAwesome Class)</label>
                 <div className="flex gap-2">
                   <input 
                     type="text" placeholder="e.g. fa-fingerprint, fa-id-card" 
@@ -727,18 +703,6 @@ const Services = () => {
                   {formData.enabled && <Check size={14} className="text-white" />}
                 </div>
                 <span className="text-sm text-slate-300">Active Status</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer group">
-                <input 
-                  type="checkbox" 
-                  checked={formData.payment_required} 
-                  onChange={e => setFormData({...formData, payment_required: e.target.checked})}
-                  className="hidden"
-                />
-                <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${formData.payment_required ? 'bg-orange-600 border-orange-600' : 'border-slate-600 group-hover:border-slate-500'}`}>
-                  {formData.payment_required && <Check size={14} className="text-white" />}
-                </div>
-                <span className="text-sm text-slate-300">Payment Required before Application</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer group">
                 <input 
@@ -828,26 +792,6 @@ const Services = () => {
                 {getIcon(service.icon)}
               </div>
               <h3 className="text-xl font-bold text-white mb-2">{service.name}</h3>
-              <div className="flex items-center gap-2 mb-2 flex-wrap">
-                <span className="text-xs font-bold px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30" title="User Price">
-                  User: ₹{service.service_price || 0}
-                </span>
-                {(user?.role === 'admin' || user?.role === 'staff') && (
-                  <>
-                    <span className="text-xs font-bold px-2 py-0.5 rounded bg-purple-500/20 text-purple-400 border border-purple-500/30" title="Wallet Fee">
-                      Fee: ₹{service.fee || 0}
-                    </span>
-                    <span className="text-xs font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" title="Staff Commission">
-                      Comm: ₹{service.staff_commission || 0}
-                    </span>
-                  </>
-                )}
-                {!!service.payment_required && (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-orange-500/20 text-orange-400 border border-orange-500/30 uppercase tracking-wider">
-                    Paid Service
-                  </span>
-                )}
-              </div>
               <p className="text-slate-400 text-sm mb-6 line-clamp-3 flex-1">{service.description}</p>
               
               <div className="mt-auto flex flex-col gap-2">

@@ -17,12 +17,6 @@ export const serviceConfig: Record<string, { name: string; authority: string; pr
     processing: "https://voters.eci.gov.in",
     apply: "https://voters.eci.gov.in"
   },
-  airtel: {
-    name: "Airtel Payments",
-    authority: "Airtel Payments Bank",
-    processing: "https://portal.airtelbank.com/RetailerPortal",
-    apply: "https://www.airtel.in/bank"
-  },
   csc: {
     name: "CSC Portal",
     authority: "CSC e-Governance",
@@ -64,12 +58,6 @@ export const serviceConfig: Record<string, { name: string; authority: string; pr
     authority: "Passport Seva",
     processing: "https://portal2.passportindia.gov.in",
     apply: "https://passportindia.gov.in"
-  },
-  swiftmoney: {
-    name: "Swift Money",
-    authority: "QuickSekure",
-    processing: "https://swift.quicksekure.com/Login.aspx",
-    apply: "https://swift.quicksekure.com"
   },
   ssp_post: {
     name: "SSP Post Matric",

@@ -694,41 +694,6 @@ const ApplyService = () => {
       // Generate a reference number
       const referenceNumber = `APP-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
 
-      // Staff/Admin Wallet Deduction check
-      if ((user?.role === 'staff' || user?.role === 'admin') && serviceFee && serviceFee > 0) {
-        if (!window.confirm(`A service fee of ₹${serviceFee} will be deducted from your wallet. Continue?`)) {
-          setIsSubmitting(false);
-          return;
-        }
-        
-        try {
-          // In serverless, we'd need to update ledger and wallet balance
-          const ledgerRef = collection(db, 'ledger');
-          await addDoc(ledgerRef, {
-            user_id: user?.uid,
-            amount: -serviceFee,
-            type: 'debit',
-            description: `Service Fee for ${serviceName} (${referenceNumber})`,
-            service_id: serviceDetails.service_id,
-            created_at: serverTimestamp(),
-            status: 'completed'
-          });
-
-          const walletSnap = await getDocs(query(collection(db, 'wallets'), where('user_id', '==', user?.uid || '')));
-          if (!walletSnap.empty) {
-            const walletDoc = walletSnap.docs[0];
-            await updateDoc(doc(db, 'wallets', walletDoc.id), {
-              balance: (walletDoc.data().balance || 0) - serviceFee,
-              updated_at: serverTimestamp()
-            });
-          }
-        } catch (walletErr: any) {
-          setError('Failed to deduct from wallet. Please ensure you have sufficient balance.');
-          setIsSubmitting(false);
-          return;
-        }
-      }
-
       // Save application to Firestore
       const userId = currentUser.uid;
       if (!userId) {
@@ -749,7 +714,7 @@ const ApplyService = () => {
         status: 'Pending',
         assignedTo: '',
         assignedToName: '',
-        payment_status: serviceDetails?.payment_required ? 'Pending' : 'Free',
+        payment_status: 'Free',
         reference_number: String(referenceNumber),
         created_at: serverTimestamp(),
         updated_at: serverTimestamp()
@@ -769,15 +734,6 @@ const ApplyService = () => {
       });
 
       const docRef = await addDoc(collection(db, 'applications'), finalData);
-      
-      // If payment is required, we still show the payment step but now we have a Firestore ID
-      if (serviceDetails?.payment_required && serviceDetails?.service_price > 0 && !paymentStatus.paid && user?.role === 'user') {
-        setDraftId(docRef.id as any); // Using Firestore ID as draft ID
-        setShowPaymentStep(true);
-        setIsSubmitting(false);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        return;
-      }
 
       setSubmittedApp({ ...applicationData, id: docRef.id });
       setSuccess(true);
@@ -1203,51 +1159,6 @@ const ApplyService = () => {
               </span>
             </label>
           </div>
-
-          {/* Wallet Balance & Fee Info */}
-          {serviceFee !== null && serviceFee > 0 && (
-            <div className="p-8 border-t border-slate-100 bg-slate-50/50">
-              <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-blue-600/10 rounded-2xl">
-                    <WalletIcon className="text-blue-600" size={24} />
-                  </div>
-                  <div>
-                    <p className="text-sm text-slate-500 font-medium uppercase tracking-wider">Wallet Balance</p>
-                    <p className="text-2xl font-black text-slate-900">₹{walletBalance?.toLocaleString() || '0'}</p>
-                  </div>
-                </div>
-                
-                <div className="h-12 w-px bg-slate-200 hidden md:block" />
-
-                <div className="text-center md:text-right">
-                  <p className="text-sm text-slate-500 font-medium uppercase tracking-wider">Service Fee</p>
-                  <p className="text-2xl font-black text-red-600">₹{(serviceFee || 0).toLocaleString()}</p>
-                </div>
-              </div>
-              
-              {walletBalance !== null && walletBalance < serviceFee ? (
-                <div className="mt-6 flex items-center gap-4 p-4 bg-red-50 border border-red-100 rounded-2xl text-red-600 animate-in fade-in slide-in-from-top-2">
-                  <AlertTriangle size={24} />
-                  <div className="flex-1">
-                    <p className="text-sm font-bold">Insufficient Balance</p>
-                    <p className="text-xs opacity-80">You need ₹{((serviceFee || 0) - (walletBalance || 0)).toLocaleString()} more to apply for this service.</p>
-                  </div>
-                  <ModernButton 
-                    text="Add Money" 
-                    onClick={() => navigate('/app/wallet')}
-                    className="!py-2 !px-4 text-xs"
-                    gradient="red-gradient"
-                  />
-                </div>
-              ) : (
-                <div className="mt-6 flex items-center gap-4 p-4 bg-emerald-50 border border-emerald-100 rounded-2xl text-emerald-600">
-                  <CheckCircle2 size={24} />
-                  <p className="text-sm font-bold">Balance sufficient for this application.</p>
-                </div>
-              )}
-            </div>
-          )}
         </div>
 
         {/* Buttons */}
