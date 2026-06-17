@@ -9,68 +9,138 @@ service cloud.firestore {
 
     // Explicitly bootstrap the admin emails so they cannot be locked out.
     function isBootstrapAdmin() {
-      return isSignedIn() && (
-        request.auth.token.email == 'shahisthabanu78@gmail.com' || 
-        request.auth.token.email == 'pancardjhc2018@gmail.com' ||
-        request.auth.token.email == 'admin@jhportal.gov.in'
-      );
+      return isSignedIn() && 
+        'email' in request.auth.token && (
+          request.auth.token.email == 'shahisthabanu78@gmail.com' || 
+          request.auth.token.email == 'pancardjhc2018@gmail.com' ||
+          request.auth.token.email == 'admin@jhportal.gov.in' ||
+          request.auth.token.email == 'shahisthabanu78@GMAIL.COM' || 
+          request.auth.token.email == 'pancardjhc2018@GMAIL.COM' ||
+          request.auth.token.email == 'admin@JHPORTAL.GOV.IN'
+        );
     }
 
-    function getUserData() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    function getUserRole() {
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        ? (('role' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data)
+            ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
+            : 'none')
+        : 'none';
+    }
+
+    function getUserPhone() {
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        ? (('phone' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data)
+            ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.phone
+            : '')
+        : '';
     }
 
     function isStaff() {
-      return isBootstrapAdmin() || (
-        isSignedIn() && 
-        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-        getUserData().role in ['staff', 'admin']
-      );
+      return isBootstrapAdmin() || getUserRole() == 'staff' || getUserRole() == 'admin';
     }
 
     function isAdmin() {
-      return isBootstrapAdmin() || (
-        isSignedIn() && 
-        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-        getUserData().role == 'admin'
-      );
+      return isBootstrapAdmin() || getUserRole() == 'admin';
     }
 
-    // --- Default Catch-All ---
-    match /{document=**} {
-      allow read, write: if false;
-    }
-
-    // --- Users ---
+    // --- Users Collection ---
     match /users/{userId} {
-      allow read, get: if isSignedIn();
-      allow list: if isStaff();
-      allow create, update: if isSignedIn() && (request.auth.uid == userId || isAdmin() || request.auth.token.email == resource.data.email);
-      allow delete: if isAdmin() || (isSignedIn() && request.auth.token.email == resource.data.email);
+      allow read: if true;
+      allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+    }
+
+    // --- Dynamic Settings and Service Controls (Public Read for Portal Loading) ---
+    match /settings/{docId} {
+      allow read: if true; // Dynamic portal theme, logo, and title configuration is public
+      allow write: if isAdmin();
+    }
+
+    match /service_controls/{docId} {
+      allow read: if true; // Publicly shows online/offline/maintenance services
+      allow write: if isAdmin();
+    }
+
+    match /services/{docId} {
+      allow read: if true; // Public list of offered digital and citizen services
+      allow write: if isAdmin() || isStaff();
+    }
+
+    match /service_inputs/{docId} {
+      allow read: if true; // Field definitions for services are public
+      allow write: if isAdmin() || isStaff();
+    }
+
+    match /service_links/{docId} {
+      allow read: if true;
+      allow write: if isAdmin() || isStaff();
+    }
+
+    // --- Applications & Track Systems ---
+    match /applications/{docId} {
+      allow get: if true; // Allow direct get for tracking
+      allow list: if isStaff() || (isSignedIn() && (
+        resource.data.user_id == request.auth.uid || 
+        resource.data.userId == request.auth.uid || 
+        (getUserPhone() != '' && resource.data.user_phone == getUserPhone())
+      )) || (
+        // Public Check for search/track application matching reference_number or user_phone
+        resource.data.reference_number != null ||
+        resource.data.user_phone != null
+      );
+      allow create: if isSignedIn() && (
+        request.resource.data.user_id == request.auth.uid || 
+        request.resource.data.userId == request.auth.uid || 
+        isStaff()
+      );
+      allow update: if isStaff() || (isSignedIn() && (
+        resource.data.user_id == request.auth.uid || 
+        resource.data.userId == request.auth.uid
+      ));
+      allow delete: if isAdmin();
+    }
+
+    match /application_drafts/{docId} {
+      allow read: if isSignedIn() && (
+        resource.data.user_id == request.auth.uid || 
+        resource.data.userId == request.auth.uid || 
+        isStaff()
+      );
+      allow create, update: if isSignedIn() && (
+        request.resource.data.user_id == request.auth.uid || 
+        request.resource.data.userId == request.auth.uid || 
+        isStaff()
+      );
+      allow delete: if isSignedIn() && (
+        resource.data.user_id == request.auth.uid || 
+        resource.data.userId == request.auth.uid || 
+        isStaff()
+      );
     }
 
     // --- Support Chats & Messages (supportChats & supportMessages) ---
     match /supportChats/{chatId} {
-      allow read: if isSignedIn() && (resource.data.customerId == request.auth.uid || isStaff());
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && (resource.data.customerId == request.auth.uid || isStaff());
-      allow delete: if isAdmin();
+      allow read, write: if isSignedIn();
     }
 
     match /supportMessages/{messageId} {
-      allow read: if isSignedIn() && (
-        resource == null || 
-        resource.data.senderId == request.auth.uid || 
-        isStaff()
-      );
+      allow read, write: if isSignedIn();
+    }
+
+    // --- Support Tickets System ---
+    match /support_tickets/{docId} {
+      allow read: if isStaff() || (isSignedIn() && (
+        resource.data.user_id == request.auth.uid || 
+        resource.data.userId == request.auth.uid
+      ));
       allow create: if isSignedIn() && (
-        request.resource.data.senderId == request.auth.uid || 
-        isStaff()
+        request.resource.data.user_id == request.auth.uid || 
+        request.resource.data.userId == request.auth.uid
       );
-      allow update: if isSignedIn() && (
-        resource.data.senderId == request.auth.uid || 
-        isStaff()
-      );
+      allow update: if isStaff() || (isSignedIn() && (
+        resource.data.user_id == request.auth.uid || 
+        resource.data.userId == request.auth.uid
+      ));
       allow delete: if isAdmin();
     }
 
@@ -93,52 +163,112 @@ service cloud.firestore {
     }
 
     // --- Ledger System ---
+    match /ledger_config/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
     match /ledger/{docId} {
-      // Staff can read all. Users can read their own entries.
-      allow read: if isStaff() || (isSignedIn() && resource.data.user_id == request.auth.uid);
-      // Staff can create. Users can create if they attribute it to themselves.
-      allow create: if isStaff() || (isSignedIn() && request.resource.data.user_id == request.auth.uid);
+      allow read: if isStaff() || (isSignedIn() && (
+        resource.data.user_id == request.auth.uid || 
+        resource.data.userId == request.auth.uid
+      ));
+      allow create: if isStaff() || (isSignedIn() && (
+        request.resource.data.user_id == request.auth.uid || 
+        request.resource.data.userId == request.auth.uid
+      ));
       allow update: if isStaff();
       allow delete: if isAdmin();
     }
 
     // --- Core Wallets ---
     match /wallets/{docId} {
-      allow read: if isStaff() || (isSignedIn() && resource.data.user_id == request.auth.uid);
-      // Users can manage their wallet entries.
-      allow create, update: if isStaff() || (isSignedIn() && request.resource.data.user_id == request.auth.uid);
+      allow read: if isStaff() || (isSignedIn() && (
+        resource.data.user_id == request.auth.uid || 
+        resource.data.userId == request.auth.uid
+      ));
+      allow create, update: if isStaff() || (isSignedIn() && (
+        request.resource.data.user_id == request.auth.uid || 
+        request.resource.data.userId == request.auth.uid
+      ));
+      allow delete: if isAdmin();
+    }
+
+    match /wallet_logs/{docId} {
+      allow read: if isStaff() || (isSignedIn() && (
+        resource.data.user_id == request.auth.uid || 
+        resource.data.userId == request.auth.uid
+      ));
+      allow create, update: if isStaff() || (isSignedIn() && (
+        request.resource.data.user_id == request.auth.uid || 
+        request.resource.data.userId == request.auth.uid
+      ));
+      allow delete: if isAdmin();
+    }
+
+    match /financial_transactions/{docId} {
+      allow read: if isStaff() || (isSignedIn() && (
+        resource.data.user_id == request.auth.uid || 
+        resource.data.userId == request.auth.uid
+      ));
+      allow create, update: if isStaff() || (isSignedIn() && (
+        request.resource.data.user_id == request.auth.uid || 
+        request.resource.data.userId == request.auth.uid
+      ));
       allow delete: if isAdmin();
     }
 
     // --- Document System ---
     match /documentFolders/{docId} {
-      allow read: if isSignedIn() && (isStaff() || resource.data.ownerId == request.auth.uid || resource.data.ownerId == 'global');
+      allow read: if isSignedIn() && (
+        isStaff() || 
+        resource.data.ownerId == request.auth.uid || 
+        resource.data.ownerId == 'global'
+      );
       allow create: if isSignedIn() && (isStaff() || request.resource.data.ownerId == request.auth.uid);
       allow update, delete: if isSignedIn() && (isStaff() || resource.data.ownerId == request.auth.uid);
     }
 
     match /documents/{docId} {
-      allow read: if isSignedIn() && (isStaff() || resource.data.ownerId == request.auth.uid || resource.data.ownerId == 'global');
+      allow read: if isSignedIn() && (
+        isStaff() || 
+        resource.data.ownerId == request.auth.uid || 
+        resource.data.ownerId == 'global'
+      );
       allow create: if isSignedIn() && (isStaff() || request.resource.data.ownerId == request.auth.uid);
       allow update, delete: if isSignedIn() && (isStaff() || resource.data.ownerId == request.auth.uid);
     }
 
     // --- Notifications ---
     match /notifications/{docId} {
-      allow read: if isSignedIn() && (resource.data.user_id == request.auth.uid || isStaff());
+      allow get: if isSignedIn() && (resource.data.user_id == request.auth.uid || isStaff());
+      allow list: if isSignedIn() && (resource.data.user_id == request.auth.uid || isStaff());
       allow create: if isStaff();
       allow update: if isSignedIn() && (resource.data.user_id == request.auth.uid || isStaff());
       allow delete: if isAdmin();
     }
 
-    // --- Standard Fallback matching one-level Collections ---
-    match /{collectionName}/{docId} {
-      allow read: if isSignedIn();
-      allow write: if isStaff() || (isSignedIn() && (
-        request.resource.data.user_id == request.auth.uid || 
-        request.resource.data.userId == request.auth.uid ||
-        request.resource.data.customerId == request.auth.uid
-      ));
+    // --- Recycle Bin ---
+    match /recycle_bin/{docId} {
+      allow read: if isStaff();
+      allow write: if isAdmin();
+    }
+
+    // --- Staff Management ---
+    match /attendance/{docId} {
+      allow read: if isStaff();
+      allow write: if isAdmin() || isStaff();
+    }
+
+    match /salaries/{docId} {
+      allow read: if isStaff();
+      allow write: if isAdmin();
+    }
+
+    // --- Activity Logs ---
+    match /activity_logs/{docId} {
+      allow read: if isStaff();
+      allow write: if isStaff();
     }
   }
 }

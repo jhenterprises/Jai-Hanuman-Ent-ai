@@ -69,8 +69,20 @@ const AdminDashboard = () => {
       setStats((prev: any) => {
         const newStats = { ...(prev || { overview: {} }) };
         if (!newStats.overview) newStats.overview = {};
-        newStats.overview.totalUsers = activeDocs.filter((doc: any) => doc.data().role === 'user').length;
-        newStats.overview.totalStaff = activeDocs.filter((doc: any) => doc.data().role === 'staff').length;
+        
+        const totalUsers = activeDocs.filter((doc: any) => (doc.data().role || 'user') === 'user').length;
+        const totalStaff = activeDocs.filter((doc: any) => doc.data().role === 'staff').length;
+        const totalAdmins = activeDocs.filter((doc: any) => doc.data().role === 'admin').length;
+        
+        newStats.overview.totalUsers = totalUsers;
+        newStats.overview.totalStaff = totalStaff;
+        newStats.overview.totalAdmins = totalAdmins;
+        
+        newStats.userBreakdown = [
+          { name: 'Admin', value: totalAdmins, color: '#f59e0b' },
+          { name: 'Staff', value: totalStaff, color: '#3b82f6' },
+          { name: 'User', value: totalUsers, color: '#10b981' }
+        ];
         return newStats;
       });
       setLoading(false);
@@ -632,42 +644,98 @@ const AdminDashboard = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Staff Performance Panel */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 lg:col-span-2 overflow-hidden">
-          <div className="p-6 border-b border-slate-200">
-            <h3 className="text-lg font-bold text-slate-900">Staff Performance</h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-200">
-                  <th className="p-4 text-slate-500 font-bold text-xs uppercase tracking-wider">Staff Name</th>
-                  <th className="p-4 text-slate-500 font-bold text-xs uppercase tracking-wider text-center">Assigned</th>
-                  <th className="p-4 text-slate-500 font-bold text-xs uppercase tracking-wider text-center">Completed</th>
-                  <th className="p-4 text-slate-500 font-bold text-xs uppercase tracking-wider text-center">Pending</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {staffPerformance.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="p-8 text-center text-slate-500">No staff data available</td>
+        <div id="staff-performance-card" className="bg-white rounded-2xl shadow-sm border border-slate-200 lg:col-span-1 overflow-hidden flex flex-col justify-between">
+          <div>
+            <div className="p-6 border-b border-slate-200">
+              <h3 className="text-lg font-bold text-slate-900">Staff Performance</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200">
+                    <th className="p-4 text-slate-500 font-bold text-xs uppercase tracking-wider">Staff Name</th>
+                    <th className="p-4 text-slate-500 font-bold text-xs uppercase tracking-wider text-center">Assigned</th>
+                    <th className="p-4 text-slate-500 font-bold text-xs uppercase tracking-wider text-center">Completed</th>
+                    <th className="p-4 text-slate-500 font-bold text-xs uppercase tracking-wider text-center">Pending</th>
                   </tr>
-                ) : (
-                  staffPerformance?.map((staff: any, idx: number) => (
-                    <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                      <td className="p-4 text-sm font-medium text-slate-900 flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs">
-                          {staff.staff_name.charAt(0)}
-                        </div>
-                        {staff.staff_name}
-                      </td>
-                      <td className="p-4 text-sm text-slate-700 text-center">{staff.assigned}</td>
-                      <td className="p-4 text-sm text-emerald-600 font-medium text-center">{staff.completed || 0}</td>
-                      <td className="p-4 text-sm text-amber-600 font-medium text-center">{staff.pending || 0}</td>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {staffPerformance.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="p-8 text-center text-slate-500">No staff data available</td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    staffPerformance?.slice(0, 5).map((staff: any, idx: number) => (
+                      <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                        <td className="p-4 text-sm font-medium text-slate-900 flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs">
+                            {staff.staff_name.charAt(0)}
+                          </div>
+                          <span className="truncate max-w-[80px] block" title={staff.staff_name}>{staff.staff_name}</span>
+                        </td>
+                        <td className="p-4 text-sm text-slate-700 text-center">{staff.assigned}</td>
+                        <td className="p-4 text-sm text-emerald-600 font-medium text-center">{staff.completed || 0}</td>
+                        <td className="p-4 text-sm text-amber-600 font-medium text-center">{staff.pending || 0}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        {/* Users by Role Doughnut Chart Card */}
+        <div id="users-by-role-card" className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 lg:col-span-1 flex flex-col justify-between">
+          <div>
+            <h3 className="text-lg font-bold text-slate-900 mb-6">Users by Role</h3>
+            <div className="h-44 relative flex items-center justify-center">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={stats?.userBreakdown || []}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={48}
+                    outerRadius={68}
+                    paddingAngle={3}
+                    dataKey="value"
+                  >
+                    {(stats?.userBreakdown || []).map((entry: any, index: number) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <span className="text-2xl font-extrabold text-slate-800">
+                  {((stats?.overview?.totalUsers || 0) + (stats?.overview?.totalStaff || 0) + (stats?.overview?.totalAdmins || 0))}
+                </span>
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Total</span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="space-y-2 mt-4">
+            {(stats?.userBreakdown || []).map((item: any, idx: number) => {
+              const total = ((stats?.overview?.totalUsers || 0) + (stats?.overview?.totalStaff || 0) + (stats?.overview?.totalAdmins || 0)) || 1;
+              const pct = ((item.value / total) * 100).toFixed(0);
+              return (
+                <div key={idx} className="flex items-center justify-between text-sm py-1 border-b border-slate-50 last:border-none">
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
+                    <span className="font-semibold text-slate-700">{item.name}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="font-bold text-slate-950">{item.value}</span>
+                    <span className="text-xs text-slate-400 font-medium">({pct}%)</span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 

@@ -56,108 +56,133 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         let isMounted = true;
-        const unsubscribeUser = onSnapshot(doc(db, 'users', firebaseUser.uid), async (userDoc) => {
-          if (!isMounted) return;
-          
-          try {
-            const isAdminEmail = firebaseUser.email && (
-              /pancardjhc2018@gmail.com|shahisthabanu78@gmail.com|admin@jhportal.gov.in/i.test(firebaseUser.email)
-            );
+        let unsubscribeUser: () => void = () => {};
+        let retryCount = 0;
+        const maxRetries = 5;
 
-            if (userDoc.exists()) {
-              const userData = userDoc.data() as User;
-              userData.uid = firebaseUser.uid;
-              
-              if (isAdminEmail && userData.role !== 'admin') {
-                userData.role = 'admin';
-                try {
-                  await setDoc(doc(db, 'users', firebaseUser.uid), { role: 'admin' }, { merge: true });
-                } catch (err) {
-                  console.error('Error auto-evaluating user to admin:', err);
-                }
-              }
+        const startUserListener = () => {
+          unsubscribeUser = onSnapshot(doc(db, 'users', firebaseUser.uid), async (userDoc) => {
+            if (!isMounted) return;
+            
+            try {
+              const isAdminEmail = firebaseUser.email && (
+                /pancardjhc2018@gmail.com|shahisthabanu78@gmail.com|admin@jhportal.gov.in/i.test(firebaseUser.email)
+              );
 
-              setUser(userData);
-              setLoading(false);
-            } else {
-              // No user document exists under this UID. Let's look for a pre-created (orphan) user doc with this email.
-              let existingData: any = null;
-              let existingDocId: string | null = null;
-
-              if (firebaseUser.email) {
-                try {
-                  const q = query(collection(db, 'users'), where('email', '==', firebaseUser.email));
-                  const querySnap = await getDocs(q);
-                  const match = querySnap.docs.find(d => d.id !== firebaseUser.uid);
-                  if (match) {
-                    existingData = match.data();
-                    existingDocId = match.id;
-                  }
-                } catch (err) {
-                  console.error('Error querying pre-existing user email:', err);
-                }
-              }
-
-              const newUser: any = {
-                uid: firebaseUser.uid,
-                name: existingData?.name || firebaseUser.displayName || (isAdminEmail ? 'JH Admin' : 'User'),
-                email: firebaseUser.email || '',
-                photoURL: firebaseUser.photoURL || undefined,
-                role: existingData?.role || (isAdminEmail ? 'admin' : 'user'),
-                phone: existingData?.phone || '',
-                status: existingData?.status || 'active',
-                staff_id: existingData?.staff_id || undefined,
-                salary_amount: existingData?.salary_amount || undefined,
-                designation: existingData?.designation || undefined,
-                address: existingData?.address || undefined,
-                blood_group: existingData?.blood_group || undefined,
-                joining_date: existingData?.joining_date || undefined,
-              };
-              
-              try {
-                // Save under user's actual Auth UID so everything is tied to their account!
-                await setDoc(doc(db, 'users', firebaseUser.uid), {
-                  ...newUser,
-                  createdAt: existingData?.created_at || existingData?.createdAt || serverTimestamp(),
-                  updated_at: serverTimestamp()
-                }, { merge: true });
-
-                // Delete or clear the pre-created orphan document
-                if (existingDocId) {
+              if (userDoc.exists()) {
+                const userData = userDoc.data() as User;
+                userData.uid = firebaseUser.uid;
+                
+                if (isAdminEmail && userData.role !== 'admin') {
+                  userData.role = 'admin';
                   try {
-                    await deleteDoc(doc(db, 'users', existingDocId));
-                  } catch (deleteErr) {
-                    console.warn('Could not delete migration source doc, attempting overwrite/mark instead:', deleteErr);
+                    await setDoc(doc(db, 'users', firebaseUser.uid), { role: 'admin' }, { merge: true });
+                  } catch (err) {
+                    console.error('Error auto-evaluating user to admin:', err);
+                  }
+                }
+
+                setUser(userData);
+                setLoading(false);
+              } else {
+                // No user document exists under this UID. Let's look for a pre-created (orphan) user doc with this email.
+                let existingData: any = null;
+                let existingDocId: string | null = null;
+
+                if (firebaseUser.email) {
+                  try {
+                    const q = query(collection(db, 'users'), where('email', '==', firebaseUser.email));
+                    const querySnap = await getDocs(q);
+                    const match = querySnap.docs.find(d => d.id !== firebaseUser.uid);
+                    if (match) {
+                      existingData = match.data();
+                      existingDocId = match.id;
+                    }
+                  } catch (err) {
+                    console.error('Error querying pre-existing user email:', err);
+                  }
+                }
+
+                const newUser: any = {
+                  uid: firebaseUser.uid,
+                  name: existingData?.name || firebaseUser.displayName || (isAdminEmail ? 'JH Admin' : 'User'),
+                  email: firebaseUser.email || '',
+                  photoURL: firebaseUser.photoURL || undefined,
+                  role: isAdminEmail ? 'admin' : (existingData?.role || 'user'),
+                  phone: existingData?.phone || '',
+                  status: existingData?.status || 'active',
+                  staff_id: existingData?.staff_id || undefined,
+                  salary_amount: existingData?.salary_amount || undefined,
+                  designation: existingData?.designation || undefined,
+                  address: existingData?.address || undefined,
+                  blood_group: existingData?.blood_group || undefined,
+                  joining_date: existingData?.joining_date || undefined,
+                };
+                
+                try {
+                  // Save under user's actual Auth UID so everything is tied to their account!
+                  await setDoc(doc(db, 'users', firebaseUser.uid), {
+                    ...newUser,
+                    createdAt: existingData?.created_at || existingData?.createdAt || serverTimestamp(),
+                    updated_at: serverTimestamp()
+                  }, { merge: true });
+
+                  // Delete or clear the pre-created orphan document
+                  if (existingDocId) {
                     try {
-                      await setDoc(doc(db, 'users', existingDocId), {
-                        email: `migrated_${Date.now()}_${existingData.email}`,
-                        migrated_to: firebaseUser.uid,
-                        status: 'disabled'
-                      }, { merge: true });
-                    } catch (updateErr) {
-                      console.error('Failed to clear migration source doc:', updateErr);
+                      await deleteDoc(doc(db, 'users', existingDocId));
+                    } catch (deleteErr) {
+                      console.warn('Could not delete migration source doc, attempting overwrite/mark instead:', deleteErr);
+                      try {
+                        await setDoc(doc(db, 'users', existingDocId), {
+                          email: `migrated_${Date.now()}_${existingData.email}`,
+                          migrated_to: firebaseUser.uid,
+                          status: 'disabled'
+                        }, { merge: true });
+                      } catch (updateErr) {
+                        console.error('Failed to clear migration source doc:', updateErr);
+                      }
                     }
                   }
+                } catch (e) {
+                  console.warn('Could not create user doc yet, listener will pick it up when online:', e);
                 }
-              } catch (e) {
-                console.warn('Could not create user doc yet, listener will pick it up when online:', e);
+                setUser(newUser);
+                setLoading(false);
               }
-              setUser(newUser);
+            } catch (err) {
+              console.error('Error processing user document snapshot:', err);
+            }
+          }, (err) => {
+            if (!isMounted) return;
+            
+            if (err.code === 'permission-denied' && retryCount < maxRetries) {
+              retryCount++;
+              const delay = Math.pow(2, retryCount) * 150 + Math.random() * 100;
+              console.warn(`User listener got temporary permission-denied. Retrying in ${Math.round(delay)}ms... (Attempt ${retryCount}/${maxRetries})`);
+              setTimeout(() => {
+                if (isMounted) {
+                  if (typeof unsubscribeUser === 'function') {
+                    unsubscribeUser();
+                  }
+                  startUserListener();
+                }
+              }, delay);
+            } else {
+              console.error('Permission error on user listener:', err);
+              handleFirestoreError(err, OperationType.GET, `users/${firebaseUser.uid}`);
               setLoading(false);
             }
-          } catch (err) {
-            console.error('Error processing user document snapshot:', err);
-          }
-        }, (err) => {
-          if (!isMounted) return;
-          console.error('Permission error on user listener:', err);
-          handleFirestoreError(err, OperationType.GET, `users/${firebaseUser.uid}`);
-          setLoading(false);
-        });
+          });
+        };
+
+        startUserListener();
 
         return () => {
           isMounted = false;
-          unsubscribeUser();
+          if (typeof unsubscribeUser === 'function') {
+            unsubscribeUser();
+          }
         };
       } else {
         setUser(null);

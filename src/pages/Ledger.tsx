@@ -304,18 +304,46 @@ const Ledger = () => {
       return;
     }
 
-    if (!window.confirm(`Are you sure you want to delete this entry? This action cannot be undone.`)) return;
+    const ledgerItem = ledger.find(l => l.id === targetId);
+    if (!ledgerItem) {
+      toast.error('Ledger entry not found');
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to move this ledger entry to the Recycle Bin?`)) return;
     
     const fullPath = `${targetCol}/${targetId}`;
     
     try {
-      console.log('Deleting entry from:', fullPath);
+      console.log('Soft-deleting entry to Recycle Bin:', fullPath);
+      
+      // Construct recycle bin document matching our schema
+      const recycleData = {
+        ...ledgerItem,
+        original_id: targetId,
+        type: 'ledger',
+        deleted_at: serverTimestamp(),
+        // Map ledger fields to standard Recycle Bin display properties
+        name: ledgerItem.customer_name || ledgerItem.customer || ledgerItem.particulars || 'Ledger Entry',
+        service_name: ledgerItem.service_name || ledgerItem.service_type || ledgerItem.service || 'Financial Entry',
+        reference_number: ledgerItem.reference_number || targetId.slice(0, 8)
+      };
+
+      // Delete non-serializable fields if any
+      delete recycleData.id;
+      delete recycleData.created_at;
+      delete recycleData.updated_at;
+
+      // Add to recycle bin first
+      await addDoc(collection(db, 'recycle_bin'), recycleData);
+
+      // Now delete from original ledger collection
       await deleteDoc(doc(db, targetCol, targetId));
       await fetchData();
-      toast.success('Successfully deleted tracking record');
+      toast.success('Ledger entry moved to Recycle Bin successfully');
     } catch (err: any) {
       console.error('Delete error at', fullPath, ':', err);
-      toast.error('Failed to delete record. Please check permissions.');
+      toast.error('Failed to move record to Recycle Bin. Please check permissions.');
       handleFirestoreError(err, OperationType.DELETE, fullPath);
     }
   };

@@ -4,7 +4,7 @@ import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { 
   collection, getDocs, doc, setDoc, updateDoc, 
-  deleteDoc, query, where, serverTimestamp, getDoc 
+  deleteDoc, query, where, serverTimestamp, getDoc, onSnapshot 
 } from 'firebase/firestore';
 import { 
   Search, Plus, Trash2, Shield, User, Edit2, Check, X, 
@@ -37,6 +37,7 @@ const UsersPage = () => {
     phone: '',
     password: '',
     role: 'user',
+    status: 'active',
     staff_id: ''
   });
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -59,34 +60,36 @@ const UsersPage = () => {
   });
 
   useEffect(() => {
-    fetchUsers();
-    console.log('Users page mounted');
-  }, []);
-
-  const fetchUsers = async () => {
     setLoading(true);
-    try {
-      console.log('Fetching users from Firestore...');
-      const snapshot = await getDocs(collection(db, 'users'));
+    const q = collection(db, 'users');
+    const unsubscribe = onSnapshot(q, (snapshot) => {
       const usersList = snapshot.docs
         .map(doc => {
           const data = doc.data();
           return {
             id: doc.id,
             ...data,
-            role: data.role || 'user',
-            status: data.status || 'active'
-          };
-        });
+            role: (data.role || 'user').toLowerCase(),
+            status: (data.status || 'active').toLowerCase()
+          } as any;
+        })
+        .filter(u => u.email && u.email !== 'undefined' && u.name && u.name !== 'undefined' && !u.is_deleted);
       
-      console.log('Users fetched from Firestore:', usersList);
+      console.log('Users updated in real-time:', usersList);
       setUsers(usersList);
-    } catch (err: any) {
-      console.error('Error fetching users from Firestore:', err);
-      handleFirestoreError(err, OperationType.LIST, 'users');
-    } finally {
       setLoading(false);
-    }
+    }, (err) => {
+      console.error('Error listening to users collection:', err);
+      handleFirestoreError(err, OperationType.LIST, 'users');
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const fetchUsers = async () => {
+    // Users are automatically updated in real-time via onSnapshot subscription
+    console.log('Real-time listener is active, no-op for fetchUsers');
   };
 
   const generateStaffId = async () => {
@@ -125,7 +128,7 @@ const UsersPage = () => {
         email: formData.email,
         phone: formData.phone,
         role: formData.role,
-        status: 'active',
+        status: formData.status || 'active',
         created_at: serverTimestamp(),
         updated_at: serverTimestamp()
       };
@@ -157,6 +160,7 @@ const UsersPage = () => {
         email: formData.email,
         phone: formData.phone,
         role: formData.role,
+        status: formData.status || 'active',
         updated_at: serverTimestamp()
       };
       
@@ -166,7 +170,7 @@ const UsersPage = () => {
           : (selectedUser.staff_id || await generateStaffId());
       }
       
-      await updateDoc(userRef, updateData);
+      await setDoc(userRef, updateData, { merge: true });
       setShowEditModal(false);
       resetForm();
       fetchUsers();
@@ -180,10 +184,10 @@ const UsersPage = () => {
     const newStatus = user.status === 'active' ? 'disabled' : 'active';
     try {
       const userRef = doc(db, 'users', user.id);
-      await updateDoc(userRef, {
+      await setDoc(userRef, {
         status: newStatus,
         updated_at: serverTimestamp()
-      });
+      }, { merge: true });
       fetchUsers();
       alert(`User ${newStatus === 'active' ? 'enabled' : 'disabled'} successfully`);
     } catch (err: any) {
@@ -284,7 +288,7 @@ const UsersPage = () => {
   };
 
   const resetForm = () => {
-    setFormData({ name: '', email: '', phone: '', password: '', role: 'user', staff_id: '' });
+    setFormData({ name: '', email: '', phone: '', password: '', role: 'user', status: 'active', staff_id: '' });
     setSelectedUser(null);
   };
 
@@ -295,7 +299,8 @@ const UsersPage = () => {
       email: user.email,
       phone: user.phone,
       password: '',
-      role: user.role,
+      role: (user.role || 'user').toLowerCase(),
+      status: (user.status || 'active').toLowerCase(),
       staff_id: user.staff_id || ''
     });
     setShowEditModal(true);
@@ -620,13 +625,13 @@ const UsersPage = () => {
                         placeholder="john@example.com"
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       <div className="space-y-2">
                         <label className="text-[10px] text-slate-500 uppercase font-bold tracking-widest ml-1">Phone Number</label>
                         <input 
                           type="tel" required
                           value={formData.phone || ''} onChange={e => setFormData({...formData, phone: e.target.value})}
-                          className="w-full px-5 py-3 bg-slate-800/50 border border-slate-700 rounded-2xl text-white focus:border-blue-500 outline-none transition-all"
+                          className="w-full px-5 py-3 bg-slate-800/50 border border-slate-700 rounded-2xl text-white focus:border-blue-500 outline-none transition-all text-sm"
                           placeholder="+91 9876543210"
                         />
                       </div>
@@ -634,11 +639,21 @@ const UsersPage = () => {
                         <label className="text-[10px] text-slate-500 uppercase font-bold tracking-widest ml-1">Account Role</label>
                         <select 
                           value={formData.role || 'user'} onChange={e => setFormData({...formData, role: e.target.value})}
-                          className="w-full px-5 py-3 bg-slate-800/50 border border-slate-700 rounded-2xl text-white focus:border-blue-500 outline-none transition-all"
+                          className="w-full px-5 py-3 bg-slate-800/50 border border-slate-700 rounded-2xl text-white focus:border-blue-500 outline-none transition-all text-sm"
                         >
                           <option value="user">User</option>
                           <option value="staff">Staff</option>
                           <option value="admin">Admin</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] text-slate-500 uppercase font-bold tracking-widest ml-1">Status</label>
+                        <select 
+                          value={formData.status || 'active'} onChange={e => setFormData({...formData, status: e.target.value})}
+                          className="w-full px-5 py-3 bg-slate-800/50 border border-slate-700 rounded-2xl text-white focus:border-blue-500 outline-none transition-all text-sm"
+                        >
+                          <option value="active">Active</option>
+                          <option value="disabled">Disabled</option>
                         </select>
                       </div>
                     </div>

@@ -149,53 +149,7 @@ const Dashboard = () => {
         </div>
       </header>
 
-      {/* Stats Overview */}
-      <div className="space-y-6">
-        <GlassCard className="p-8 border-white/10 h-full backdrop-blur-3xl bg-slate-900/40 shadow-2xl">
-           <header className="flex items-center justify-between mb-8">
-             <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-               <Zap size={14} className="text-amber-500" /> Digital Services
-             </h3>
-             <Link to="/app/services" className="text-xs font-bold text-blue-500 hover:underline">View All</Link>
-           </header>
-           
-           <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-             {servicesLoading ? (
-               [1, 2, 3, 4].map(i => <div key={i} className="aspect-square bg-white/5 rounded-3xl animate-pulse" />)
-             ) : (
-               services.slice(0, 4).map((service) => (
-                 <ServiceCard 
-                   key={service.id} 
-                   service={service} 
-                   icon={ICON_MAP[service.serviceKey] || Smartphone} 
-                   color={COLOR_MAP[service.serviceKey] || 'bg-blue-600'} 
-                 />
-               ))
-             )}
-           </div>
 
-           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-             <div className="p-4 rounded-2xl bg-white/5 border border-white/5 flex items-center gap-4 group hover:bg-white/10 transition-colors cursor-pointer">
-               <div className="w-10 h-10 bg-indigo-500/10 rounded-xl flex items-center justify-center text-indigo-400 border border-indigo-500/20">
-                 <Activity size={20} />
-               </div>
-               <div>
-                 <p className="text-xs font-black text-white uppercase tracking-tight">Active Usage</p>
-                 <p className="text-[10px] text-slate-500 font-bold">2.4k transactions today</p>
-               </div>
-             </div>
-             <div className="p-4 rounded-2xl bg-white/5 border border-white/5 flex items-center gap-4 group hover:bg-white/10 transition-colors cursor-pointer">
-               <div className="w-10 h-10 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-400 border border-emerald-500/20">
-                 <CheckCircle2 size={20} />
-               </div>
-               <div>
-                 <p className="text-xs font-black text-white uppercase tracking-tight">System Status</p>
-                 <p className="text-[10px] text-slate-500 font-bold text-emerald-500">Live & Optimal</p>
-               </div>
-             </div>
-           </div>
-        </GlassCard>
-      </div>
 
       {loading ? (
         <div className="grid md:grid-cols-3 gap-6">

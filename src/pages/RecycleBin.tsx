@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Trash2, RefreshCcw, Search, Filter, AlertCircle, CheckCircle2, Loader2, Database } from 'lucide-react';
-import { collection, getDocs, deleteDoc, doc, addDoc, query, orderBy, getDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, deleteDoc, doc, addDoc, query, orderBy, getDoc, serverTimestamp, updateDoc, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { safeFormat } from '../utils/dateUtils';
@@ -54,7 +54,7 @@ const RecycleBin = () => {
       
       if (binSnap.exists()) {
         const item = binSnap.data();
-        const collectionName = item.type === 'service' ? 'services' : (item.type === 'user' ? 'users' : 'applications');
+        const collectionName = item.type === 'ledger' ? 'ledger' : (item.type === 'service' ? 'services' : (item.type === 'user' ? 'users' : 'applications'));
         
         // Restore to original collection
         const restoredData = { ...item };
@@ -65,8 +65,14 @@ const RecycleBin = () => {
         const originalId = restoredData.original_id;
         delete restoredData.original_id;
         
+        // Remove mappings used for recycle bin display if present
+        if (type === 'ledger') {
+          // If we mapped fields, we might want to clean them, but keeping them is also safe.
+        }
+        
         if (originalId) {
-          await updateDoc(doc(db, collectionName, originalId), restoredData);
+          // setDoc is more robust for restored documents, particularly for fully purged items.
+          await setDoc(doc(db, collectionName, originalId), restoredData);
         } else {
           // If for some reason we don't have original_id, we add it back as a new doc
           await addDoc(collection(db, collectionName), restoredData);
@@ -149,6 +155,7 @@ const RecycleBin = () => {
                 <option value="application">Applications Only</option>
                 <option value="service">Services Only</option>
                 <option value="user">Users Only</option>
+                <option value="ledger">Ledger Entries Only</option>
               </select>
             </div>
           </div>
