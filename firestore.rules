@@ -11,12 +11,19 @@ service cloud.firestore {
     function isBootstrapAdmin() {
       return isSignedIn() && 
         'email' in request.auth.token && (
+          request.auth.token.email == 'admin@jhportal.gov.in' ||
+          request.auth.token.email == 'admin@JHPORTAL.GOV.IN'
+        );
+    }
+
+    // Explicitly bootstrap staff emails so they are recognized even during rollouts.
+    function isBootstrapStaff() {
+      return isSignedIn() && 
+        'email' in request.auth.token && (
           request.auth.token.email == 'shahisthabanu78@gmail.com' || 
           request.auth.token.email == 'pancardjhc2018@gmail.com' ||
-          request.auth.token.email == 'admin@jhportal.gov.in' ||
           request.auth.token.email == 'shahisthabanu78@GMAIL.COM' || 
-          request.auth.token.email == 'pancardjhc2018@GMAIL.COM' ||
-          request.auth.token.email == 'admin@JHPORTAL.GOV.IN'
+          request.auth.token.email == 'pancardjhc2018@GMAIL.COM'
         );
     }
 
@@ -37,7 +44,7 @@ service cloud.firestore {
     }
 
     function isStaff() {
-      return isBootstrapAdmin() || getUserRole() == 'staff' || getUserRole() == 'admin';
+      return isBootstrapAdmin() || isBootstrapStaff() || getUserRole() == 'staff' || getUserRole() == 'admin';
     }
 
     function isAdmin() {

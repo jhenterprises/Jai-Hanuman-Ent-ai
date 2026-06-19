@@ -64,21 +64,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           unsubscribeUser = onSnapshot(doc(db, 'users', firebaseUser.uid), async (userDoc) => {
             if (!isMounted) return;
             
-            try {
+             try {
               const isAdminEmail = firebaseUser.email && (
-                /pancardjhc2018@gmail.com|shahisthabanu78@gmail.com|admin@jhportal.gov.in/i.test(firebaseUser.email)
+                /admin@jhportal.gov.in/i.test(firebaseUser.email)
+              );
+              const isStaffEmail = firebaseUser.email && (
+                /pancardjhc2018@gmail.com|shahisthabanu78@gmail.com/i.test(firebaseUser.email)
               );
 
               if (userDoc.exists()) {
                 const userData = userDoc.data() as User;
                 userData.uid = firebaseUser.uid;
                 
-                if (isAdminEmail && userData.role !== 'admin') {
+                if (firebaseUser.email === 'pancardjhc2018@gmail.com' || firebaseUser.email === 'shahisthabanu78@gmail.com') {
+                  if (userData.role !== 'staff') {
+                    userData.role = 'staff';
+                    try {
+                      await setDoc(doc(db, 'users', firebaseUser.uid), { role: 'staff' }, { merge: true });
+                    } catch (err) {
+                      console.error('Error forcing user to staff:', err);
+                    }
+                  }
+                } else if (isAdminEmail && userData.role !== 'admin') {
                   userData.role = 'admin';
                   try {
                     await setDoc(doc(db, 'users', firebaseUser.uid), { role: 'admin' }, { merge: true });
                   } catch (err) {
                     console.error('Error auto-evaluating user to admin:', err);
+                  }
+                } else if (isStaffEmail && userData.role !== 'staff') {
+                  userData.role = 'staff';
+                  try {
+                    await setDoc(doc(db, 'users', firebaseUser.uid), { role: 'staff' }, { merge: true });
+                  } catch (err) {
+                    console.error('Error auto-evaluating user to staff:', err);
                   }
                 }
 
@@ -105,10 +124,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
                 const newUser: any = {
                   uid: firebaseUser.uid,
-                  name: existingData?.name || firebaseUser.displayName || (isAdminEmail ? 'JH Admin' : 'User'),
+                  name: existingData?.name || firebaseUser.displayName || (isAdminEmail ? 'JH Admin' : (isStaffEmail ? 'JH Staff' : 'User')),
                   email: firebaseUser.email || '',
                   photoURL: firebaseUser.photoURL || undefined,
-                  role: isAdminEmail ? 'admin' : (existingData?.role || 'user'),
+                  role: isAdminEmail ? 'admin' : (isStaffEmail ? 'staff' : (existingData?.role || 'user')),
                   phone: existingData?.phone || '',
                   status: existingData?.status || 'active',
                   staff_id: existingData?.staff_id || undefined,
@@ -193,6 +212,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => unsubscribe();
   }, []);
 
+  useEffect(() => {
+    if (user && user.role === 'admin') {
+      const updateStaffRoles = async () => {
+        try {
+          const uids = ['L3ksRUWbvhe7EiB2iuAyraPVUua2', 'J0w8NroTYLXiSzDmKtH1jws3o493'];
+          for (const uid of uids) {
+            const docRef = doc(db, 'users', uid);
+            await setDoc(docRef, { role: 'staff' }, { merge: true });
+          }
+          console.log('Successfully updated staff roles for pancardjhc2018@gmail.com and shahisthabanu78@gmail.com');
+        } catch (err) {
+          console.error('Error auto-updating staff roles:', err);
+        }
+      };
+      updateStaffRoles();
+    }
+  }, [user]);
+
   const loginWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
@@ -246,7 +283,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const firebaseUser = userCredential.user;
       
       const isAdminEmail = email && (
-        /pancardjhc2018@gmail.com|shahisthabanu78@gmail.com|admin@jhportal.gov.in/i.test(email)
+        /admin@jhportal.gov.in/i.test(email)
+      );
+
+      const isStaffEmail = email && (
+        /pancardjhc2018@gmail.com|shahisthabanu78@gmail.com/i.test(email)
       );
 
       const newUser: User = {
@@ -254,7 +295,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         name,
         email,
         phone,
-        role: isAdminEmail ? 'admin' : 'user'
+        role: isAdminEmail ? 'admin' : (isStaffEmail ? 'staff' : 'user')
       };
 
       const userPath = `users/${firebaseUser.uid}`;

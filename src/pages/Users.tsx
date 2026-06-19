@@ -9,8 +9,9 @@ import {
 import { 
   Search, Plus, Trash2, Shield, User, Edit2, Check, X, 
   UserMinus, UserCheck, Key, Filter, ChevronLeft, ChevronRight,
-  MoreVertical, Phone, Mail, Calendar, Info
+  MoreVertical, Phone, Mail, Calendar, Info, Download
 } from 'lucide-react';
+import { exportToCSV } from '../utils/csvExport';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
@@ -350,13 +351,21 @@ const UsersPage = () => {
           <h1 className="text-3xl font-bold text-white">User Management</h1>
           <p className="text-slate-400 text-sm mt-1">Manage system users, roles, and access controls.</p>
         </div>
-        <button 
-          onClick={() => { resetForm(); setShowAddModal(true); }}
-          className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl transition-all shadow-lg shadow-blue-600/20 font-bold text-sm w-fit"
-        >
-          <Plus size={20} />
-          Add New User
-        </button>
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={() => exportToCSV(filtered, 'Users_Report')}
+            className="flex items-center gap-2 px-6 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl transition-all font-bold text-sm"
+          >
+            <Download size={20} /> Export CSV
+          </button>
+          <button 
+            onClick={() => { resetForm(); setShowAddModal(true); }}
+            className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl transition-all shadow-lg shadow-blue-600/20 font-bold text-sm w-fit"
+          >
+            <Plus size={20} />
+            Add New User
+          </button>
+        </div>
       </div>
 
       {/* Filters & Search */}

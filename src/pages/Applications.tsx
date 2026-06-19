@@ -8,6 +8,7 @@ import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import { Search, FileText, CheckCircle, XCircle, Clock, Eye, Download, User, ExternalLink, Activity, Upload, MessageSquare, Filter, Shield, Loader2, Trash2 } from 'lucide-react';
 import { downloadPDF } from '../utils/pdfGenerator';
+import { exportToCSV } from '../utils/csvExport';
 import AcknowledgementReceipt from '../components/AcknowledgementReceipt';
 import { safeFormat } from '../utils/dateUtils';
 
@@ -295,6 +296,12 @@ const Applications = () => {
               className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-sm"
             />
           </div>
+          <button 
+            onClick={() => exportToCSV(filtered, 'Applications_Report')}
+            className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white text-xs font-bold rounded-xl hover:bg-slate-800 transition-all shadow-sm"
+          >
+            <Download size={16} /> Export CSV
+          </button>
         </div>
       </div>
 
