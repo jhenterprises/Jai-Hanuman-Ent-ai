@@ -182,7 +182,7 @@ const ServiceControlSettings = () => {
       <header className="flex justify-between items-center">
         <div className="space-y-1">
           <h1 className="text-4xl font-black text-white tracking-tight">Service <span className="text-blue-500">Control Panel</span></h1>
-          <p className="text-slate-500">Enable/disable financial services and manage maintenance modes.</p>
+          <p className="text-slate-500">Enable/disable digital services and manage maintenance modes.</p>
         </div>
         <button 
           onClick={() => setShowAddForm(!showAddForm)}
@@ -207,7 +207,7 @@ const ServiceControlSettings = () => {
           <GlassCard className="p-8 border-blue-500/30 bg-blue-500/5">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Service Key (e.g. mobileRecharge)</label>
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Service Key (e.g. panServices)</label>
                 <input 
                   value={newServiceData.key}
                   onChange={e => setNewServiceData({...newServiceData, key: e.target.value})}
@@ -220,7 +220,7 @@ const ServiceControlSettings = () => {
                 <input 
                   value={newServiceData.name}
                   onChange={e => setNewServiceData({...newServiceData, name: e.target.value})}
-                  placeholder="e.g. Mobile Recharge"
+                  placeholder="e.g. PAN Services"
                   className="w-full p-4 bg-white/5 border border-white/10 rounded-xl text-white font-bold focus:ring-2 ring-blue-500 outline-none"
                 />
               </div>

@@ -35,6 +35,9 @@ export const useSupportChats = (statusFilter?: ChatStatus[]) => {
       
       setChats(chatsData);
       setLoading(false);
+    }, (error) => {
+      console.error("Error fetching support chats:", error);
+      setLoading(false);
     });
 
     return () => unsubscribe();

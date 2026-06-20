@@ -93,6 +93,8 @@ const LiveSupport = () => {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const msgs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setMessages(msgs);
+    }, (error) => {
+      console.error("LiveSupport chat messages stream error:", error);
     });
 
     return () => unsubscribe();

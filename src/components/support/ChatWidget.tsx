@@ -32,6 +32,12 @@ export const ChatWidget: React.FC = () => {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    const handleOpenChat = () => setIsOpen(true);
+    window.addEventListener('nz-open-live-chat', handleOpenChat);
+    return () => window.removeEventListener('nz-open-live-chat', handleOpenChat);
+  }, []);
+
+  useEffect(() => {
     if (isOpen && user && !chatId) {
       chatService.getOrCreateChat(user).then(setChatId);
     }

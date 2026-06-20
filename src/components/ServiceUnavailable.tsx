@@ -55,10 +55,10 @@ const ServiceUnavailable: React.FC<ServiceUnavailableProps> = ({ type, serviceNa
           </div>
 
           <Link 
-            to="/app/financial/hub"
+            to="/app/dashboard"
             className="inline-flex items-center gap-2 px-8 py-4 bg-white/5 hover:bg-white/10 text-white font-black uppercase tracking-widest text-[10px] rounded-2xl border border-white/10 transition-all"
           >
-            <ArrowLeft size={16} /> Back to Hub
+            <ArrowLeft size={16} /> Back to Dashboard
           </Link>
         </GlassCard>
       </motion.div>

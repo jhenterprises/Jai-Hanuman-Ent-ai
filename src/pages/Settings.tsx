@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
-import { Briefcase, Users, Shield, Settings as SettingsIcon, LayoutTemplate, Wallet, FileText, Lock, List, Activity, IdCard, Trash2, Power } from 'lucide-react';
+import { Briefcase, Users, Shield, Settings as SettingsIcon, LayoutTemplate, Wallet, FileText, Lock, List, Activity, IdCard, Trash2, Power, Sparkles } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const SettingsLayout = () => {
@@ -13,6 +13,7 @@ const SettingsLayout = () => {
     { name: 'User Management', icon: <Users size={20} />, path: '/app/users', roles: ['admin', 'staff'] },
     { name: 'Staff Management', icon: <Users size={20} />, path: '/app/settings/staff', roles: ['admin'] },
     { name: 'Service Control', icon: <Power size={20} />, path: '/app/settings/service-control', roles: ['admin'] },
+    { name: 'AI Copilot', icon: <Sparkles size={20} />, path: '/app/settings/ai-copilot', roles: ['admin'] },
     { name: 'ID Card Designer', icon: <IdCard size={20} />, path: '/app/admin/id-card-designer', roles: ['admin'] },
     { name: 'Recycle Bin', icon: <Trash2 size={20} />, path: '/app/recycle-bin', roles: ['admin'] },
     { name: 'System Permissions', icon: <Lock size={20} />, path: '/app/settings/permissions', roles: ['admin'] },

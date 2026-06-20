@@ -78,20 +78,9 @@ const ServiceCard: React.FC<ServiceCardProps> = ({ service, icon: Icon, color })
   if (isAvailable) {
     const getPath = () => {
       switch (service.serviceKey) {
-        case 'mobileRecharge': return '/app/financial/recharge';
-        case 'dthRecharge': return '/app/financial/recharge?type=dth';
-        case 'electricityBill': return '/app/financial/bill-pay';
-        case 'waterBill': return '/app/financial/bill-pay?cat=water';
-        case 'gasBill': return '/app/financial/bill-pay?cat=gas';
-        case 'broadbandBill': return '/app/financial/bill-pay?cat=broadband';
-        case 'dmt': return '/app/financial/dmt';
-        case 'aeps': return '/app/financial/aeps';
-        case 'aadhaarPay': return '/app/financial/aeps?type=pay';
-        case 'wallet': return '/app/financial/wallet';
-        case 'pan': return '/app/pan-card';
-        case 'aadhaarService': return '/app/aadhaar-center';
-        case 'fastag': return '/app/financial/bill-pay?cat=fastag';
-        default: return '#';
+        case 'pan': return '/app/user/apply/pan';
+        case 'aadhaarService': return '/app/user/apply/aadhaarservice';
+        default: return `/app/user/apply/${service.serviceKey.toLowerCase()}`;
       }
     };
     

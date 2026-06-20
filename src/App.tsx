@@ -12,6 +12,7 @@ import PublicLayout from './layouts/PublicLayout';
 const Home = lazy(() => import('./pages/Home'));
 const About = lazy(() => import('./pages/About'));
 const Contact = lazy(() => import('./pages/Contact'));
+const TrackApplication = lazy(() => import('./pages/TrackApplication'));
 const Login = lazy(() => import('./pages/Login'));
 const Register = lazy(() => import('./pages/Register'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
@@ -27,6 +28,7 @@ const SupportCenter = lazy(() => import('./pages/SupportCenter'));
 const Profile = lazy(() => import('./pages/Profile'));
 const Settings = lazy(() => import('./pages/Settings'));
 const ServiceControlSettings = lazy(() => import('./pages/admin/ServiceControlSettings'));
+const AICopilotSettings = lazy(() => import('./pages/admin/AICopilotSettings'));
 const IDCardSettings = lazy(() => import('./pages/IDCardSettings'));
 const RecycleBin = lazy(() => import('./pages/RecycleBin'));
 const Documents = lazy(() => import('./pages/Documents'));
@@ -92,6 +94,8 @@ export default function App() {
                   <Route path="/" element={<Home />} />
                   <Route path="/about" element={<About />} />
                   <Route path="/contact" element={<Contact />} />
+                  <Route path="/track" element={<TrackApplication />} />
+                  <Route path="/track/:ref" element={<TrackApplication />} />
                 </Route>
                 
                 <Route path="/login" element={<Login />} />
@@ -135,6 +139,7 @@ export default function App() {
                   <Route path="settings" element={<ProtectedRoute roles={['admin']}><Settings /></ProtectedRoute>}>
                     <Route path="services" element={<Services />} />
                     <Route path="service-control" element={<ServiceControlSettings />} />
+                    <Route path="ai-copilot" element={<AICopilotSettings />} />
                     <Route path="users" element={<Users />} />
                     <Route path="staff" element={<Users />} />
                     <Route path="permissions" element={<SystemPermissions />} />

@@ -240,6 +240,8 @@ const AdminDashboard = () => {
         ...prev,
         adminLogs: snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
       }));
+    }, (err) => {
+      console.warn('Error reading activity logs:', err);
     });
 
     const handleClickOutside = (event: MouseEvent) => {
