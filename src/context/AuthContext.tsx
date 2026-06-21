@@ -20,6 +20,8 @@ interface User {
   phone?: string;
   photoURL?: string;
   role: 'user' | 'staff' | 'admin';
+  last_login_at?: string;
+  last_logout_at?: string;
 }
 
 interface AuthContextType {
@@ -103,6 +105,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
                 setUser(userData);
                 setLoading(false);
+
+                // Track last login time safely
+                if (userData.role === 'staff' || userData.role === 'admin') {
+                  const nowStr = new Date().toISOString();
+                  const lastLoginTime = userData.last_login_at ? new Date(userData.last_login_at).getTime() : 0;
+                  if (new Date().getTime() - lastLoginTime > 15000) {
+                    setDoc(doc(db, 'users', firebaseUser.uid), {
+                      last_login_at: nowStr
+                    }, { merge: true }).catch(err => console.warn('Login track error:', err));
+                  }
+                }
               } else {
                 // No user document exists under this UID. Let's look for a pre-created (orphan) user doc with this email.
                 let existingData: any = null;
@@ -211,24 +224,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return () => unsubscribe();
   }, []);
-
-  useEffect(() => {
-    if (user && user.role === 'admin') {
-      const updateStaffRoles = async () => {
-        try {
-          const uids = ['L3ksRUWbvhe7EiB2iuAyraPVUua2', 'J0w8NroTYLXiSzDmKtH1jws3o493'];
-          for (const uid of uids) {
-            const docRef = doc(db, 'users', uid);
-            await setDoc(docRef, { role: 'staff' }, { merge: true });
-          }
-          console.log('Successfully updated staff roles for pancardjhc2018@gmail.com and shahisthabanu78@gmail.com');
-        } catch (err) {
-          console.error('Error auto-updating staff roles:', err);
-        }
-      };
-      updateStaffRoles();
-    }
-  }, [user]);
 
   const loginWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
@@ -364,6 +359,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     try {
+      if (user && user.uid) {
+        await setDoc(doc(db, 'users', user.uid), {
+          last_logout_at: new Date().toISOString()
+        }, { merge: true }).catch(err => console.warn('Logout track error:', err));
+      }
       await signOut(auth);
     } catch (error) {
       console.error('Logout failed:', error);

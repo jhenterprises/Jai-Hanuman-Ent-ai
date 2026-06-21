@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import * as LucideIcons from 'lucide-react';
-import { Search, Plus, Trash2, ExternalLink, ArrowRight, X, Check, Eye, EyeOff, Power, Edit2, Rocket, Settings } from 'lucide-react';
+import { Search, Plus, Trash2, ExternalLink, ArrowRight, X, Check, Eye, EyeOff, Power, Edit2, Rocket, Settings, UserCog } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import ConfirmDialog from '../components/ConfirmDialog';
 import ModernButton from '../components/ModernButton';
@@ -75,12 +75,18 @@ const SortableServiceItem = ({ service, isAdmin, onTogglePopular }: { service: a
   );
 };
 
+import { seedServicesToFirestore } from '../seedServices';
+
 const Services = () => {
   const { config } = useConfig();
   const [activeTab, setActiveTab] = useState('all'); // 'all' or 'popular'
   const [services, setServices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    seedServicesToFirestore().catch(e => console.log(e));
+  }, []);
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('name-asc');
   const [filterType, setFilterType] = useState('all');
@@ -194,28 +200,74 @@ const Services = () => {
     setLoading(true);
     setError(null);
     try {
-      console.log('Fetching services from Firestore...');
+      console.log('Fetching services from both service_management and services...');
+      const servicesMap = new Map();
+
+      // First load from service_management (Admin edited)
+      const manageSnapshot = await getDocs(collection(db, 'service_management'));
+      if (!manageSnapshot.empty) {
+        manageSnapshot.docs.forEach((doc) => {
+          const data = doc.data() as any;
+          const serviceUrl = data.url || data.service_url || data.serviceUrl || '';
+          servicesMap.set(data.serviceId || doc.id, {
+            service_id: doc.id,
+            id: doc.id,
+            serviceId: data.serviceId || doc.id,
+            name: data.serviceName || data.name || 'Unnamed Service',
+            description: data.description || 'No description available',
+            url: serviceUrl,
+            service_url: serviceUrl,
+            serviceUrl: serviceUrl,
+            icon: data.icon || 'fa-file',
+            image: data.image || '',
+            category: data.category || 'Identity Services',
+            enabled: data.status === 'active',
+            status: data.status || 'active',
+            is_visible: data.isVisible !== undefined ? data.isVisible !== false : data.is_visible !== false,
+            application_type: data.application_type || (serviceUrl ? 'external' : 'internal'),
+            isPopular: !!data.isPopular,
+            order: data.displayOrder || 0
+          });
+        });
+      }
+
+      // Then load from classic services collection, filling in whatever isn't already there
       const querySnapshot = await getDocs(collection(db, 'services'));
-      const servicesData = querySnapshot.docs.map(doc => {
-        const data = doc.data() as any;
-        return {
-          service_id: doc.id,
-          ...data,
-          name: data.name || data.service_name || 'Unnamed Service',
-          description: data.description || 'No description available',
-          url: data.url || data.service_url || '',
-          icon: data.icon || 'fa-file',
-          enabled: data.enabled !== undefined ? data.enabled : (data.is_active !== undefined ? data.is_active : true),
-          is_visible: data.is_visible !== undefined ? data.is_visible : true,
-          application_type: data.application_type || (data.url || data.service_url ? 'external' : 'internal'),
-          isPopular: !!data.isPopular,
-          order: data.order || 0
-        };
-      });
-      console.log('Fetched services:', servicesData);
+      if (!querySnapshot.empty) {
+        querySnapshot.docs.forEach((doc) => {
+          const serviceId = doc.id;
+          if (!servicesMap.has(serviceId)) {
+            const data = doc.data() as any;
+            const serviceUrl = data.url || data.service_url || data.serviceUrl || '';
+            servicesMap.set(serviceId, {
+              service_id: doc.id,
+              id: doc.id,
+              serviceId: doc.id,
+              name: data.name || data.service_name || 'Unnamed Service',
+              description: data.description || 'No description available',
+              url: serviceUrl,
+              service_url: serviceUrl,
+              serviceUrl: serviceUrl,
+              icon: data.icon || 'fa-file',
+              image: '',
+              category: 'Other Services',
+              enabled: data.enabled !== undefined ? data.enabled : (data.is_active !== undefined ? data.is_active : true),
+              status: (data.enabled !== false) ? 'active' : 'disabled',
+              is_visible: data.is_visible !== undefined ? data.is_visible : true,
+              application_type: data.application_type || (serviceUrl ? 'external' : 'internal'),
+              isPopular: !!data.isPopular,
+              order: data.order || 0
+            });
+          }
+        });
+      }
+
+      const servicesData = Array.from(servicesMap.values());
+      servicesData.sort((a, b) => (a.order || 0) - (b.order || 0));
+      console.log('Fetched integrated services:', servicesData);
       setServices(servicesData);
     } catch (err) {
-      console.error('Error fetching services from Firestore:', err);
+      console.error('Error fetching services with fallback:', err);
       setError('Failed to load services. Please try again later.');
       setServices([]);
       handleFirestoreError(err, OperationType.LIST, 'services');
@@ -421,7 +473,8 @@ const Services = () => {
     }
   };
 
-  const getServiceKey = (name: string) => {
+  const getServiceKey = (name: string, serviceId?: string) => {
+    if (serviceId) return serviceId;
     const lowerName = name.toLowerCase();
     if (lowerName.includes('aadhaar')) return 'aadhaar';
     if (lowerName.includes('pan')) return 'pan';
@@ -437,7 +490,17 @@ const Services = () => {
   };
 
   const handleApply = async (service: any) => {
-    const key = getServiceKey(service.name);
+    if (service.status === 'comingSoon') {
+      alert('This service is Coming Soon! Please stay tuned.');
+      return;
+    }
+    if (service.status === 'maintenance') {
+      alert('This service is currently Under Maintenance. Please check back later.');
+      return;
+    }
+    
+    const sid = service.service_id || service.serviceId || service.id;
+    const key = getServiceKey(service.name, sid);
     // If it's a hardcoded one, use that key. 
     // Otherwise, use the service name itself so ApplyService can find it.
     const urlParam = (key && key !== 'general') ? key : encodeURIComponent(service.name);
@@ -445,8 +508,13 @@ const Services = () => {
   };
 
   const handleOpenUrl = async (service: any) => {
-    if (service.url) {
-      window.open(service.url, '_blank');
+    const urlToOpen = service.url || service.service_url || service.serviceUrl;
+    if (urlToOpen) {
+      if (urlToOpen.startsWith('http')) {
+        window.open(urlToOpen, '_blank');
+      } else {
+        window.open(`https://${urlToOpen}`, '_blank');
+      }
     } else {
       alert("Service URL not configured.");
     }
@@ -454,6 +522,11 @@ const Services = () => {
 
   const filtered = (services || [])
     .filter(s => {
+      const isAdminUser = user?.role === 'admin';
+      if (!isAdminUser) {
+        if (s.is_visible === false) return false;
+        if (s.status === 'disabled') return false;
+      }
       const matchesSearch = (s.name || '').toLowerCase().includes(search.toLowerCase());
       const matchesFilter = filterType === 'all' || 
                            (filterType === 'internal' && s.application_type === 'internal') ||
@@ -462,6 +535,10 @@ const Services = () => {
       return matchesSearch && matchesFilter;
     })
     .sort((a, b) => {
+      if (a.order !== undefined && b.order !== undefined) {
+        const orderDiff = (a.order || 0) - (b.order || 0);
+        if (orderDiff !== 0) return orderDiff;
+      }
       if (sortBy === 'name-asc') return a.name.localeCompare(b.name);
       if (sortBy === 'name-desc') return b.name.localeCompare(a.name);
       if (sortBy === 'most-visited') return (b.visit_count || 0) - (a.visit_count || 0);
@@ -733,7 +810,7 @@ const Services = () => {
                   </div>
                   <button
                     type="button"
-                    onClick={() => navigate(`/app/services/${editingService.service_id}/builder`)}
+                    onClick={() => navigate(`/app/services/${encodeURIComponent(editingService.serviceId || editingService.service_id || editingService.id)}/builder`)}
                     className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-medium transition-colors flex items-center gap-2"
                   >
                     <Settings size={16} /> Open Form Builder
@@ -768,69 +845,129 @@ const Services = () => {
           <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
         </div>
       ) : (
-        <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-${config.grid_columns || 4} gap-6`}>
-          {filtered.length > 0 ? (
-            filtered.map(service => (
-            <div key={service.service_id} className="group bg-slate-800/60 backdrop-blur-xl rounded-3xl p-6 border border-slate-700/50 shadow-lg hover:border-blue-500/50 transition-all hover:-translate-y-1 relative flex flex-col">
-              {isAdmin && (
-                <div className="absolute top-4 right-4 flex gap-2 opacity-100 transition-opacity">
-                  <button onClick={() => toggleVisibility(service)} className={`p-1.5 rounded-lg ${service.is_visible ? 'text-blue-400' : 'text-slate-500'}`} title={service.is_visible ? 'Visible' : 'Hidden'}>
-                    {service.is_visible ? <Eye size={16} /> : <EyeOff size={16} />}
-                  </button>
-                  <button onClick={() => toggleStatus(service)} className={`p-1.5 rounded-lg ${service.enabled ? 'text-green-400' : 'text-slate-500'}`} title={service.enabled ? 'Deactivate' : 'Activate'}>
-                    <Power size={16} />
-                  </button>
-                  <button onClick={() => handleEdit(service)} className="p-1.5 rounded-lg text-slate-400 hover:text-white" title="Edit">
-                    <Edit2 size={16} />
-                  </button>
-                  <button onClick={() => handleDelete(service.service_id)} className="p-1.5 rounded-lg text-red-400 hover:text-white" title="Delete">
-                    <Trash2 size={16} />
-                  </button>
-                </div>
+        <div className="space-y-12">
+          {activeTab === 'popular' ? (
+            <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-${config.grid_columns || 4} gap-6`}>
+              {filtered.filter(s => s.isPopular).length > 0 ? (
+                filtered.filter(s => s.isPopular).map(service => {
+                  const isComingSoon = service.status === 'comingSoon';
+                  const isMaintenance = service.status === 'maintenance';
+                  return (
+                    <div key={service.service_id} className="group bg-slate-800/60 backdrop-blur-xl rounded-3xl p-6 border border-slate-700/50 shadow-lg hover:border-blue-500/50 transition-all hover:-translate-y-1 relative flex flex-col overflow-hidden">
+                      {isComingSoon && (
+                        <div className="absolute top-4 right-4 bg-amber-500/20 border border-amber-500/30 text-amber-400 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full">
+                          Coming Soon
+                        </div>
+                      )}
+                      {isMaintenance && (
+                        <div className="absolute top-4 right-4 bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full">
+                          Maintenance
+                        </div>
+                      )}
+                      {isAdmin && !isComingSoon && !isMaintenance && (
+                        <div className="absolute top-4 right-4 flex gap-2 opacity-150 transition-opacity">
+                          <button onClick={() => toggleVisibility(service)} className={`p-1.5 rounded-lg ${service.is_visible ? 'text-blue-400' : 'text-slate-500'}`} title={service.is_visible ? 'Visible' : 'Hidden'}>
+                            {service.is_visible ? <Eye size={16} /> : <EyeOff size={16} />}
+                          </button>
+                          <button onClick={() => toggleStatus(service)} className={`p-1.5 rounded-lg ${service.enabled ? 'text-green-400' : 'text-slate-500'}`} title={service.enabled ? 'Deactivate' : 'Activate'}>
+                            <Power size={16} />
+                          </button>
+                          <button onClick={() => handleEdit(service)} className="p-1.5 rounded-lg text-blue-400 hover:text-white" title="Edit">
+                            <Edit2 size={16} />
+                          </button>
+                          <button onClick={() => handleDelete(service.service_id || service.serviceId || service.id)} className="p-1.5 rounded-lg text-red-500 hover:text-white" title="Delete">
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      )}
+                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500/20 to-cyan-400/20 border border-blue-500/30 flex items-center justify-center mb-4 text-blue-400">
+                        {getIcon(service.icon)}
+                      </div>
+                      <h3 className="text-xl font-bold text-white mb-2">{service.name}</h3>
+                      <p className="text-slate-400 text-sm mb-6 line-clamp-3 flex-1">{service.description}</p>
+                      <div className="mt-auto flex flex-col gap-2">
+                        {isComingSoon ? (
+                          <button disabled className="w-full py-3 bg-amber-500/10 border border-amber-500/20 text-amber-400 font-extrabold uppercase tracking-wider rounded-2xl text-xs cursor-not-allowed">Coming Soon</button>
+                        ) : isMaintenance ? (
+                          <button disabled className="w-full py-3 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 font-extrabold uppercase tracking-wider rounded-2xl text-xs cursor-not-allowed">Under Maintenance</button>
+                        ) : (user?.role === 'admin' || user?.role === 'staff') ? (
+                          <>
+                            <ModernButton text="Apply for Customer" icon={UserCog} onClick={() => handleApply(service)} gradient="blue-gold-gradient" className="w-full !py-2 !text-xs" />
+                            {(service.application_type === 'external' || service.service_url || service.url) && (
+                              <button onClick={() => handleOpenUrl(service)} className="inline-flex items-center justify-center w-full py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl transition-all font-bold text-xs gap-2">Open Service URL</button>
+                            )}
+                          </>
+                        ) : (
+                          <ModernButton text="Apply Now" icon={UserCog} onClick={() => handleApply(service)} gradient="blue-gold-gradient" className="w-full !py-3 !text-sm" />
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="col-span-full text-center text-slate-400 py-10">No popular services found.</div>
               )}
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500/20 to-cyan-400/20 border border-blue-500/30 flex items-center justify-center mb-4 text-blue-400">
-                {getIcon(service.icon)}
-              </div>
-              <h3 className="text-xl font-bold text-white mb-2">{service.name}</h3>
-              <p className="text-slate-400 text-sm mb-6 line-clamp-3 flex-1">{service.description}</p>
-              
-              <div className="mt-auto flex flex-col gap-2">
-                {(user?.role === 'admin' || user?.role === 'staff') ? (
-                  <>
-                    <ModernButton 
-                      text="Apply for Customer" 
-                      icon={Rocket} 
-                      onClick={() => handleApply(service)}
-                      gradient="blue-gold-gradient"
-                      className="w-full !py-2 !text-xs"
-                    />
-                    {(service.application_type === 'external' || service.service_url) && (
-                      <button 
-                        onClick={() => handleOpenUrl(service)}
-                        className="inline-flex items-center justify-center w-full py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl transition-all font-bold text-xs gap-2"
-                      >
-                        Open Service URL
-                      </button>
-                    )}
-                  </>
-                ) : (
-                  <ModernButton 
-                    text="Apply Now" 
-                    icon={Rocket} 
-                    onClick={() => handleApply(service)}
-                    gradient="blue-gold-gradient"
-                    className="w-full !py-3 !text-sm"
-                  />
-                )}
-              </div>
             </div>
-          ))
-        ) : (
-          <div className="col-span-full text-center text-slate-400 py-10">
-            No services found.
-          </div>
-        )}
-      </div>
+          ) : (
+            <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-${config.grid_columns || 4} gap-6`}>
+              {filtered.map(service => {
+                const isComingSoon = service.status === 'comingSoon';
+                const isMaintenance = service.status === 'maintenance';
+                return (
+                  <div key={service.service_id} className="group bg-slate-800/60 backdrop-blur-xl rounded-2xl p-6 border border-slate-700/50 shadow-lg hover:border-blue-500/50 transition-all hover:-translate-y-1 relative flex flex-col overflow-hidden">
+                    {isComingSoon && (
+                      <div className="absolute top-4 right-4 bg-amber-500/20 border border-amber-500/30 text-amber-400 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full">
+                        Coming Soon
+                      </div>
+                    )}
+                    {isMaintenance && (
+                      <div className="absolute top-4 right-4 bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full">
+                        Maintenance
+                      </div>
+                    )}
+                    {isAdmin && !isComingSoon && !isMaintenance && (
+                      <div className="absolute top-4 right-4 flex gap-2 opacity-100 transition-opacity">
+                        <button onClick={() => toggleVisibility(service)} className={`p-1.5 rounded-lg ${service.is_visible ? 'text-blue-400' : 'text-slate-500'}`} title={service.is_visible ? 'Visible' : 'Hidden'}>
+                          {service.is_visible ? <Eye size={16} /> : <EyeOff size={16} />}
+                        </button>
+                        <button onClick={() => toggleStatus(service)} className={`p-1.5 rounded-lg ${service.enabled ? 'text-green-400' : 'text-slate-500'}`} title={service.enabled ? 'Deactivate' : 'Activate'}>
+                          <Power size={16} />
+                        </button>
+                        <button onClick={() => handleEdit(service)} className="p-1.5 rounded-lg text-blue-400 hover:text-white" title="Edit">
+                          <Edit2 size={16} />
+                        </button>
+                        <button onClick={() => handleDelete(service.service_id || service.serviceId || service.id)} className="p-1.5 rounded-lg text-red-500 hover:text-white" title="Delete">
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    )}
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500/20 to-cyan-400/20 border border-blue-500/30 flex items-center justify-center mb-4 text-blue-400">
+                      {getIcon(service.icon)}
+                    </div>
+                    <h3 className="text-xl font-bold text-white mb-2">{service.name}</h3>
+                    <p className="text-slate-400 text-sm mb-6 line-clamp-3 flex-1">{service.description}</p>
+                    <div className="mt-auto flex flex-col gap-2">
+                      {isComingSoon ? (
+                        <button disabled className="w-full py-3 bg-amber-500/10 border border-amber-500/20 text-amber-400 font-extrabold uppercase tracking-wider rounded-2xl text-xs cursor-not-allowed">Coming Soon</button>
+                      ) : isMaintenance ? (
+                        <button disabled className="w-full py-3 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 font-extrabold uppercase tracking-wider rounded-2xl text-xs cursor-not-allowed">Under Maintenance</button>
+                      ) : (user?.role === 'admin' || user?.role === 'staff') ? (
+                        <>
+                          <ModernButton text="Apply for Customer" icon={UserCog} onClick={() => handleApply(service)} gradient="blue-gold-gradient" className="w-full !py-2 !text-xs" />
+                          {(service.application_type === 'external' || service.service_url || service.url) && (
+                            <button onClick={() => handleOpenUrl(service)} className="inline-flex items-center justify-center w-full py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl transition-all font-bold text-xs gap-2">Open Service URL</button>
+                          )}
+                        </>
+                      ) : (
+                        <ModernButton text="Apply Now" icon={UserCog} onClick={() => handleApply(service)} gradient="blue-gold-gradient" className="w-full !py-3 !text-sm" />
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       )}
       </>
       )}

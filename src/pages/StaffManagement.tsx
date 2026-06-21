@@ -28,6 +28,7 @@ const StaffManagement = () => {
   const [staff, setStaff] = useState<any[]>([]);
   const [attendance, setAttendance] = useState<any[]>([]);
   const [salaries, setSalaries] = useState<any[]>([]);
+  const [applications, setApplications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -121,10 +122,16 @@ const StaffManagement = () => {
       setSalaries(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
+    // Real-time Applications for Performance Tracking
+    const unsubscribeApps = onSnapshot(collection(db, 'applications'), (snapshot) => {
+      setApplications(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
     return () => {
       unsubscribeStaff();
       unsubscribeAttendance();
       unsubscribeSalaries();
+      unsubscribeApps();
     };
   }, []); // Cleanup useEffect dependencies
 
@@ -668,6 +675,7 @@ const StaffManagement = () => {
                     <th className="p-5 text-slate-400 font-bold text-[10px] uppercase tracking-widest">Staff Member</th>
                     <th className="p-5 text-slate-400 font-bold text-[10px] uppercase tracking-widest">Contact</th>
                     <th className="p-5 text-slate-400 font-bold text-[10px] uppercase tracking-widest">Status</th>
+                    <th className="p-5 text-slate-400 font-bold text-[10px] uppercase tracking-widest font-sans">Performance</th>
                     <th className="p-5 text-slate-400 font-bold text-[10px] uppercase tracking-widest">Joined</th>
                     <th className="p-5 text-slate-400 font-bold text-[10px] uppercase tracking-widest text-right">Actions</th>
                   </tr>
@@ -725,6 +733,38 @@ const StaffManagement = () => {
                             {item.status === 'active' ? <UserCheck size={10} /> : <UserMinus size={10} />}
                             {item.status || 'active'}
                           </span>
+                        </td>
+                        <td className="p-5 text-slate-300">
+                          {(() => {
+                            const staffApps = applications.filter(app => 
+                              app.assigned_to === item.id || 
+                              app.staff_id === item.id || 
+                              app.staff_id === item.staff_id ||
+                              (app.completed_by_name && app.completed_by_name.toLowerCase() === item.name?.toLowerCase()) ||
+                              (app.staff_name && app.staff_name.toLowerCase() === item.name?.toLowerCase())
+                            );
+                            const completedCount = staffApps.filter(app => 
+                              app.status === 'Completed' || app.status === 'Approved'
+                            ).length;
+                            const pendingCount = staffApps.length - completedCount;
+                            
+                            return (
+                              <div className="space-y-1 text-xs">
+                                <div className="text-slate-300 flex justify-between gap-4 max-w-[140px]">
+                                  <span className="text-slate-500 font-bold uppercase text-[9px]">Assigned:</span>
+                                  <span className="font-bold text-blue-400">{staffApps.length}</span>
+                                </div>
+                                <div className="text-slate-400 flex justify-between gap-4 max-w-[140px]">
+                                  <span className="text-slate-500 font-bold uppercase text-[9px]">Completed:</span>
+                                  <span className="font-bold text-emerald-400">{completedCount}</span>
+                                </div>
+                                <div className="text-slate-400 flex justify-between gap-4 max-w-[140px]">
+                                  <span className="text-slate-500 font-bold uppercase text-[9px]">Pending:</span>
+                                  <span className="font-bold text-amber-500">{pendingCount}</span>
+                                </div>
+                              </div>
+                            );
+                          })()}
                         </td>
                         <td className="p-5">
                           <div className="flex items-center gap-2 text-slate-400 text-xs">
@@ -834,6 +874,7 @@ const StaffManagement = () => {
                   <tr className="bg-white/5 text-[10px] font-black uppercase tracking-widest text-slate-500">
                     <th className="px-6 py-4">Date</th>
                     <th className="px-6 py-4">Staff Member</th>
+                    <th className="px-6 py-4">Session Timing (Last Login / Logout)</th>
                     <th className="px-6 py-4 text-right">Status</th>
                   </tr>
                 </thead>
@@ -853,6 +894,24 @@ const StaffManagement = () => {
                             <div className="text-[10px] text-slate-500">{at.staff_id}</div>
                           </div>
                         </div>
+                      </td>
+                      <td className="px-6 py-4 text-xs font-medium text-slate-300">
+                        {(() => {
+                          const sUser = staff.find(s => s.id === at.userId);
+                          if (!sUser) return <span className="text-slate-500 italic">No session active</span>;
+                          return (
+                            <div className="space-y-0.5">
+                              <div className="flex items-center gap-1.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                <span>Login: {sUser.last_login_at ? format(new Date(sUser.last_login_at), 'dd/MM, hh:mm a') : 'N/A'}</span>
+                              </div>
+                              <div className="flex items-center gap-1.5 text-slate-400">
+                                <span className="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+                                <span>Logout: {sUser.last_logout_at ? format(new Date(sUser.last_logout_at), 'dd/MM, hh:mm a') : 'N/A'}</span>
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td className="px-6 py-4 text-right flex items-center justify-end gap-2">
                         <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase ${

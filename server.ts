@@ -99,7 +99,11 @@ async function startServer() {
     const distPath = path.join(process.cwd(), 'dist');
     expressApp.use(express.static(distPath));
     expressApp.get('*all', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
+      if (path.extname(req.path)) {
+        res.status(404).send('Not Found');
+      } else {
+        res.sendFile(path.join(distPath, 'index.html'));
+      }
     });
   }
 

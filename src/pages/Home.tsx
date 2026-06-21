@@ -21,33 +21,78 @@ const Home = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Real-time listener for popular services
-    const q = query(
-      collection(db, 'services'),
-      where('isPopular', '==', true),
-      where('enabled', '==', true)
-    );
+    let manageData: any[] = [];
+    let oldData: any[] = [];
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const servicesData = snapshot.docs.map(doc => {
+    const updateCombined = () => {
+      const mergedMap = new Map();
+      
+      // Add old data first
+      oldData.forEach(d => mergedMap.set(d.serviceId, d));
+      // Overwrite with management data
+      manageData.forEach(d => mergedMap.set(d.serviceId, d));
+      
+      const all = Array.from(mergedMap.values());
+      const activePopular = all.filter(s => s.isPopular && s.status === 'active' && s.is_visible);
+      
+      // If none explicitly marked as popular, fallback to first active ones
+      const toShow = activePopular.length > 0 ? activePopular : all.filter(s => s.status === 'active' && s.is_visible).slice(0, 8);
+      const sorted = toShow.sort((a, b) => (a.order || 0) - (b.order || 0));
+      
+      console.log('Real-time popular integrated services:', sorted);
+      setServices(sorted);
+    };
+
+    const unsubOld = onSnapshot(collection(db, 'services'), (snapshot) => {
+      oldData = snapshot.docs.map(doc => {
         const data = doc.data() as any;
+        const serviceUrl = data.url || data.service_url || data.serviceUrl || '';
         return {
           service_id: doc.id,
+          serviceId: doc.id,
           ...data,
           name: data.name || data.service_name || 'Unnamed Service',
           description: data.description || 'No description available',
-          url: data.url || data.service_url || '',
+          url: serviceUrl,
+          serviceUrl: serviceUrl,
           icon: data.icon || 'fa-file',
+          status: data.enabled !== false ? 'active' : 'disabled',
+          is_visible: data.is_visible !== false,
+          isPopular: !!data.isPopular,
+          order: data.order || 0
         };
-      }).sort((a, b) => (a.order || 0) - (b.order || 0));
-      
-      console.log('Real-time popular services:', servicesData);
-      setServices(servicesData);
-    }, (error) => {
-      console.error('Error fetching popular services:', error);
+      });
+      updateCombined();
     });
 
-    return () => unsubscribe();
+    const unsubManage = onSnapshot(collection(db, 'service_management'), (snapshot) => {
+      manageData = snapshot.docs.map(doc => {
+        const data = doc.data() as any;
+        const serviceUrl = data.url || data.service_url || data.serviceUrl || '';
+        return {
+          service_id: doc.id,
+          serviceId: data.serviceId || doc.id,
+          name: data.serviceName || data.name || 'Unnamed Service',
+          description: data.description || 'No description available',
+          url: serviceUrl,
+          serviceUrl: serviceUrl,
+          icon: data.icon || 'fa-file',
+          image: data.image || '',
+          category: data.category || 'Identity Services',
+          status: data.status || 'active',
+          is_visible: data.isVisible !== undefined ? data.isVisible !== false : data.is_visible !== false,
+          application_type: data.application_type || (serviceUrl ? 'external' : 'internal'),
+          isPopular: data.isPopular !== undefined ? !!data.isPopular : true,
+          order: data.displayOrder || 0
+        };
+      });
+      updateCombined();
+    });
+
+    return () => {
+      unsubOld();
+      unsubManage();
+    };
   }, []);
 
   const getServiceKey = (name: string) => {
@@ -62,7 +107,8 @@ const Home = () => {
 
   const getApplyUrl = (service: any) => {
     const key = getServiceKey(service.name);
-    const urlParam = (key && key !== 'general') ? key : encodeURIComponent(service.name);
+    const sid = service.service_id || service.serviceId || service.id;
+    const urlParam = (key && key !== 'general') ? key : (sid ? sid : encodeURIComponent(service.name));
     return `/app/user/apply/${urlParam}`;
   };
 
@@ -230,9 +276,9 @@ const Home = () => {
                   <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-3 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{service.name}</h3>
                   <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed mb-8 line-clamp-2 flex-grow">{service.description}</p>
                   
-                  {service.application_type === 'external' && service.url ? (
+                  {service.application_type === 'external' || service.serviceUrl?.startsWith('http') || service.url?.startsWith('http') ? (
                     <a 
-                      href={service.url}
+                      href={service.serviceUrl || service.url}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="w-full py-4 glass-dark rounded-xl text-center text-xs font-bold text-white hover:bg-blue-600 transition-all ripple-effect border-white/5"

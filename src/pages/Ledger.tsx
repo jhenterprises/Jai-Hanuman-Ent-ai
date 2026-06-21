@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useConfig } from '../context/ConfigContext';
 import { motion, AnimatePresence } from 'motion/react';
 import toast, { Toaster } from 'react-hot-toast';
-import { Plus, Trash2, Edit2, CheckCircle, XCircle, Download, FileText, Printer, Search, Sparkles, Receipt, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Plus, Trash2, Edit2, CheckCircle, XCircle, Download, FileText, Printer, Search, Sparkles, Receipt, CheckCircle2, AlertCircle, ArrowUpDown, TrendingUp, Layers, PieChart, Eye, Calendar } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -762,64 +762,130 @@ const Ledger = () => {
 
       <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6">
         <div>
-          <h1 className="text-3xl font-bold text-white mb-2">Professional Ledger</h1>
-          <p className="text-slate-400">Complete financial tracking for your digital services.</p>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-10 h-10 bg-white text-slate-900 rounded-full flex items-center justify-center shrink-0 shadow-lg">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
+            </div>
+            <h1 className="text-3xl font-bold text-white">Professional Ledger ✨</h1>
+          </div>
+          <p className="text-slate-400 pl-13">Complete financial tracking for your digital services.</p>
         </div>
         
         <div className="flex flex-wrap items-center gap-4">
-          <div className="flex items-center bg-slate-800 rounded-2xl p-1 border border-slate-700">
-            <input type="date" value={dateRange.from} onChange={e => setDateRange({...dateRange, from: e.target.value})} className="px-3 py-2 bg-transparent text-white border-0 focus:ring-0 text-sm" />
-            <span className="text-slate-500 px-2">to</span>
-            <input type="date" value={dateRange.to} onChange={e => setDateRange({...dateRange, to: e.target.value})} className="px-3 py-2 bg-transparent text-white border-0 focus:ring-0 text-sm" />
-            <button onClick={fetchData} className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl text-sm font-medium transition-colors ml-2">Search</button>
+          <div className="flex items-center bg-transparent border border-slate-700/60 rounded-xl p-1 shadow-inner">
+            <div className="flex items-center text-slate-400 px-3 py-1.5"><Calendar size={14} className="mr-2"/></div>
+            <input type="date" value={dateRange.from} onChange={e => setDateRange({...dateRange, from: e.target.value})} className="bg-transparent text-slate-300 border-0 focus:ring-0 text-sm outline-none [color-scheme:dark]" />
+            <span className="text-slate-500 px-3 text-sm">to</span>
+            <div className="flex items-center text-slate-400 px-3 py-1.5"><Calendar size={14} className="mr-2"/></div>
+            <input type="date" value={dateRange.to} onChange={e => setDateRange({...dateRange, to: e.target.value})} className="bg-transparent text-slate-300 border-0 focus:ring-0 text-sm outline-none [color-scheme:dark]" />
+            <button onClick={fetchData} className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-sm font-medium transition-colors ml-2 shadow-[inset_0_1px_rgba(255,255,255,0.1)]">Search</button>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button onClick={exportToExcel} className="flex items-center gap-2 px-4 py-2 bg-green-600/20 hover:bg-green-600/30 text-green-400 border border-green-600/30 rounded-xl transition-all text-sm font-medium">
-              <Download size={18} /> Excel
+          <div className="flex items-center gap-3">
+            <button onClick={exportToExcel} className="flex items-center gap-2 px-5 py-2.5 bg-[#052e16]/40 hover:bg-[#052e16]/60 text-emerald-400 border border-emerald-900/50 rounded-lg transition-all text-sm font-medium">
+              <Download size={16} /> Excel
             </button>
-            <button onClick={exportToPDF} className="flex items-center gap-2 px-4 py-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-600/30 rounded-xl transition-all text-sm font-medium">
-              <FileText size={18} /> PDF
+            <button onClick={exportToPDF} className="flex items-center gap-2 px-5 py-2.5 bg-[#450a0a]/40 hover:bg-[#450a0a]/60 text-red-500 border border-red-900/50 rounded-lg transition-all text-sm font-medium">
+              <FileText size={16} /> PDF
             </button>
-            <button onClick={() => { setShowAdd(true); setEditingEntry(null); }} className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl shadow-lg shadow-blue-600/20 text-sm font-medium">
-              <Plus size={18} /> Add Entry
+            <button onClick={() => { setShowAdd(true); setEditingEntry(null); }} className="flex items-center gap-2 px-5 py-2.5 bg-indigo-900/40 hover:bg-indigo-900/60 text-indigo-300 border border-indigo-700/50 rounded-lg text-sm font-medium transition-all ml-2">
+              <Plus size={16} /> Add Entry
             </button>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-slate-800 p-6 rounded-3xl border border-slate-700 shadow-xl">
-          <p className="text-slate-400 text-sm mb-1">Period Balance</p>
-          <p className={`text-3xl font-bold ${dailyTotalBalance >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-            ₹{dailyTotalBalance.toLocaleString()}
-          </p>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Period Balance Card */}
+        <div className="lg:col-span-4 bg-gradient-to-br from-indigo-600/30 via-slate-800 to-slate-900 p-6 rounded-[2rem] border border-indigo-500/20 shadow-2xl relative overflow-hidden flex flex-col justify-between min-h-[160px]">
+          <div className="absolute top-0 right-0 p-8 opacity-20 pointer-events-none">
+            <Sparkles size={120} className="text-indigo-400" />
+          </div>
+          <div className="relative z-10 flex items-center gap-4 mb-2">
+            <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 flex items-center justify-center border border-indigo-500/30">
+              <Receipt className="text-indigo-400" size={24} />
+            </div>
+            <p className="text-slate-300 font-medium">Period Balance</p>
+          </div>
+          <div className="relative z-10">
+            <p className={`text-5xl font-black ${dailyTotalBalance >= 0 ? 'text-green-500 drop-shadow-[0_0_15px_rgba(34,197,94,0.3)]' : 'text-red-500 drop-shadow-[0_0_15px_rgba(239,68,68,0.3)]'}`}>
+              ₹{dailyTotalBalance.toLocaleString()}
+            </p>
+            <p className="text-slate-400 text-sm mt-3">This is your closing balance for the selected period</p>
+          </div>
         </div>
-        <div className="bg-slate-800 p-6 rounded-3xl border border-slate-700 shadow-xl overflow-hidden">
-          <p className="text-slate-400 text-sm mb-3">Balance Split</p>
-          <div className="flex gap-4">
-            <div className="flex-1">
-              <p className="text-[10px] text-orange-400 font-bold uppercase">Cash</p>
-              <p className="text-lg font-bold text-white">₹{paymentTotals['Cash']?.toLocaleString() || 0}</p>
+
+        {/* Balance Split Card */}
+        <div className="lg:col-span-4 bg-slate-800/80 backdrop-blur-md p-6 rounded-[2rem] border border-slate-700 shadow-xl overflow-hidden flex flex-col justify-between min-h-[160px]">
+          <p className="text-slate-300 font-medium mb-4">Balance Split</p>
+          <div className="flex items-center gap-6">
+            {/* Visual Donut representation */}
+            <div className="relative w-20 h-20 shrink-0">
+              <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                <circle cx="18" cy="18" r="16" fill="transparent" stroke="#1E293B" strokeWidth="4" />
+                {(() => {
+                  const absCash = Math.abs(paymentTotals['Cash'] || 0);
+                  const absPhonePe = Math.abs(paymentTotals['PhonePe'] || 0);
+                  const absGPay = Math.abs(paymentTotals['GPay'] || 0);
+                  const totalAbs = absCash + absPhonePe + absGPay || 1;
+                  
+                  const cashPct = (absCash / totalAbs) * 100;
+                  const phonePePct = (absPhonePe / totalAbs) * 100;
+                  const gPayPct = (absGPay / totalAbs) * 100;
+
+                  return (
+                    <>
+                      <circle cx="18" cy="18" r="16" fill="transparent" stroke="#22C55E" strokeWidth="4" strokeDasharray={`${cashPct} 100`} />
+                      <circle cx="18" cy="18" r="16" fill="transparent" stroke="#A855F7" strokeWidth="4" strokeDasharray={`${phonePePct} 100`} strokeDashoffset={`-${cashPct}`} />
+                      <circle cx="18" cy="18" r="16" fill="transparent" stroke="#3B82F6" strokeWidth="4" strokeDasharray={`${gPayPct} 100`} strokeDashoffset={`-${cashPct + phonePePct}`} />
+                    </>
+                  );
+                })()}
+              </svg>
             </div>
-            <div className="flex-1 border-x border-slate-700 px-4">
-              <p className="text-[10px] text-purple-400 font-bold uppercase">PhonePe</p>
-              <p className="text-lg font-bold text-white">₹{paymentTotals['PhonePe']?.toLocaleString() || 0}</p>
-            </div>
-            <div className="flex-1">
-              <p className="text-[10px] text-blue-400 font-bold uppercase">GPay</p>
-              <p className="text-lg font-bold text-white">₹{paymentTotals['GPay']?.toLocaleString() || 0}</p>
+            <div className="flex-1 space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] text-green-400 font-bold uppercase tracking-wider">Cash</span>
+                <span className="text-sm font-bold text-white">₹{paymentTotals['Cash']?.toLocaleString() || 0}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] text-purple-400 font-bold uppercase tracking-wider">PhonePe</span>
+                <span className="text-sm font-bold text-white">₹{paymentTotals['PhonePe']?.toLocaleString() || 0}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] text-blue-400 font-bold uppercase tracking-wider">GPay</span>
+                <span className="text-sm font-bold text-white">₹{paymentTotals['GPay']?.toLocaleString() || 0}</span>
+              </div>
             </div>
           </div>
         </div>
-        <div className="relative">
-          <input 
-            type="text" 
-            placeholder="Search custom or service..." 
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-full h-full px-6 bg-slate-800 border border-slate-700 rounded-3xl text-white focus:ring-2 focus:ring-blue-500 transition-all outline-none"
-          />
+
+        {/* Quick Search Card */}
+        <div className="lg:col-span-4 bg-slate-800/80 backdrop-blur-md p-6 rounded-[2rem] border border-slate-700 shadow-xl overflow-hidden flex flex-col justify-between min-h-[160px]">
+          <div className="flex items-center gap-2 mb-4 text-slate-300 font-medium">
+            <Search size={18} className="text-blue-400" />
+            <p>Quick Search</p>
+          </div>
+          <div className="space-y-3">
+            <input 
+              type="text" 
+              placeholder="Search custom or service..." 
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-white focus:ring-2 focus:ring-blue-500 transition-all outline-none text-sm"
+            />
+            <div className="flex gap-2">
+              <select className="flex-1 bg-slate-900 border border-slate-700 text-slate-300 text-xs rounded-lg px-2 py-2 outline-none">
+                <option>All Services</option>
+              </select>
+              <select className="flex-1 bg-slate-900 border border-slate-700 text-slate-300 text-xs rounded-lg px-2 py-2 outline-none">
+                <option>All Types</option>
+              </select>
+              <select className="flex-1 bg-slate-900 border border-slate-700 text-slate-300 text-xs rounded-lg px-2 py-2 outline-none">
+                <option>All Payments</option>
+              </select>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -904,75 +970,84 @@ const Ledger = () => {
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-700/50 sticky top-0 backdrop-blur-md z-10">
-                <th className="p-4 text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-600">SN</th>
-                <th className="p-4 text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-600">Date & Time</th>
-                <th className="p-4 text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-600">Customer</th>
-                <th className="p-4 text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-600">Service</th>
-                <th className="p-4 text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-600 text-right">Principal</th>
-                <th className="p-4 text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-600 text-right">Profit</th>
-                <th className="p-4 text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-600 text-right">Total</th>
-                <th className="p-4 text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-600 text-right">Balance</th>
-                <th className="p-4 text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-600 text-right">Actions</th>
+              <tr className="bg-slate-800/80 sticky top-0 backdrop-blur-md z-10">
+                <th className="p-4 text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-700 whitespace-nowrap"># SN</th>
+                <th className="p-4 text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-700 whitespace-nowrap">📅 DATE & TIME</th>
+                <th className="p-4 text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-700 whitespace-nowrap">👤 CUSTOMER</th>
+                <th className="p-4 text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-700 whitespace-nowrap">💼 SERVICE</th>
+                <th className="p-4 text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-700 text-right whitespace-nowrap">🪙 PRINCIPAL</th>
+                <th className="p-4 text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-700 text-right whitespace-nowrap">📈 PROFIT</th>
+                <th className="p-4 text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-700 text-right whitespace-nowrap">📄 TOTAL</th>
+                <th className="p-4 text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-700 text-right whitespace-nowrap">👝 BALANCE</th>
+                <th className="p-4 text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-700 text-right whitespace-nowrap">⚙️ ACTIONS</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-700/30">
-              {filtered.map((item, index) => (
-                <tr key={item.id} className={`${index % 2 === 0 ? 'bg-transparent' : 'bg-slate-700/10'} hover:bg-slate-700/20 transition-colors group`}>
-                  <td className="p-4 text-sm font-mono text-slate-500 ">{item.serial_number}</td>
-                  <td className="p-4 text-xs text-slate-400">
-                    {item.created_at && typeof item.created_at.toDate === 'function' ? item.created_at.toDate().toLocaleDateString() : (item.created_at ? new Date(item.created_at).toLocaleDateString() : 'N/A')}<br/>
-                    <span className="text-slate-600">{item.created_at && typeof item.created_at.toDate === 'function' ? item.created_at.toDate().toLocaleTimeString() : (item.created_at ? new Date(item.created_at).toLocaleTimeString() : '')}</span>
-                  </td>
-                  <td className="p-4">
-                    <span className="text-sm font-medium text-slate-200">{item.customer_name}</span>
-                    <p className="text-[10px] text-slate-500 uppercase font-bold">{item.payment_mode}</p>
-                  </td>
-                  <td className="p-4 text-sm text-slate-400">
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-900 border border-slate-700 mr-2 uppercase">{item.service_type}</span>
-                    {item.service_name}
-                  </td>
-                  <td className="p-4 text-sm text-slate-400 text-right font-mono">₹{Math.abs(item.principle_amount || 0).toLocaleString()}</td>
-                  <td className="p-4 text-sm text-green-400/80 text-right font-mono">₹{(item.profit_amount || 0).toLocaleString()}</td>
-                  <td className={`p-4 text-sm font-bold text-right font-mono ${item.type === 'withdrawal' ? 'text-red-400' : 'text-green-400'}`}>
-                    {item.type === 'withdrawal' ? '-' : '+'}₹{Math.abs(item.total_amount || 0).toLocaleString()}
-                  </td>
-                  <td className="p-4 text-sm font-bold text-right font-mono text-blue-400 underline decoration-blue-500/30">
-                    ₹{item.runningBalance?.toLocaleString()}
-                  </td>
-                  <td className="p-4 text-right">
-                    <div className="flex justify-end items-center gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                      <button 
-                        onClick={() => {
-                          const details = Object.entries(item.data || {})
-                            .map(([key, val]) => `${key}: ${val}`)
-                            .join('\n');
-                          alert(`Custom Fields:\n${details || 'No custom fields'}`);
-                        }} 
-                        className="p-2 text-slate-400 hover:text-white hover:bg-slate-600 rounded-lg transition-colors" 
-                        title="View Details"
-                      >
-                        <Search size={16} />
-                      </button>
-                      <button onClick={() => printInvoice(item)} className="p-2 text-slate-400 hover:text-white hover:bg-slate-600 rounded-lg transition-colors" title="Print Invoice">
-                        <Printer size={16} />
-                      </button>
-                      <button onClick={() => handleEdit(item)} className="p-2 text-blue-400 hover:text-white hover:bg-blue-600 rounded-lg transition-colors" title="Edit">
-                        <Edit2 size={16} />
-                      </button>
-                      {(user?.role === 'admin' || user?.uid === item.staff_id) && (
+              {filtered.map((item, index) => {
+                const isWithdrawal = item.type === 'withdrawal';
+                return (
+                  <tr key={item.id} className={`${index % 2 === 0 ? 'bg-transparent' : 'bg-slate-800/30'} hover:bg-slate-700/40 transition-colors group`}>
+                    <td className="p-4 text-sm font-mono text-slate-300">{item.serial_number}</td>
+                    <td className="p-4 text-xs text-slate-300">
+                      {item.created_at && typeof item.created_at.toDate === 'function' ? item.created_at.toDate().toLocaleDateString() : (item.created_at ? new Date(item.created_at).toLocaleDateString() : 'N/A')}<br/>
+                      <span className="text-slate-500">{item.created_at && typeof item.created_at.toDate === 'function' ? item.created_at.toDate().toLocaleTimeString() : (item.created_at ? new Date(item.created_at).toLocaleTimeString() : '')}</span>
+                    </td>
+                    <td className="p-4">
+                      <span className="text-sm font-medium text-slate-200 block">{item.customer_name}</span>
+                      <span className="text-[10px] text-blue-400 uppercase font-bold tracking-wider">{item.payment_mode}</span>
+                    </td>
+                    <td className="p-4 text-sm">
+                      <div className="flex flex-col items-start gap-1">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider
+                          ${item.service_type?.toLowerCase().includes('withdrawal') 
+                            ? 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/20' 
+                            : item.service_type?.toLowerCase().includes('transfer')
+                            ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                            : 'bg-purple-500/10 text-purple-400 border border-purple-500/20'}`}>
+                          {item.service_type || 'OTHERS'}
+                        </span>
+                        <span className="text-slate-400 text-xs">{item.service_name}</span>
+                      </div>
+                    </td>
+                    <td className="p-4 text-sm text-slate-300 text-right font-mono">₹{Math.abs(item.principle_amount || 0).toLocaleString()}</td>
+                    <td className="p-4 text-sm text-green-400 text-right font-mono">₹{(item.profit_amount || 0).toLocaleString()}</td>
+                    <td className={`p-4 text-sm font-bold text-right font-mono ${isWithdrawal ? 'text-red-400' : 'text-green-400'}`}>
+                      {isWithdrawal ? '-' : '+'}₹{Math.abs(item.total_amount || 0).toLocaleString()}
+                    </td>
+                    <td className="p-4 text-sm font-bold text-right font-mono text-blue-400">
+                      ₹{item.runningBalance?.toLocaleString()}
+                    </td>
+                    <td className="p-4 text-right">
+                      <div className="flex justify-end items-center gap-2">
                         <button 
-                          onClick={() => handleDelete(item.id, 'ledger')} 
-                          className="p-2 text-red-500 hover:text-white hover:bg-red-600 rounded-lg transition-all active:scale-90" 
-                          title="Delete Action"
+                          onClick={() => {
+                            const details = Object.entries(item.data || {})
+                              .map(([key, val]) => `${key}: ${val}`)
+                              .join('\n');
+                            alert(`Custom Fields:\n${details || 'No custom fields'}`);
+                          }} 
+                          className="p-2 text-blue-400 border border-blue-900/30 bg-blue-900/10 hover:bg-blue-600 hover:text-white rounded-lg transition-colors" 
+                          title="View Details"
                         >
-                          <Trash2 size={16} />
+                          <Eye size={14} />
                         </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                        <button onClick={() => handleEdit(item)} className="p-2 text-orange-400 border border-orange-900/30 bg-orange-900/10 hover:bg-orange-600 hover:text-white rounded-lg transition-colors" title="Edit">
+                          <Edit2 size={14} />
+                        </button>
+                        {(user?.role === 'admin' || user?.uid === item.staff_id) && (
+                          <button 
+                            onClick={() => handleDelete(item.id, 'ledger')} 
+                            className="p-2 text-red-500 border border-red-900/30 bg-red-900/10 hover:bg-red-600 hover:text-white rounded-lg transition-all active:scale-90" 
+                            title="Delete Action"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
               {filtered.length > 0 && (
                 <tr className="bg-slate-900/50 font-bold border-t-2 border-slate-700">
                   <td colSpan={4} className="p-4 text-right text-slate-200">TOTAL</td>
@@ -996,6 +1071,74 @@ const Ledger = () => {
               )}
             </tbody>
           </table>
+        </div>
+        {/* Pagination placeholder matching the design */}
+        <div className="bg-slate-800/80 p-4 border-t border-slate-700 flex items-center justify-between text-slate-400 text-sm">
+          <p>Showing 1 to {filtered.length} of {filtered.length} entries</p>
+          <div className="flex items-center gap-2">
+            <button className="px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors">&larr;</button>
+            <button className="px-3 py-1 bg-indigo-600 text-white rounded-lg">1</button>
+            <button className="px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors">&rarr;</button>
+            <select className="bg-slate-700 border border-slate-600 text-slate-300 rounded-lg px-2 py-1 outline-none ml-4">
+              <option>10 / page</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* Total Entries */}
+        <div className="bg-slate-800/80 backdrop-blur-md p-6 rounded-3xl border border-slate-700 shadow-xl flex items-center gap-4 relative overflow-hidden group">
+          <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          <div className="w-14 h-14 rounded-2xl bg-purple-500/20 flex items-center justify-center border border-purple-500/30 shrink-0">
+            <ArrowUpDown className="text-purple-400" size={24} />
+          </div>
+          <div>
+            <p className="text-slate-400 text-xs font-medium uppercase tracking-wider mb-1">Total Entries</p>
+            <p className="text-2xl font-bold text-white">{filtered.length}</p>
+            <p className="text-slate-500 text-[10px] uppercase mt-1">In selected period</p>
+          </div>
+        </div>
+
+        {/* Total Principal */}
+        <div className="bg-slate-800/80 backdrop-blur-md p-6 rounded-3xl border border-slate-700 shadow-xl flex items-center gap-4 relative overflow-hidden group">
+          <div className="absolute inset-0 bg-gradient-to-r from-emerald-600/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          <div className="w-14 h-14 rounded-2xl bg-emerald-500/20 flex items-center justify-center border border-emerald-500/30 shrink-0">
+            <TrendingUp className="text-emerald-400" size={24} />
+          </div>
+          <div>
+            <p className="text-slate-400 text-xs font-medium uppercase tracking-wider mb-1">Total Principal</p>
+            <p className="text-2xl font-bold text-emerald-400">₹{filtered.reduce((sum, item) => sum + Math.abs(item.principle_amount || 0), 0).toLocaleString()}</p>
+            <p className="text-slate-500 text-[10px] uppercase mt-1">Total amount processed</p>
+          </div>
+        </div>
+
+        {/* Total Profit */}
+        <div className="bg-slate-800/80 backdrop-blur-md p-6 rounded-3xl border border-slate-700 shadow-xl flex items-center gap-4 relative overflow-hidden group">
+          <div className="absolute inset-0 bg-gradient-to-r from-orange-600/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          <div className="w-14 h-14 rounded-2xl bg-orange-500/20 flex items-center justify-center border border-orange-500/30 shrink-0">
+            <Layers className="text-orange-400" size={24} />
+          </div>
+          <div>
+            <p className="text-slate-400 text-xs font-medium uppercase tracking-wider mb-1">Total Profit</p>
+            <p className="text-2xl font-bold text-orange-400">₹{filtered.reduce((sum, item) => sum + (item.profit_amount || 0), 0).toLocaleString()}</p>
+            <p className="text-slate-500 text-[10px] uppercase mt-1">Total earnings</p>
+          </div>
+        </div>
+
+        {/* Success Rate */}
+        <div className="bg-slate-800/80 backdrop-blur-md p-6 rounded-3xl border border-slate-700 shadow-xl flex items-center gap-4 relative overflow-hidden group">
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          <div className="w-14 h-14 rounded-2xl bg-blue-500/20 flex items-center justify-center border border-blue-500/30 shrink-0">
+            <PieChart className="text-blue-400" size={24} />
+          </div>
+          <div>
+            <p className="text-slate-400 text-xs font-medium uppercase tracking-wider mb-1">Success Rate</p>
+            <p className="text-2xl font-bold text-blue-400">
+              {filtered.length > 0 ? Math.round((filtered.filter(item => (item.profit_amount || 0) > 0).length / filtered.length) * 100) : 100}%
+            </p>
+            <p className="text-slate-500 text-[10px] uppercase mt-1">Profitable transactions</p>
+          </div>
         </div>
       </div>
 

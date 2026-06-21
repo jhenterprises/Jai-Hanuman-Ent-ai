@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { collection, getDocs, updateDoc, doc, getDoc, serverTimestamp, query, where } from 'firebase/firestore';
+import { collection, getDocs, updateDoc, doc, getDoc, serverTimestamp, query, where, writeBatch } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { ArrowLeft, Plus, Trash2, Save, Eye, GripVertical, Settings, Type, Hash, Calendar, List, AlignLeft, Upload, CheckSquare, CircleDot, Minus, Heading } from 'lucide-react';
 import ModernButton from '../../components/ModernButton';
+import { toast } from 'react-hot-toast';
 
 type Field = {
   id: string;
@@ -98,23 +99,19 @@ const ServiceFormBuilder = () => {
     if (!id) return;
     try {
       setIsLoading(true);
-      const serviceRef = doc(db, 'services', id);
+      const serviceRef = doc(db, 'service_management', id);
       const serviceSnap = await getDoc(serviceRef);
       
       if (serviceSnap.exists()) {
         const data = serviceSnap.data();
         setService({ id: serviceSnap.id, ...data });
         
-        const hasFields = (s: any) => s && Array.isArray(s.sections) && s.sections.some((sec: any) => Array.isArray(sec.fields) && sec.fields.length > 0);
-        
         const draftStr = localStorage.getItem(`form_draft_${id}`);
         let draftSchema = null;
         if (draftStr) {
           try {
             draftSchema = JSON.parse(draftStr);
-          } catch (e) {
-            console.error('Failed to parse draft', e);
-          }
+          } catch (e) {}
         }
 
         const cleanSchema = (s: any) => ({
@@ -127,53 +124,23 @@ const ServiceFormBuilder = () => {
           }))
         });
 
+        // Load from form_settings first if available
+        const settingsQ = query(collection(db, 'form_settings'), where('serviceId', '==', data.serviceId || id));
+        const settingsSnap = await getDocs(settingsQ);
+        if (!settingsSnap.empty) {
+          const sdoc = settingsSnap.docs[0].data();
+          if (sdoc.fields) {
+            setSchema({
+               sections: [{ id: generateId(), title: 'General Details', fields: sdoc.fields }]
+            });
+            return;
+          }
+        }
+
         if (data.form_schema && Array.isArray(data.form_schema.sections)) {
           setSchema(cleanSchema(data.form_schema));
-        } else if (data.form_fields && data.form_fields.length > 0) {
-          // Fallback if they were stored in form_fields array
-          const sectionsMap: Record<string, Field[]> = {};
-          data.form_fields.forEach((f: any) => {
-            const secName = f.section_name || 'General Details';
-            if (!sectionsMap[secName]) sectionsMap[secName] = [];
-            sectionsMap[secName].push({
-              id: generateId(),
-              type: f.type,
-              label: f.label,
-              name: f.label.toLowerCase().replace(/[^a-z0-9]/g, '_'),
-              placeholder: f.placeholder,
-              required: f.required === 1 || f.required === true,
-              options: parseOptions(f.options)
-            });
-          });
-          
-          const newSections = Object.keys(sectionsMap).map(title => ({
-            id: generateId(),
-            title,
-            fields: sectionsMap[title]
-          }));
-          setSchema({ sections: newSections });
         } else {
-          // Check 'service_inputs' collection for legacy inputs
-          const q = query(collection(db, 'service_inputs'), where('service_id', '==', id));
-          const snapshot = await getDocs(q);
-          if (!snapshot.empty) {
-            const fields: Field[] = snapshot.docs.map(doc => {
-              const f = doc.data();
-              return {
-                id: doc.id || generateId(),
-                type: f.input_type || 'text',
-                label: f.input_label || 'Input',
-                name: (f.input_label || 'Input').toLowerCase().replace(/[^a-z0-9]/g, '_'),
-                required: f.required === 1 || f.required === true,
-                options: parseOptions(f.options),
-              };
-            });
-            setSchema({
-               sections: [{ id: generateId(), title: 'General Details', fields }]
-            });
-          } else if (draftSchema && Array.isArray(draftSchema.sections)) {
-             setSchema(cleanSchema(draftSchema));
-          }
+            setSchema({ sections: [{ id: generateId(), title: 'General Details', fields: [] }] });
         }
       }
     } catch (err) {
@@ -184,7 +151,7 @@ const ServiceFormBuilder = () => {
   };
 
   const handleSave = async () => {
-    if (!id) return;
+    if (!id || !service) return;
     try {
       setIsSaving(true);
       
@@ -201,19 +168,33 @@ const ServiceFormBuilder = () => {
         }))
       };
       
-      const serviceRef = doc(db, 'services', id);
-      await updateDoc(serviceRef, { 
+      const serviceRef = doc(db, 'service_management', id);
+      const allFields = cleanedSchema.sections.flatMap(s => s.fields);
+      
+      const batch = writeBatch(db);
+      batch.update(serviceRef, { 
         form_schema: cleanedSchema,
         updated_at: serverTimestamp()
       });
+
+      // Also save to form_settings to comply with db structure instruction
+      const settingsId = service.serviceId || id;
+      const settingsRef = doc(db, 'form_settings', settingsId);
+      batch.set(settingsRef, {
+        serviceId: settingsId,
+        fields: allFields,
+        updated_at: serverTimestamp()
+      }, { merge: true });
+
+      await batch.commit();
       
       setSchema(cleanedSchema);
       setHasUnsavedChanges(false);
       localStorage.removeItem(`form_draft_${id}`);
-      alert('Form configuration saved successfully!');
+      toast.success('Form configuration saved successfully!');
     } catch (err) {
       console.error('Error saving:', err);
-      alert('Failed to save configuration.');
+      toast.error('Failed to save configuration.');
     } finally {
       setIsSaving(false);
     }
@@ -516,7 +497,7 @@ const ServiceFormBuilder = () => {
       <div className="flex-none flex items-center justify-between pb-4 border-b border-white/10">
         <div className="flex items-center gap-4">
           <button 
-            onClick={() => navigate('/app/services')}
+            onClick={() => navigate(-1)}
             className="p-2 hover:bg-white/5 rounded-xl transition-colors text-slate-400 hover:text-white"
           >
             <ArrowLeft size={20} />

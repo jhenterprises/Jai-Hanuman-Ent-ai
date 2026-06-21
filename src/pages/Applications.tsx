@@ -109,25 +109,63 @@ const Applications = () => {
 
   const fetchServices = async () => {
     try {
-      console.log('Fetching services from Firestore for Applications...');
-      const querySnapshot = await getDocs(collection(db, 'services'));
-      const servicesData = querySnapshot.docs.map(doc => {
-        const data = doc.data() as any;
-        return {
-          service_id: doc.id,
-          ...data,
-          name: data.name || data.service_name || 'Unnamed Service',
-          description: data.description || 'No description available',
-          url: data.url || data.service_url || '',
-          icon: data.icon || 'fa-file',
-          enabled: data.enabled !== undefined ? data.enabled : (data.is_active !== undefined ? data.is_active : true),
-          is_visible: data.is_visible !== undefined ? data.is_visible : true,
-          application_type: data.application_type || (data.url || data.service_url ? 'external' : 'internal')
-        };
-      });
+      console.log('Fetching services from service_management first or fallback to services for Applications...');
+      let servicesData: any[] = [];
+      try {
+        const manageSnapshot = await getDocs(collection(db, 'service_management'));
+        if (!manageSnapshot.empty) {
+          servicesData = manageSnapshot.docs.map(doc => {
+            const data = doc.data() as any;
+            return {
+              service_id: doc.id,
+              ...data,
+              name: data.serviceName || data.name || 'Unnamed Service',
+              description: data.description || 'No description available',
+              url: data.url || data.service_url || '',
+              icon: data.icon || 'fa-file',
+              enabled: data.status === 'active',
+              is_visible: data.isVisible !== false,
+              application_type: data.application_type || (data.url || data.service_url ? 'external' : 'internal')
+            };
+          });
+        } else {
+          const querySnapshot = await getDocs(collection(db, 'services'));
+          servicesData = querySnapshot.docs.map(doc => {
+            const data = doc.data() as any;
+            return {
+              service_id: doc.id,
+              ...data,
+              name: data.name || data.service_name || 'Unnamed Service',
+              description: data.description || 'No description available',
+              url: data.url || data.service_url || '',
+              icon: data.icon || 'fa-file',
+              enabled: data.enabled !== undefined ? data.enabled : (data.is_active !== undefined ? data.is_active : true),
+              is_visible: data.is_visible !== undefined ? data.is_visible : true,
+              application_type: data.application_type || (data.url || data.service_url ? 'external' : 'internal')
+            };
+          });
+        }
+      } catch (err) {
+        console.warn('Failed to fetch from service_management, using backup list:', err);
+        const querySnapshot = await getDocs(collection(db, 'services'));
+        servicesData = querySnapshot.docs.map(doc => {
+          const data = doc.data() as any;
+          return {
+            service_id: doc.id,
+            ...data,
+            name: data.name || data.service_name || 'Unnamed Service',
+            description: data.description || 'No description available',
+            url: data.url || data.service_url || '',
+            icon: data.icon || 'fa-file',
+            enabled: data.enabled !== undefined ? data.enabled : (data.is_active !== undefined ? data.is_active : true),
+            is_visible: data.is_visible !== undefined ? data.is_visible : true,
+            application_type: data.application_type || (data.url || data.service_url ? 'external' : 'internal')
+          };
+        });
+      }
       setServices(servicesData);
     } catch (err) {
-      console.error('Error fetching services from Firestore for Applications:', err);
+      console.error('Error fetching services with fallback for Applications:', err);
     }
   };
 

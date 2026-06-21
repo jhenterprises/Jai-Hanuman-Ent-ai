@@ -78,17 +78,30 @@ const DashboardLayout = () => {
   }, [user]);
 
   const fetchNotifications = async () => {
-    if (!auth.currentUser || !user?.uid) return;
+    if (!auth.currentUser) return;
     try {
+      const currentUid = auth.currentUser.uid;
       const q = query(
         collection(db, 'notifications'),
-        where('user_id', '==', user?.uid || ''),
-        orderBy('created_at', 'desc'),
-        limit(20)
+        where('user_id', '==', currentUid),
+        limit(50)
       );
       const snapshot = await getDocs(q);
-      const alerts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setNotifications(alerts);
+      const alerts = snapshot.docs.map(doc => {
+        const data = doc.data();
+        let timestamp = 0;
+        if (data.created_at) {
+          if (typeof data.created_at.toDate === 'function') {
+            timestamp = data.created_at.toDate().getTime();
+          } else {
+            timestamp = new Date(data.created_at).getTime();
+          }
+        }
+        return { id: doc.id, ...data, timestamp };
+      });
+      // Sort in-memory to prevent requiring composite index
+      alerts.sort((a, b) => b.timestamp - a.timestamp);
+      setNotifications(alerts.slice(0, 20));
     } catch (err) {
       console.error('Error fetching notifications:', err);
       setNotifications([]);

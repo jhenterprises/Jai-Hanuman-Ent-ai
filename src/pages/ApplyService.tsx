@@ -10,6 +10,7 @@ import { Upload, File, X, CheckCircle2, AlertCircle, User, AlertTriangle, Downlo
 import { downloadPDF } from '../utils/pdfGenerator';
 import AcknowledgementReceipt from '../components/AcknowledgementReceipt';
 import { getRazorpayKey } from '../utils/razorpayUtils';
+import { toast } from 'react-hot-toast';
 
 const SERVICE_CONFIGS: Record<string, any> = {
   aadhaar: {
@@ -334,17 +335,68 @@ const ApplyService = () => {
         }
       }
 
-      console.log('Fetching services from Firestore for ApplyService...');
-      const querySnapshot = await getDocs(collection(db, 'services'));
-      const services = querySnapshot.docs.map(doc => {
-        const data = doc.data() as any;
-        return {
-          id: doc.id,
-          service_id: doc.id,
-          ...data,
-          name: data.name || data.service_name || 'Unnamed Service',
-        };
-      });
+      let services: any[] = [];
+      try {
+        const servicesMap = new Map();
+        
+        const manageSnapshot = await getDocs(collection(db, 'service_management'));
+        if (!manageSnapshot.empty) {
+          manageSnapshot.docs.forEach((doc) => {
+            const data = doc.data() as any;
+            const serviceUrl = data.url || data.service_url || data.serviceUrl || '';
+            servicesMap.set(data.serviceId || doc.id, {
+              id: doc.id,
+              service_id: doc.id,
+              serviceId: data.serviceId || doc.id,
+              name: data.serviceName || data.name || 'Unnamed Service',
+              description: data.description || 'No description available',
+              url: serviceUrl,
+              service_url: serviceUrl,
+              serviceUrl: serviceUrl,
+              icon: data.icon || 'fa-file',
+              image: data.image || '',
+              category: data.category || 'Identity Services',
+              enabled: data.status === 'active',
+              status: data.status || 'active',
+              is_visible: data.isVisible !== undefined ? data.isVisible !== false : data.is_visible !== false,
+              application_type: data.application_type || (serviceUrl ? 'external' : 'internal'),
+              isPopular: !!data.isPopular,
+              order: data.displayOrder || data.order || 0
+            });
+          });
+        }
+        
+        const querySnapshot = await getDocs(collection(db, 'services'));
+        querySnapshot.docs.forEach((doc) => {
+          const data = doc.data() as any;
+          if (!servicesMap.has(doc.id)) {
+            const serviceUrl = data.url || data.service_url || data.serviceUrl || '';
+            servicesMap.set(doc.id, {
+              id: doc.id,
+              service_id: doc.id,
+              serviceId: doc.id,
+              name: data.name || data.service_name || 'Unnamed Service',
+              description: data.description || 'No description available',
+              url: serviceUrl,
+              service_url: serviceUrl,
+              serviceUrl: serviceUrl,
+              icon: data.icon || 'fa-file',
+              image: '',
+              category: 'Identity Services',
+              enabled: data.enabled !== undefined ? data.enabled : (data.is_active !== undefined ? data.is_active : true),
+              status: (data.enabled !== false) ? 'active' : 'disabled',
+              is_visible: data.is_visible !== undefined ? data.is_visible : true,
+              application_type: data.application_type || (serviceUrl ? 'external' : 'internal'),
+              isPopular: !!data.isPopular,
+              order: data.order || 0
+            });
+          }
+        });
+        
+        services = Array.from(servicesMap.values());
+      } catch (e) {
+        console.error('Failed to fetch services, trying fallback...', e);
+      }
       
       const decodedType = decodeURIComponent(serviceType || '').toLowerCase();
       
@@ -355,12 +407,32 @@ const ApplyService = () => {
                name.includes(decodedType) || 
                decodedType.includes(name) || 
                name.replace(/\s+/g, '-') === decodedType ||
-               s.id === serviceType;
+               s.id?.toLowerCase() === decodedType ||
+               s.service_id?.toLowerCase() === decodedType ||
+               s.serviceId?.toLowerCase() === decodedType;
       });
 
       if (!currentService) {
-        setError('Service not found.');
-        setIsChecking(false);
+        toast.error('Service route not configured');
+        navigate('/app/services');
+        return;
+      }
+
+      if (currentService.status === 'disabled') {
+        toast.error('This service is currently disabled');
+        navigate('/app/services');
+        return;
+      }
+      
+      if (currentService.status === 'comingSoon') {
+        toast.error('Coming Soon');
+        navigate('/app/services');
+        return;
+      }
+      
+      if (currentService.status === 'maintenance') {
+        toast.error('Under Maintenance');
+        navigate('/app/services');
         return;
       }
 

@@ -35,6 +35,7 @@ const Documents = lazy(() => import('./pages/Documents'));
 const SecurityControls = lazy(() => import('./pages/admin/SecurityControls'));
 const SystemPermissions = lazy(() => import('./pages/admin/SystemPermissions'));
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
+const ServiceApplicationsManagement = lazy(() => import('./pages/admin/ServiceApplicationsManagement'));
 const ServiceFormBuilder = lazy(() => import('./pages/admin/ServiceFormBuilder'));
 const Ledger = lazy(() => import('./pages/Ledger'));
 
@@ -138,6 +139,7 @@ export default function App() {
                   
                   <Route path="settings" element={<ProtectedRoute roles={['admin']}><Settings /></ProtectedRoute>}>
                     <Route path="services" element={<Services />} />
+                    <Route path="service-management" element={<ServiceApplicationsManagement />} />
                     <Route path="service-control" element={<ServiceControlSettings />} />
                     <Route path="ai-copilot" element={<AICopilotSettings />} />
                     <Route path="users" element={<Users />} />

@@ -23,6 +23,7 @@ const AdminDashboard = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [stats, setStats] = useState<any>(null);
+  const [servicesStatus, setServicesStatus] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [error, setError] = useState<string | null>(null);
@@ -73,10 +74,12 @@ const AdminDashboard = () => {
         const totalUsers = activeDocs.filter((doc: any) => (doc.data().role || 'user') === 'user').length;
         const totalStaff = activeDocs.filter((doc: any) => doc.data().role === 'staff').length;
         const totalAdmins = activeDocs.filter((doc: any) => doc.data().role === 'admin').length;
+        const totalUserWallets = activeDocs.reduce((sum: number, doc: any) => sum + (parseFloat(doc.data().wallet_balance || doc.data().balance || 0) || 0), 0);
         
         newStats.overview.totalUsers = totalUsers;
         newStats.overview.totalStaff = totalStaff;
         newStats.overview.totalAdmins = totalAdmins;
+        newStats.overview.totalUserWallets = totalUserWallets;
         
         newStats.userBreakdown = [
           { name: 'Admin', value: totalAdmins, color: '#f59e0b' },
@@ -178,6 +181,15 @@ const AdminDashboard = () => {
       let totalRev = 0;
       let serviceRev = 0;
       
+      let todayCollection = 0;
+      let todayWithdrawal = 0;
+      const totalLedgerEntries = activeLedger.length;
+
+      const todayStart = new Date();
+      todayStart.setHours(0,0,0,0);
+      const todayEnd = new Date();
+      todayEnd.setHours(23,59,59,999);
+      
       const monthlyDataMap: Record<string, { serviceRevenue: number; totalRevenue: number; count: number }> = {};
 
       activeLedger.forEach((doc: any) => {
@@ -222,18 +234,54 @@ const AdminDashboard = () => {
         monthlyDataMap[monthStr].serviceRevenue += itemService;
         monthlyDataMap[monthStr].totalRevenue += itemTotal;
         monthlyDataMap[monthStr].count += 1;
+
+        // Calculate Today's metrics
+        const createdAt = (data.created_at && typeof data.created_at.toDate === 'function') ? data.created_at.toDate() : (data.created_at ? new Date(data.created_at) : null);
+        let isToday = false;
+        if (createdAt && createdAt >= todayStart && createdAt <= todayEnd) {
+          isToday = true;
+        } else if (data.date_string === new Date().toISOString().split('T')[0]) {
+          isToday = true;
+        }
+
+        if (isToday) {
+          const totalAmountVal = data.total_amount !== undefined ? parseFloat(data.total_amount) : (principle + profit);
+          if (isDebit) {
+            todayWithdrawal += Math.abs(totalAmountVal);
+          } else {
+            todayCollection += Math.abs(totalAmountVal);
+          }
+        }
       });
+
+      // Find Daily Closing Balance
+      const sortedLedger = [...activeLedger].sort((a: any, b: any) => {
+        const timeA = a.data().created_at && typeof a.data().created_at.toDate === 'function' ? a.data().created_at.toDate().getTime() : (a.data().created_at ? new Date(a.data().created_at).getTime() : 0);
+        const timeB = b.data().created_at && typeof b.data().created_at.toDate === 'function' ? b.data().created_at.toDate().getTime() : (b.data().created_at ? new Date(b.data().created_at).getTime() : 0);
+        return timeB - timeA;
+      });
+      const latestEntry = sortedLedger[0]?.data();
+      const dailyClosingBalance = latestEntry ? (latestEntry.runningBalance || latestEntry.balance || 0) : 0;
 
       setStats((prev: any) => ({
         ...prev,
         overview: {
           ...(prev?.overview || {}),
           totalRevenue: totalRev,
-          serviceRevenue: serviceRev
+          serviceRevenue: serviceRev,
+          todayCollection,
+          todayWithdrawal,
+          dailyClosingBalance,
+          totalLedgerEntries
         },
         monthlyStats: monthlyDataMap
       }));
     }, (err) => setError('Ledger: ' + err.message));
+
+    // Watch service controls
+    const unsubServices = onSnapshot(collection(db, 'service_controls'), (snap) => {
+      setServicesStatus(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (err) => console.log('Services sync error in dashboard:', err));
 
     const unsubLogs = onSnapshot(query(collection(db, 'activity_logs'), orderBy('timestamp', 'desc'), limit(10)), (snap) => {
       setStats((prev: any) => ({
@@ -259,6 +307,7 @@ const AdminDashboard = () => {
       unsubUsers();
       unsubApps();
       unsubLedger();
+      unsubServices();
       unsubLogs();
       document.removeEventListener('mousedown', handleClickOutside);
     };
@@ -476,6 +525,193 @@ const AdminDashboard = () => {
             </motion.div>
           );
         })}
+      </div>
+
+      {/* JH Portal Financial & Operational Overview */}
+      <div className="space-y-4">
+        <div className="border-l-4 border-blue-600 pl-3">
+          <h2 className="text-lg font-bold text-slate-900 tracking-tight">Financial & Live Portal Controls</h2>
+          <p className="text-xs text-slate-500 mt-0.5">Real-time ledger summary and gateway status gates of digital services</p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Today's Collection */}
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between"
+          >
+            <div>
+              <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Today's Collection</p>
+              <h3 className="text-2xl font-bold text-slate-900 tracking-tight mt-1">
+                ₹{(overview.todayCollection || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </h3>
+              <p className="text-[10px] text-emerald-600 font-semibold mt-1 flex items-center gap-1">
+                <span>●</span> Deposited & Profits
+              </p>
+            </div>
+            <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
+              <IndianRupee size={22} />
+            </div>
+          </motion.div>
+
+          {/* Today's Withdrawal */}
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between"
+          >
+            <div>
+              <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Today's Withdrawal</p>
+              <h3 className="text-2xl font-bold text-slate-900 tracking-tight mt-1">
+                ₹{(overview.todayWithdrawal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </h3>
+              <p className="text-[10px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
+                <span>●</span> Outbound Debits
+              </p>
+            </div>
+            <div className="p-3 bg-rose-50 text-rose-600 rounded-xl">
+              <IndianRupee size={22} />
+            </div>
+          </motion.div>
+
+          {/* Daily Closing Balance */}
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between"
+          >
+            <div>
+              <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Running Pool Balance</p>
+              <h3 className="text-2xl font-bold text-slate-900 tracking-tight mt-1">
+                ₹{(overview.dailyClosingBalance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </h3>
+              <p className="text-[10px] text-blue-600 font-semibold mt-1 flex items-center gap-1">
+                <span>●</span> Daily Closing Estimate
+              </p>
+            </div>
+            <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
+              <IndianRupee size={22} />
+            </div>
+          </motion.div>
+
+          {/* Total Ledger Entries */}
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between"
+          >
+            <div>
+              <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Total Ledger Entries</p>
+              <h3 className="text-2xl font-bold text-slate-900 tracking-tight mt-1">
+                {(overview.totalLedgerEntries || 0).toLocaleString('en-IN')}
+              </h3>
+              <p className="text-[10px] text-purple-600 font-semibold mt-1 flex items-center gap-1">
+                <span>●</span> All-time txns logged
+              </p>
+            </div>
+            <div className="p-3 bg-purple-50 text-purple-600 rounded-xl">
+              <Activity size={22} />
+            </div>
+          </motion.div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-2">
+          {/* Wallet Summary */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+            <h3 className="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
+              <span className="p-1 bg-yellow-50 text-yellow-600 rounded-lg"><IndianRupee size={16} /></span>
+              Portal Wallet Summary
+            </h3>
+            
+            <div className="space-y-4">
+              <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 flex justify-between items-center">
+                <div>
+                  <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">Cumulative Client Wallets</span>
+                  <p className="text-xl font-black text-slate-900 mt-0.5">
+                    ₹{(overview.totalUserWallets || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Wallet Balance Pool</span>
+                  <span className="text-xs bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full mt-1 inline-block">Active Pools</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div className="p-3 bg-slate-50/50 border border-slate-100 rounded-xl text-center">
+                  <span className="text-slate-400 text-[10px] uppercase font-bold block">Admins</span>
+                  <span className="text-base font-bold text-slate-800 mt-1 block">{overview.totalAdmins || 0}</span>
+                </div>
+                <div className="p-3 bg-slate-50/50 border border-slate-100 rounded-xl text-center">
+                  <span className="text-slate-400 text-[10px] uppercase font-bold block">Staff Counter</span>
+                  <span className="text-base font-bold text-slate-800 mt-1 block">{overview.totalStaff || 0}</span>
+                </div>
+                <div className="p-3 bg-slate-50/50 border border-slate-100 rounded-xl text-center">
+                  <span className="text-slate-400 text-[10px] uppercase font-bold block">Clients</span>
+                  <span className="text-base font-bold text-slate-800 mt-1 block">{overview.totalUsers || 0}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Service Status Panel */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div>
+              <h3 className="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
+                <span className="p-1 bg-indigo-50 text-indigo-600 rounded-lg"><Server size={16} /></span>
+                Service Status Gates
+              </h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {servicesStatus.length === 0 ? (
+                  <div className="col-span-3 text-center py-4 text-xs text-slate-400 italic">
+                    Loading portal service control gates...
+                  </div>
+                ) : (
+                  servicesStatus.slice(0, 6).map((srv: any) => {
+                    const isM = !!srv.maintenanceMode;
+                    const isC = !!srv.comingSoon;
+                    const isL = !isM && !isC && srv.isLive;
+                    
+                    let pillClr = "bg-rose-50 text-rose-700 border-rose-100";
+                    let label = "Offline";
+                    if (isL) {
+                      pillClr = "bg-emerald-50 text-emerald-700 border-emerald-100";
+                      label = "Live";
+                    } else if (isM) {
+                      pillClr = "bg-amber-50 text-amber-700 border-amber-100";
+                      label = "Maintenance";
+                    } else if (isC) {
+                      pillClr = "bg-blue-50 text-blue-700 border-blue-100";
+                      label = "Soon";
+                    }
+
+                    return (
+                      <div 
+                        key={srv.id} 
+                        className="p-2.5 bg-slate-50/50 hover:bg-white border hover:shadow-sm border-slate-100 rounded-xl transition-all"
+                      >
+                        <span className="text-xs font-semibold text-slate-700 truncate block">{srv.serviceName || srv.id}</span>
+                        <div className="flex items-center gap-1.5 mt-1.5">
+                          {isL && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />}
+                          <span className={`text-[9px] uppercase font-bold border px-1.5 py-0.5 rounded-lg truncate ${pillClr}`}>
+                            {label}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+            
+            <div className="mt-4 pt-3 border-t border-slate-100 flex justify-end">
+              <Link to="/app/settings/services" className="text-xs font-bold text-indigo-600 hover:underline flex items-center gap-1">
+                Configure Control Gates <ArrowRight size={12} />
+              </Link>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

@@ -23,6 +23,9 @@ export default defineConfig(({ mode }) => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
+        devOptions: {
+          enabled: true
+        },
         includeAssets: ['logo.svg'],
         manifest: {
           name: 'JH Digital Seva Kendra',

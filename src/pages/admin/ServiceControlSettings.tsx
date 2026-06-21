@@ -118,6 +118,12 @@ const ServiceControlSettings = () => {
     const defaults = [
       { key: 'pan', name: 'PAN Services', order: 1 },
       { key: 'aadhaarService', name: 'Aadhaar Services', order: 2 },
+      { key: 'mobileRecharge', name: 'Mobile Recharge', order: 3 },
+      { key: 'dthRecharge', name: 'DTH Recharge', order: 4 },
+      { key: 'electricityBill', name: 'BBPS Services', order: 5 },
+      { key: 'aeps', name: 'AEPS Service', order: 6 },
+      { key: 'dmt', name: 'DMT Transfer', order: 7 },
+      { key: 'wallet', name: 'Wallet Transactions', order: 8 },
     ];
 
     const toastId = toast.loading('Seeding services...');

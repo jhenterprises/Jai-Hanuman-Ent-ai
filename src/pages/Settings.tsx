@@ -10,6 +10,7 @@ const SettingsLayout = () => {
 
   const allModules = [
     { name: 'Branding & Portal', icon: <SettingsIcon size={20} />, path: '/app/settings/portal', roles: ['admin'] },
+    { name: 'Service Applications Management', icon: <Briefcase size={20} />, path: '/app/settings/service-management', roles: ['admin'] },
     { name: 'User Management', icon: <Users size={20} />, path: '/app/users', roles: ['admin', 'staff'] },
     { name: 'Staff Management', icon: <Users size={20} />, path: '/app/settings/staff', roles: ['admin'] },
     { name: 'Service Control', icon: <Power size={20} />, path: '/app/settings/service-control', roles: ['admin'] },
