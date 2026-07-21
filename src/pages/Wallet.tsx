@@ -159,8 +159,8 @@ const Wallet = () => {
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black text-white">My Wallet</h1>
-          <p className="text-slate-400">Manage your balance and view transactions</p>
+          <h1 className="text-3xl font-black text-slate-900 dark:text-white">My Wallet</h1>
+          <p className="text-slate-500 dark:text-slate-400">Manage your balance and view transactions</p>
         </div>
         <button
           onClick={() => setShowAddMoney(true)}
@@ -196,8 +196,8 @@ const Wallet = () => {
               <WalletIcon className="text-white" size={24} />
             </div>
             <div>
-              <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">Current Balance</p>
-              <h2 className="text-4xl font-black text-white flex items-center gap-1">
+              <p className="text-slate-500 dark:text-slate-400 font-bold uppercase tracking-widest text-xs">Current Balance</p>
+              <h2 className="text-4xl font-black text-slate-900 dark:text-white flex items-center gap-1">
                 <IndianRupee size={28} className="text-blue-500" />
                 {(wallet?.balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
               </h2>
@@ -214,8 +214,8 @@ const Wallet = () => {
               <TrendingUp className="text-emerald-400" size={24} />
             </div>
             <div>
-              <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">Total Credits</p>
-              <h2 className="text-3xl font-black text-white flex items-center gap-1">
+              <p className="text-slate-500 dark:text-slate-400 font-bold uppercase tracking-widest text-xs">Total Credits</p>
+              <h2 className="text-3xl font-black text-slate-900 dark:text-white flex items-center gap-1">
                 <IndianRupee size={24} className="text-emerald-400" />
                 {(totalCredits || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
               </h2>
@@ -232,8 +232,8 @@ const Wallet = () => {
               <TrendingDown className="text-red-400" size={24} />
             </div>
             <div>
-              <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">Total Debits</p>
-              <h2 className="text-3xl font-black text-white flex items-center gap-1">
+              <p className="text-slate-500 dark:text-slate-400 font-bold uppercase tracking-widest text-xs">Total Debits</p>
+              <h2 className="text-3xl font-black text-slate-900 dark:text-white flex items-center gap-1">
                 <IndianRupee size={24} className="text-red-400" />
                 {(totalDebits || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
               </h2>
@@ -244,26 +244,26 @@ const Wallet = () => {
 
       {/* Transaction History */}
       <div className="glass rounded-[2.5rem] overflow-hidden">
-        <div className="p-8 border-b border-white/5 flex items-center justify-between">
+        <div className="p-8 border-b border-slate-200 dark:border-white/5 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center">
-              <History className="text-slate-400" size={20} />
+            <div className="w-10 h-10 bg-slate-100 dark:bg-slate-800 rounded-xl flex items-center justify-center">
+              <History className="text-slate-500 dark:text-slate-400" size={20} />
             </div>
-            <h3 className="text-xl font-black text-white">Transaction History</h3>
+            <h3 className="text-xl font-black text-slate-900 dark:text-white">Transaction History</h3>
           </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
-              <tr className="bg-white/5">
-                <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-slate-400">Transaction ID</th>
-                <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-slate-400">Date</th>
-                <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-slate-400">Description</th>
-                <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-slate-400">Amount</th>
-                <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-slate-400">Status</th>
+              <tr className="bg-slate-50 dark:bg-white/5">
+                <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Transaction ID</th>
+                <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Date</th>
+                <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Description</th>
+                <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Amount</th>
+                <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/5">
+            <tbody className="divide-y divide-slate-200 dark:divide-white/5">
               {transactions.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-8 py-12 text-center text-slate-500">
@@ -272,12 +272,12 @@ const Wallet = () => {
                 </tr>
               ) : (
                 transactions.map((t) => (
-                  <tr key={t.id} className="hover:bg-white/5 transition-colors group">
+                  <tr key={t.id} className="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors group">
                     <td className="px-8 py-4">
-                      <span className="text-sm font-mono text-slate-400">#{t.id.toString().padStart(6, '0')}</span>
+                      <span className="text-sm font-mono text-slate-500 dark:text-slate-400">#{t.id.toString().padStart(6, '0')}</span>
                     </td>
                     <td className="px-8 py-4">
-                      <span className="text-sm text-slate-300">{safeFormat(t.created_at, 'dd MMM yyyy, hh:mm a')}</span>
+                      <span className="text-sm text-slate-600 dark:text-slate-300">{safeFormat(t.created_at, 'dd MMM yyyy, hh:mm a')}</span>
                     </td>
                     <td className="px-8 py-4">
                       <div className="flex items-center gap-3">
@@ -286,7 +286,7 @@ const Wallet = () => {
                         }`}>
                           {t.type === 'credit' ? <ArrowDownLeft size={16} /> : <ArrowUpRight size={16} />}
                         </div>
-                        <span className="text-sm text-white font-medium">{t.description}</span>
+                        <span className="text-sm text-slate-800 dark:text-white font-medium">{t.description}</span>
                       </div>
                     </td>
                     <td className="px-8 py-4">
@@ -315,15 +315,15 @@ const Wallet = () => {
 
       {/* Add Money Modal */}
       {showAddMoney && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-slate-950/80 backdrop-blur-sm">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="glass max-w-md w-full p-8 rounded-[2.5rem] relative"
+            className="bg-white dark:bg-slate-900/95 border border-slate-200 dark:border-white/10 max-w-md w-full p-8 rounded-[2.5rem] relative shadow-2xl"
           >
             <button
               onClick={() => setShowAddMoney(false)}
-              className="absolute top-6 right-6 text-slate-400 hover:text-white transition-colors"
+              className="absolute top-6 right-6 text-slate-500 hover:text-slate-950 dark:text-slate-400 dark:hover:text-white transition-colors"
             >
               <AlertCircle size={24} className="rotate-45" />
             </button>
@@ -333,8 +333,8 @@ const Wallet = () => {
                 <CreditCard className="text-white" size={32} />
               </div>
               <div>
-                <h3 className="text-2xl font-black text-white">Add Money</h3>
-                <p className="text-slate-400">Enter amount to add to your wallet</p>
+                <h3 className="text-2xl font-black text-slate-900 dark:text-white">Add Money</h3>
+                <p className="text-slate-500 dark:text-slate-400">Enter amount to add to your wallet</p>
               </div>
             </div>
 
@@ -349,7 +349,7 @@ const Wallet = () => {
                     min="1"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
-                    className="w-full bg-slate-900/50 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-white text-xl font-bold focus:outline-none focus:border-blue-500 transition-colors"
+                    className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-white/10 rounded-2xl py-4 pl-12 pr-4 text-slate-900 dark:text-white text-xl font-bold focus:outline-none focus:border-blue-500 transition-colors"
                     placeholder="0.00"
                   />
                 </div>
@@ -361,7 +361,7 @@ const Wallet = () => {
                     key={val}
                     type="button"
                     onClick={() => setAmount(val.toString())}
-                    className="py-2 bg-white/5 hover:bg-white/10 text-white text-sm font-bold rounded-xl border border-white/5 transition-colors"
+                    className="py-2 bg-slate-50 dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 text-slate-800 dark:text-white text-sm font-bold rounded-xl border border-slate-200 dark:border-white/5 transition-colors"
                   >
                     +₹{val}
                   </button>

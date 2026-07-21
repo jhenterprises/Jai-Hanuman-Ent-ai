@@ -166,7 +166,7 @@ const TrackApplication = () => {
                 <div className="bg-white dark:bg-slate-900/50 backdrop-blur-xl rounded-[2.5rem] p-8 border border-slate-200 dark:border-slate-800 shadow-2xl">
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 pb-8 border-b border-slate-200 dark:border-slate-800">
                     <div>
-                      <div className="text-sm text-slate-500 uppercase tracking-wider font-semibold mb-1">Reference Number</div>
+                      <div className="text-sm text-slate-500 dark:text-slate-400 uppercase tracking-wider font-semibold mb-1">Reference Number</div>
                       <div className="text-2xl font-bold text-slate-900 dark:text-white">{application.reference_number}</div>
                     </div>
                     <div className={`px-4 py-2 rounded-xl border font-bold flex items-center gap-2 ${getStatusColor(application.status)}`}>
@@ -190,7 +190,7 @@ const TrackApplication = () => {
                         <FileText size={20} />
                       </div>
                       <div>
-                        <div className="text-sm text-slate-500 mb-1">Service Type</div>
+                        <div className="text-sm text-slate-500 dark:text-slate-400 mb-1">Service Type</div>
                         <div className="text-slate-900 dark:text-white font-semibold capitalize">{application.service_type}</div>
                       </div>
                     </div>
@@ -199,7 +199,7 @@ const TrackApplication = () => {
                         <Calendar size={20} />
                       </div>
                       <div>
-                        <div className="text-sm text-slate-500 mb-1">Submission Date</div>
+                        <div className="text-sm text-slate-500 dark:text-slate-400 mb-1">Submission Date</div>
                         <div className="text-slate-900 dark:text-white font-semibold">{safeFormat(application.created_at, 'dd/MM/yyyy')}</div>
                       </div>
                     </div>
@@ -208,7 +208,7 @@ const TrackApplication = () => {
                         <User size={20} />
                       </div>
                       <div>
-                        <div className="text-sm text-slate-500 mb-1">Assigned Staff</div>
+                        <div className="text-sm text-slate-500 dark:text-slate-400 mb-1">Assigned Staff</div>
                         <div className="text-slate-900 dark:text-white font-semibold">{application.staff_name || 'Not assigned yet'}</div>
                       </div>
                     </div>

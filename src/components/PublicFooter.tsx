@@ -69,7 +69,7 @@ const PublicFooter = () => {
           </div>
         </div>
         <div className="pt-8 border-t border-slate-200 dark:border-slate-800/50 text-center text-slate-500 text-sm">
-          {config.footer_text || `© ${new Date().getFullYear()} ${config.portal_name || 'JH Digital Seva Kendra'}. All rights reserved.`}
+          {config.footer_text ? config.footer_text.replace(/2024/g, '2026') : `© ${new Date().getFullYear()} ${config.portal_name || 'JH Digital Seva Kendra'}. All rights reserved.`}
         </div>
       </div>
     </footer>

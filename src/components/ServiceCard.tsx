@@ -55,9 +55,9 @@ const ServiceCard: React.FC<ServiceCardProps> = ({ service, icon: Icon, color })
       </motion.div>
       
       <div className="text-center space-y-1">
-        <h3 className="text-sm font-black text-white uppercase tracking-tight">{service.serviceName}</h3>
+        <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight">{service.serviceName}</h3>
         {service.bannerMessage && (
-          <p className="text-[10px] text-slate-400 font-medium leading-tight max-w-[120px] mx-auto">
+          <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium leading-tight max-w-[120px] mx-auto">
             {service.bannerMessage}
           </p>
         )}

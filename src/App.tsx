@@ -19,7 +19,7 @@ const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Services = lazy(() => import('./pages/Services'));
-import Users from './pages/Users';
+const Users = lazy(() => import('./pages/Users'));
 const Applications = lazy(() => import('./pages/Applications'));
 const ApplyService = lazy(() => import('./pages/ApplyService'));
 const Support = lazy(() => import('./pages/Support'));
@@ -27,8 +27,10 @@ const StaffManagement = lazy(() => import('./pages/StaffManagement'));
 const SupportCenter = lazy(() => import('./pages/SupportCenter'));
 const Profile = lazy(() => import('./pages/Profile'));
 const Settings = lazy(() => import('./pages/Settings'));
+const FormConfigurationManager = lazy(() => import('./pages/admin/FormConfigurationManager'));
 const ServiceControlSettings = lazy(() => import('./pages/admin/ServiceControlSettings'));
 const AICopilotSettings = lazy(() => import('./pages/admin/AICopilotSettings'));
+const PortalConfig = lazy(() => import('./pages/PortalConfig'));
 const IDCardSettings = lazy(() => import('./pages/IDCardSettings'));
 const RecycleBin = lazy(() => import('./pages/RecycleBin'));
 const Documents = lazy(() => import('./pages/Documents'));
@@ -99,7 +101,8 @@ export default function App() {
                   <Route path="/track/:ref" element={<TrackApplication />} />
                 </Route>
                 
-                <Route path="/login" element={<Login />} />
+                <Route path="/login" element={<Login type="user" />} />
+                <Route path="/boss-login" element={<Login type="admin" />} />
                 <Route path="/register" element={<Register />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
@@ -115,7 +118,7 @@ export default function App() {
                   <Route path="ledger" element={<ProtectedRoute roles={['admin', 'staff']}><Ledger /></ProtectedRoute>} />
                   <Route path="admin-dashboard" element={<ProtectedRoute roles={['admin']}><AdminDashboard /></ProtectedRoute>} />
                   <Route path="services" element={<Services />} />
-                  <Route path="services/:id/builder" element={<ProtectedRoute roles={['admin']}><ServiceFormBuilder /></ProtectedRoute>} />
+                  <Route path="services/:id/builder" element={<ProtectedRoute roles={['admin']}><FormConfigurationManager /></ProtectedRoute>} />
                   <Route path="users" element={<ProtectedRoute roles={['admin']}><Users /></ProtectedRoute>} />
                   <Route path="staff-management" element={<ProtectedRoute roles={['admin']}><StaffManagement /></ProtectedRoute>} />
                   <Route path="admin/id-card-designer" element={<ProtectedRoute roles={['admin']}><IDCardSettings /></ProtectedRoute>} />
@@ -140,8 +143,10 @@ export default function App() {
                   <Route path="settings" element={<ProtectedRoute roles={['admin']}><Settings /></ProtectedRoute>}>
                     <Route path="services" element={<Services />} />
                     <Route path="service-management" element={<ServiceApplicationsManagement />} />
+                    <Route path="form-config" element={<FormConfigurationManager />} />
                     <Route path="service-control" element={<ServiceControlSettings />} />
                     <Route path="ai-copilot" element={<AICopilotSettings />} />
+                    <Route path="portal" element={<PortalConfig />} />
                     <Route path="users" element={<Users />} />
                     <Route path="staff" element={<Users />} />
                     <Route path="permissions" element={<SystemPermissions />} />

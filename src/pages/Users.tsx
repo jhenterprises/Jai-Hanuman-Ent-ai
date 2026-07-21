@@ -209,7 +209,7 @@ const UsersPage = () => {
     
     try {
         const token = await auth.currentUser?.getIdToken();
-        const response = await fetch('/api/reset-password', {
+        const response = await fetch('/api/auth/reset-password', {
             method: 'POST',
             headers: { 
                 'Content-Type': 'application/json',
@@ -348,13 +348,13 @@ const UsersPage = () => {
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-white">User Management</h1>
-          <p className="text-slate-400 text-sm mt-1">Manage system users, roles, and access controls.</p>
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">User Management</h1>
+          <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Manage system users, roles, and access controls.</p>
         </div>
         <div className="flex items-center gap-2">
           <button 
             onClick={() => exportToCSV(filtered, 'Users_Report')}
-            className="flex items-center gap-2 px-6 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl transition-all font-bold text-sm"
+            className="flex items-center gap-2 px-6 py-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-white border border-slate-200 dark:border-slate-700/50 rounded-2xl transition-all font-bold text-sm"
           >
             <Download size={20} /> Export CSV
           </button>
@@ -369,7 +369,7 @@ const UsersPage = () => {
       </div>
 
       {/* Filters & Search */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 bg-slate-800/40 p-4 rounded-3xl border border-slate-700/50 backdrop-blur-sm">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 bg-white dark:bg-slate-800/40 p-4 rounded-3xl border border-slate-200 dark:border-slate-700/50 shadow-sm backdrop-blur-sm">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
           <input 
@@ -377,7 +377,7 @@ const UsersPage = () => {
             placeholder="Search by name, email, phone..." 
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-slate-900/50 border border-slate-700/50 rounded-xl text-slate-200 focus:outline-none focus:border-blue-500 text-sm"
+            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700/50 rounded-xl text-slate-800 dark:text-slate-200 focus:outline-none focus:border-blue-500 text-sm"
           />
         </div>
         <div className="flex items-center gap-2">
@@ -385,7 +385,7 @@ const UsersPage = () => {
           <select 
             value={roleFilter}
             onChange={(e) => setRoleFilter(e.target.value)}
-            className="flex-1 px-3 py-2.5 bg-slate-900/50 border border-slate-700/50 rounded-xl text-slate-200 text-sm focus:outline-none focus:border-blue-500"
+            className="flex-1 px-3 py-2.5 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700/50 rounded-xl text-slate-800 dark:text-slate-200 text-sm focus:outline-none focus:border-blue-500"
           >
             <option value="all">All Roles</option>
             <option value="user">Users</option>
@@ -398,7 +398,7 @@ const UsersPage = () => {
           <select 
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="flex-1 px-3 py-2.5 bg-slate-900/50 border border-slate-700/50 rounded-xl text-slate-200 text-sm focus:outline-none focus:border-blue-500"
+            className="flex-1 px-3 py-2.5 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700/50 rounded-xl text-slate-800 dark:text-slate-200 text-sm focus:outline-none focus:border-blue-500"
           >
             <option value="all">All Status</option>
             <option value="active">Active</option>
@@ -409,7 +409,7 @@ const UsersPage = () => {
           <select 
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
-            className="flex-1 px-3 py-2.5 bg-slate-900/50 border border-slate-700/50 rounded-xl text-slate-200 text-sm focus:outline-none focus:border-blue-500"
+            className="flex-1 px-3 py-2.5 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700/50 rounded-xl text-slate-800 dark:text-slate-200 text-sm focus:outline-none focus:border-blue-500"
           >
             <option value="created_at">Sort by Date</option>
             <option value="name">Sort by Name</option>
@@ -417,7 +417,7 @@ const UsersPage = () => {
           </select>
           <button 
             onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-            className="p-2.5 bg-slate-900/50 border border-slate-700/50 rounded-xl text-slate-400 hover:text-white"
+            className="p-2.5 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700/50 rounded-xl text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
           >
             {sortOrder === 'asc' ? <ChevronLeft className="rotate-90" /> : <ChevronRight className="rotate-90" />}
           </button>
@@ -425,25 +425,25 @@ const UsersPage = () => {
       </div>
 
       {/* Users Table */}
-      <div className="bg-slate-800/60 backdrop-blur-xl rounded-[2.5rem] border border-slate-700/50 shadow-2xl overflow-hidden">
+      <div className="bg-white dark:bg-slate-800/60 backdrop-blur-xl rounded-[2.5rem] border border-slate-200 dark:border-slate-700/50 shadow-sm dark:shadow-2xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-700/30 border-b border-slate-700/50">
-                <th className="p-5 text-slate-400 font-bold text-[10px] uppercase tracking-widest">User Details</th>
-                <th className="p-5 text-slate-400 font-bold text-[10px] uppercase tracking-widest">Contact Info</th>
-                <th className="p-5 text-slate-400 font-bold text-[10px] uppercase tracking-widest">Role & Status</th>
-                <th className="p-5 text-slate-400 font-bold text-[10px] uppercase tracking-widest">Joined Date</th>
-                <th className="p-5 text-slate-400 font-bold text-[10px] uppercase tracking-widest text-right">Actions</th>
+              <tr className="bg-slate-50 dark:bg-slate-700/30 border-b border-slate-200 dark:border-slate-700/50">
+                <th className="p-5 text-slate-500 dark:text-slate-400 font-bold text-[10px] uppercase tracking-widest">User Details</th>
+                <th className="p-5 text-slate-500 dark:text-slate-400 font-bold text-[10px] uppercase tracking-widest">Contact Info</th>
+                <th className="p-5 text-slate-500 dark:text-slate-400 font-bold text-[10px] uppercase tracking-widest">Role & Status</th>
+                <th className="p-5 text-slate-500 dark:text-slate-400 font-bold text-[10px] uppercase tracking-widest">Joined Date</th>
+                <th className="p-5 text-slate-500 dark:text-slate-400 font-bold text-[10px] uppercase tracking-widest text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-700/30">
+            <tbody className="divide-y divide-slate-200 dark:divide-slate-700/30">
               {loading ? (
                 <tr>
                   <td colSpan={5} className="p-20 text-center">
                     <div className="flex flex-col items-center gap-3">
                       <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                      <span className="text-slate-400 text-sm font-medium">Loading users...</span>
+                      <span className="text-slate-500 dark:text-slate-400 text-sm font-medium">Loading users...</span>
                     </div>
                   </td>
                 </tr>
@@ -455,25 +455,25 @@ const UsersPage = () => {
                 </tr>
               ) : (
                 paginated.map(item => (
-                  <tr key={item.id} className="hover:bg-slate-700/20 transition-colors group">
+                  <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/20 border-b border-slate-100 dark:border-slate-700/30 transition-colors group">
                     <td className="p-5">
                       <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-slate-700 to-slate-800 border border-slate-600 flex items-center justify-center text-lg font-bold text-white shadow-inner">
+                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-800 border border-slate-300 dark:border-slate-600 flex items-center justify-center text-lg font-bold text-slate-700 dark:text-white shadow-inner">
                           {(item.name || 'U').charAt(0).toUpperCase()}
                         </div>
                         <div>
-                          <div className="text-slate-200 font-bold text-sm">{item.name || 'Unknown User'}</div>
+                          <div className="text-slate-800 dark:text-slate-200 font-bold text-sm">{item.name || 'Unknown User'}</div>
                           <div className="text-[10px] text-slate-500 font-mono mt-0.5">{item.id}</div>
                         </div>
                       </div>
                     </td>
                     <td className="p-5">
                       <div className="space-y-1">
-                        <div className="flex items-center gap-2 text-slate-300 text-xs">
+                        <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300 text-xs">
                           <Mail size={12} className="text-slate-500" />
                           {item.email}
                         </div>
-                        <div className="flex items-center gap-2 text-slate-400 text-xs">
+                        <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs">
                           <Phone size={12} className="text-slate-500" />
                           {item.phone || 'No phone'}
                         </div>
@@ -482,15 +482,15 @@ const UsersPage = () => {
                     <td className="p-5">
                       <div className="flex flex-col gap-2">
                         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border uppercase tracking-wider w-fit ${
-                          item.role === 'admin' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' :
-                          item.role === 'staff' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
-                          'bg-slate-500/10 text-slate-400 border-slate-500/20'
+                          item.role === 'admin' ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20' :
+                          item.role === 'staff' ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20' :
+                          'bg-slate-500/10 text-slate-500 dark:text-slate-400 border-slate-500/20'
                         }`}>
                           {item.role === 'admin' ? <Shield size={10} /> : <User size={10} />}
                           {item.role}
                         </span>
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-tighter w-fit ${
-                          item.status === 'active' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                          item.status === 'active' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
                         }`}>
                           {item.status === 'active' ? <UserCheck size={10} /> : <UserMinus size={10} />}
                           {item.status}
@@ -498,7 +498,7 @@ const UsersPage = () => {
                       </div>
                     </td>
                     <td className="p-5">
-                      <div className="flex items-center gap-2 text-slate-400 text-xs">
+                      <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs">
                         <Calendar size={12} className="text-slate-500" />
                         {safeFormat(item.created_at, 'dd MMM, yyyy')}
                       </div>
@@ -546,15 +546,15 @@ const UsersPage = () => {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="p-5 border-t border-slate-700/30 flex items-center justify-between bg-slate-800/20">
-            <span className="text-xs text-slate-500">
-              Showing <span className="text-slate-300 font-bold">{(page - 1) * itemsPerPage + 1}</span> to <span className="text-slate-300 font-bold">{Math.min(page * itemsPerPage, filtered.length)}</span> of <span className="text-slate-300 font-bold">{filtered.length}</span> users
+          <div className="p-5 border-t border-slate-200 dark:border-slate-700/30 flex items-center justify-between bg-slate-50 dark:bg-slate-800/20">
+            <span className="text-xs text-slate-500 dark:text-slate-400">
+              Showing <span className="text-slate-800 dark:text-slate-300 font-bold">{(page - 1) * itemsPerPage + 1}</span> to <span className="text-slate-800 dark:text-slate-300 font-bold">{Math.min(page * itemsPerPage, filtered.length)}</span> of <span className="text-slate-800 dark:text-slate-300 font-bold">{filtered.length}</span> users
             </span>
             <div className="flex items-center gap-2">
               <button 
                 onClick={() => setPage(p => Math.max(1, p - 1))}
                 disabled={page === 1}
-                className="p-2 bg-slate-900/50 border border-slate-700/50 rounded-xl text-slate-400 hover:text-white disabled:opacity-50 transition-all"
+                className="p-2 bg-slate-100 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700/50 rounded-xl text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white disabled:opacity-50 transition-all"
               >
                 <ChevronLeft size={18} />
               </button>
@@ -564,7 +564,7 @@ const UsersPage = () => {
                     key={i}
                     onClick={() => setPage(i + 1)}
                     className={`w-8 h-8 rounded-xl text-xs font-bold transition-all ${
-                      page === i + 1 ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'bg-slate-900/50 text-slate-500 hover:text-white border border-slate-700/50'
+                      page === i + 1 ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'bg-slate-100 dark:bg-slate-900/50 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-700/50'
                     }`}
                   >
                     {i + 1}
@@ -574,7 +574,7 @@ const UsersPage = () => {
               <button 
                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                 disabled={page === totalPages}
-                className="p-2 bg-slate-900/50 border border-slate-700/50 rounded-xl text-slate-400 hover:text-white disabled:opacity-50 transition-all"
+                className="p-2 bg-slate-100 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700/50 rounded-xl text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white disabled:opacity-50 transition-all"
               >
                 <ChevronRight size={18} />
               </button>
@@ -598,17 +598,17 @@ const UsersPage = () => {
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-lg bg-slate-900 border border-slate-700 rounded-[2.5rem] shadow-2xl overflow-hidden"
+              className="relative w-full max-w-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-[2.5rem] shadow-2xl overflow-hidden"
             >
               <div className="p-8">
                 <div className="flex justify-between items-center mb-8">
                   <div>
-                    <h2 className="text-2xl font-bold text-white">{showAddModal ? 'Add New User' : 'Edit User Details'}</h2>
-                    <p className="text-slate-400 text-sm mt-1">{showAddModal ? 'Create a new account for a user or staff.' : 'Update account information and roles.'}</p>
+                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white">{showAddModal ? 'Add New User' : 'Edit User Details'}</h2>
+                    <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">{showAddModal ? 'Create a new account for a user or staff.' : 'Update account information and roles.'}</p>
                   </div>
                   <button 
                     onClick={() => { setShowAddModal(false); setShowEditModal(false); }}
-                    className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-full transition-all"
+                    className="p-2 text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-all"
                   >
                     <X size={24} />
                   </button>
@@ -621,7 +621,7 @@ const UsersPage = () => {
                       <input 
                         type="text" required
                         value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})}
-                        className="w-full px-5 py-3 bg-slate-800/50 border border-slate-700 rounded-2xl text-white focus:border-blue-500 outline-none transition-all"
+                        className="w-full px-5 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-white focus:border-blue-500 outline-none transition-all"
                         placeholder="John Doe"
                       />
                     </div>
@@ -630,7 +630,7 @@ const UsersPage = () => {
                       <input 
                         type="email" required
                         value={formData.email || ''} onChange={e => setFormData({...formData, email: e.target.value})}
-                        className="w-full px-5 py-3 bg-slate-800/50 border border-slate-700 rounded-2xl text-white focus:border-blue-500 outline-none transition-all"
+                        className="w-full px-5 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-white focus:border-blue-500 outline-none transition-all"
                         placeholder="john@example.com"
                       />
                     </div>
@@ -640,7 +640,7 @@ const UsersPage = () => {
                         <input 
                           type="tel" required
                           value={formData.phone || ''} onChange={e => setFormData({...formData, phone: e.target.value})}
-                          className="w-full px-5 py-3 bg-slate-800/50 border border-slate-700 rounded-2xl text-white focus:border-blue-500 outline-none transition-all text-sm"
+                          className="w-full px-5 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-white focus:border-blue-500 outline-none transition-all text-sm"
                           placeholder="+91 9876543210"
                         />
                       </div>
@@ -648,7 +648,7 @@ const UsersPage = () => {
                         <label className="text-[10px] text-slate-500 uppercase font-bold tracking-widest ml-1">Account Role</label>
                         <select 
                           value={formData.role || 'user'} onChange={e => setFormData({...formData, role: e.target.value})}
-                          className="w-full px-5 py-3 bg-slate-800/50 border border-slate-700 rounded-2xl text-white focus:border-blue-500 outline-none transition-all text-sm"
+                          className="w-full px-5 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-white focus:border-blue-500 outline-none transition-all text-sm"
                         >
                           <option value="user">User</option>
                           <option value="staff">Staff</option>
@@ -659,7 +659,7 @@ const UsersPage = () => {
                         <label className="text-[10px] text-slate-500 uppercase font-bold tracking-widest ml-1">Status</label>
                         <select 
                           value={formData.status || 'active'} onChange={e => setFormData({...formData, status: e.target.value})}
-                          className="w-full px-5 py-3 bg-slate-800/50 border border-slate-700 rounded-2xl text-white focus:border-blue-500 outline-none transition-all text-sm"
+                          className="w-full px-5 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-white focus:border-blue-500 outline-none transition-all text-sm"
                         >
                           <option value="active">Active</option>
                           <option value="disabled">Disabled</option>
@@ -672,7 +672,7 @@ const UsersPage = () => {
                         <input 
                           type="text"
                           value={formData.staff_id || ''} onChange={e => setFormData({...formData, staff_id: e.target.value})}
-                          className="w-full px-5 py-3 bg-slate-800/50 border border-slate-700 rounded-2xl text-white focus:border-blue-500 outline-none transition-all"
+                          className="w-full px-5 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-white focus:border-blue-500 outline-none transition-all"
                           placeholder="e.g. STF-001 (Leave blank to generate)"
                         />
                       </div>
@@ -683,7 +683,7 @@ const UsersPage = () => {
                         <input 
                           type="password" required
                           value={formData.password || ''} onChange={e => setFormData({...formData, password: e.target.value})}
-                          className="w-full px-5 py-3 bg-slate-800/50 border border-slate-700 rounded-2xl text-white focus:border-blue-500 outline-none transition-all"
+                          className="w-full px-5 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-white focus:border-blue-500 outline-none transition-all"
                           placeholder="••••••••"
                         />
                       </div>
@@ -694,7 +694,7 @@ const UsersPage = () => {
                     <button 
                       type="button" 
                       onClick={() => { setShowAddModal(false); setShowEditModal(false); }}
-                      className="flex-1 py-4 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-2xl transition-all"
+                      className="flex-1 py-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 font-bold rounded-2xl transition-all"
                     >
                       Cancel
                     </button>
@@ -727,15 +727,15 @@ const UsersPage = () => {
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            className="relative w-full max-w-sm bg-slate-900 border border-slate-700 rounded-[2.5rem] shadow-2xl overflow-hidden p-8"
+            className="relative w-full max-w-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-[2.5rem] shadow-2xl overflow-hidden p-8"
           >
-            <h2 className="text-xl font-bold text-white mb-6">Reset Password for {selectedUser?.name}</h2>
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">Reset Password for {selectedUser?.name}</h2>
             <div className="space-y-4">
-              <input type="password" value={passwordFormData.newPassword} onChange={e => setPasswordFormData({...passwordFormData, newPassword: e.target.value})} className="w-full px-5 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white outline-none focus:ring-2 ring-amber-500" placeholder="New Password" />
-              <input type="password" value={passwordFormData.confirmPassword} onChange={e => setPasswordFormData({...passwordFormData, confirmPassword: e.target.value})} className="w-full px-5 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white outline-none focus:ring-2 ring-amber-500" placeholder="Confirm Password" />
+              <input type="password" value={passwordFormData.newPassword} onChange={e => setPasswordFormData({...passwordFormData, newPassword: e.target.value})} className="w-full px-5 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white outline-none focus:ring-2 ring-amber-500" placeholder="New Password" />
+              <input type="password" value={passwordFormData.confirmPassword} onChange={e => setPasswordFormData({...passwordFormData, confirmPassword: e.target.value})} className="w-full px-5 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white outline-none focus:ring-2 ring-amber-500" placeholder="Confirm Password" />
             </div>
             <div className="flex gap-3 mt-8">
-              <button onClick={() => setShowPasswordModal(false)} className="flex-1 py-3 bg-slate-800 text-white font-bold rounded-xl hover:bg-slate-700">Cancel</button>
+              <button onClick={() => setShowPasswordModal(false)} className="flex-1 py-3 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-white font-bold rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700">Cancel</button>
               <button onClick={handleManualPasswordReset} className="flex-1 py-3 bg-amber-600 text-white font-bold rounded-xl hover:bg-amber-500">Reset</button>
             </div>
           </motion.div>

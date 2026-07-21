@@ -20,8 +20,8 @@ const GlassCard: React.FC<GlassCardProps> = ({ children, className = "", hover =
       } : {}}
       className={`
         relative overflow-hidden
-        bg-[#0f172a]/40 backdrop-blur-3xl
-        border border-white/10 rounded-[2rem]
+        bg-white/80 dark:bg-[#0f172a]/40 backdrop-blur-3xl
+        border border-slate-200/60 dark:border-white/10 rounded-[2rem]
         transition-all duration-300
         ${className}
       `}

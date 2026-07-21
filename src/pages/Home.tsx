@@ -102,6 +102,12 @@ const Home = () => {
     if (lowerName.includes('pan')) return 'pan';
     if (lowerName.includes('passport')) return 'passport';
     if (lowerName.includes('voter')) return 'voterid';
+    if (lowerName.includes('income')) return 'income';
+    if (lowerName.includes('caste')) return 'caste';
+    if (lowerName.includes('birth')) return 'birth';
+    if (lowerName.includes('scheme')) return 'scheme';
+    if (lowerName.includes('loan')) return 'loan';
+    if (lowerName.includes('bill')) return 'utility';
     return 'general';
   };
 
@@ -131,7 +137,7 @@ const Home = () => {
               className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass border-blue-500/30 text-blue-600 dark:text-blue-400 text-xs font-bold uppercase tracking-widest"
             >
               <Cpu size={14} className="animate-pulse" />
-              AI-Powered Governance
+              E- Governance Services
             </motion.div>
 
             <div className="space-y-4">
@@ -281,14 +287,14 @@ const Home = () => {
                       href={service.serviceUrl || service.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="w-full py-4 glass-dark rounded-xl text-center text-xs font-bold text-white hover:bg-blue-600 transition-all ripple-effect border-white/5"
+                      className="w-full py-4 rounded-xl text-center text-xs font-bold transition-all ripple-effect border bg-slate-900 text-white hover:bg-blue-600 border-slate-900/10 dark:bg-white/10 dark:text-white dark:hover:bg-blue-600 dark:border-white/5"
                     >
                       Apply Now
                     </a>
                   ) : (
                     <Link 
                       to={getApplyUrl(service)}
-                      className="w-full py-4 glass-dark rounded-xl text-center text-xs font-bold text-white hover:bg-blue-600 transition-all ripple-effect border-white/5"
+                      className="w-full py-4 rounded-xl text-center text-xs font-bold transition-all ripple-effect border bg-slate-900 text-white hover:bg-blue-600 border-slate-900/10 dark:bg-white/10 dark:text-white dark:hover:bg-blue-600 dark:border-white/5"
                     >
                       Apply Now
                     </Link>

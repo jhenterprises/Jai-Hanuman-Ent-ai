@@ -1,6 +1,8 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
+@variant dark (&:where(.dark, .dark *));
+
 @layer utilities {
   @media print {
     .no-print {
@@ -51,7 +53,6 @@
   --color-primary: var(--color-primary);
   --color-secondary: var(--color-secondary);
   --color-header-bg: var(--color-header-bg);
-  --dark-mode: selector;
 }
 
 :root {
@@ -98,22 +99,6 @@
 .dark {
   --color-header-bg: #020617;
   --futuristic-bg: radial-gradient(circle at 0% 0%, #0f172a 0%, #020617 50%, #020617 100%);
-  
-  /* Dark mode overrides */
-  --color-slate-50: #0f172a;
-  --color-slate-100: #1e293b;
-  --color-slate-200: #334155;
-  --color-slate-300: #475569;
-  --color-slate-400: #64748b;
-  --color-slate-500: #94a3b8;
-  --color-slate-600: #cbd5e1;
-  --color-slate-700: #e2e8f0;
-  --color-slate-800: #f1f5f9;
-  --color-slate-900: #f8fafc;
-  --color-slate-950: #ffffff;
-  
-  --color-white: #0f172a;
-  --color-black: #ffffff;
 }
 
 body {

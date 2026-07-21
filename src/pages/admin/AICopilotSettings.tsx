@@ -37,11 +37,6 @@ const DEFAULT_CONFIG: AICopilotConfig = {
 - **Required Documents**: Age proof, Address proof, Matric Certificate (if applicable).
 - **Workflow**: Choose Passport application form under "Apply for Services", input core passport slot booking info, upload document, and follow up in "My Applications".
 
-## Bill Payments & Recharges
-- **Features**: Mobile & DTH Recharge, Electricity, Gas, Water bills.
-- **Workflow**: Instantly deducts funds from your Wallet. You must have a positive Wallet Balance to perform recharges or bills.
-- **History**: All recharges and payments are logged dynamically in your "Ledger" and "Wallet Logs".
-
 ## Voter ID & DL
 - **Required Documents**: Age proof, photo, local address proof.
 - **Workflow**: Apply internally via the dedicated form, and status is managed in "My Applications".
@@ -55,7 +50,7 @@ const DEFAULT_CONFIG: AICopilotConfig = {
   },
   enableMultilingual: true,
   enableWelcomeMessage: true,
-  welcomeMessage: 'Hello! Welcome back to JH Digital Seva Kendra. I am your internal service Copilot. Ask me how to apply for PAN, Aadhaar, Voter ID, Passport, Recharge, or track your application status.'
+  welcomeMessage: 'Hello! Welcome back to JH Digital Seva Kendra. I am your internal service Copilot. Ask me how to apply for PAN, Aadhaar, Voter ID, Passport, or track your application status.'
 };
 
 const AICopilotSettings: React.FC = () => {

@@ -125,11 +125,7 @@ export const chatService = {
   async handleKeywordAutoReply(chatId: string, message: string) {
     const text = message.toLowerCase();
     
-    if (text.includes('recharge')) {
-      await this.sendAutoReply(chatId, 'RECHARGE');
-    } else if (text.includes('bill payment') || text.includes('bbps')) {
-      await this.sendAutoReply(chatId, 'BBPS');
-    } else if (text.includes('refund')) {
+    if (text.includes('refund')) {
       await this.sendAutoReply(chatId, 'REFUND');
     } else if (text.includes('wallet')) {
       await this.sendAutoReply(chatId, 'WALLET');
@@ -138,17 +134,11 @@ export const chatService = {
     }
   },
 
-  async sendAutoReply(chatId: string, type: 'WELCOME' | 'RECHARGE' | 'BBPS' | 'REFUND' | 'WALLET' | 'APPLICATION' | 'OFFLINE') {
+  async sendAutoReply(chatId: string, type: 'WELCOME' | 'REFUND' | 'WALLET' | 'APPLICATION' | 'OFFLINE') {
     let message = '';
     switch (type) {
       case 'WELCOME':
         message = 'Hello 👋 Welcome to Support Center.\n\nOur team has received your message.\nPlease wait while our support staff reviews your request.\n\nTypical response time: 5–15 minutes.';
-        break;
-      case 'RECHARGE':
-        message = 'Recharge requests are usually processed within 1-3 minutes. Please share your transaction ID if delayed.';
-        break;
-      case 'BBPS':
-        message = 'Bill payment status is being verified. Refunds for failed transactions are processed automatically.';
         break;
       case 'REFUND':
         message = 'Refund requests are typically processed within 24-48 working hours. Thank you for your patience.';

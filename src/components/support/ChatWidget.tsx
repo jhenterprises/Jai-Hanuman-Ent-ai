@@ -118,7 +118,7 @@ export const ChatWidget: React.FC = () => {
                     <MessageSquare className="w-8 h-8" />
                   </div>
                   <h4 className="font-medium text-gray-900">How can we help?</h4>
-                  <p className="text-sm text-gray-500">Ask us anything about recharges, bill payments, or applications.</p>
+                  <p className="text-sm text-gray-500">Ask us anything about our digital services or applications.</p>
                 </div>
               ) : (
                 messages.map((msg, idx) => {

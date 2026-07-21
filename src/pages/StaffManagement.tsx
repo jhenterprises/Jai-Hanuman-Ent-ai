@@ -404,7 +404,7 @@ const StaffManagement = () => {
       await addDoc(collection(db, 'users'), {
         ...formData,
         staff_id: staffId,
-        role: 'staff',
+        role: formData.role || 'staff',
         status: 'active',
         created_at: serverTimestamp(),
         updated_at: serverTimestamp()
@@ -426,6 +426,7 @@ const StaffManagement = () => {
         name: formData.name,
         email: formData.email,
         phone: formData.phone,
+        role: formData.role || 'staff',
         salary_amount: Number(formData.salary_amount),
         staff_id: formData.staff_id ? formData.staff_id.trim() : selectedStaff.staff_id || '',
         designation: formData.designation || '',
@@ -587,32 +588,32 @@ const StaffManagement = () => {
     <div className="space-y-6">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-blue-600/20 flex items-center justify-center text-blue-500 border border-blue-500/20 shadow-lg shadow-blue-500/10">
+          <div className="w-14 h-14 rounded-2xl bg-blue-600/20 flex items-center justify-center text-blue-600 dark:text-blue-500 border border-blue-500/20 shadow-lg shadow-blue-500/10">
             <Briefcase size={28} />
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-white">Staff Management</h1>
-            <p className="text-slate-400 text-sm mt-1">Manage your team, their access, and performance.</p>
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Staff Management</h1>
+            <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Manage your team, their access, and performance.</p>
           </div>
         </div>
-        <div className="flex bg-slate-800/60 p-1 rounded-2xl border border-slate-700/50">
+        <div className="flex bg-slate-100 dark:bg-slate-800/60 p-1 rounded-2xl border border-slate-200 dark:border-slate-700/50">
           <button 
             onClick={() => setActiveView('staff')}
-            className={`px-6 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${activeView === 'staff' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-400 hover:text-white'}`}
+            className={`px-6 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${activeView === 'staff' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}
           >
             <User size={16} />
             Staff List
           </button>
           <button 
             onClick={() => setActiveView('attendance')}
-            className={`px-6 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${activeView === 'attendance' ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/20' : 'text-slate-400 hover:text-white'}`}
+            className={`px-6 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${activeView === 'attendance' ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/20' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}
           >
             <Activity size={16} />
             Attendance
           </button>
           <button 
             onClick={() => setActiveView('payroll')}
-            className={`px-6 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${activeView === 'payroll' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'text-slate-400 hover:text-white'}`}
+            className={`px-6 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${activeView === 'payroll' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}
           >
             <DollarSign size={16} />
             Payroll
@@ -632,14 +633,14 @@ const StaffManagement = () => {
             </button>
             <button 
               onClick={() => autoMarkAttendance(staff)}
-              className="flex items-center gap-2 px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-2xl transition-all shadow-lg font-bold text-sm w-fit"
+              className="flex items-center gap-2 px-6 py-3 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-white rounded-2xl transition-all shadow-md font-bold text-sm w-fit"
             >
               <Activity size={20} className="text-amber-500" />
               Sync Today's Attendance
             </button>
           </div>
           {/* Filters & Search */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 bg-slate-800/40 p-4 rounded-3xl border border-slate-700/50 backdrop-blur-sm">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 bg-white dark:bg-slate-800/40 p-4 rounded-3xl border border-slate-200 dark:border-slate-700/50 backdrop-blur-sm shadow-sm">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
               <input 
@@ -647,7 +648,7 @@ const StaffManagement = () => {
                 placeholder="Search staff by name, email..." 
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-900/50 border border-slate-700/50 rounded-xl text-slate-200 focus:outline-none focus:border-blue-500 text-sm"
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700/50 rounded-xl text-slate-800 dark:text-slate-200 focus:outline-none focus:border-blue-500 text-sm"
               />
             </div>
             <div className="flex items-center gap-2">
@@ -655,38 +656,38 @@ const StaffManagement = () => {
               <select 
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="flex-1 px-3 py-2.5 bg-slate-900/50 border border-slate-700/50 rounded-xl text-slate-200 text-sm focus:outline-none focus:border-blue-500"
+                className="flex-1 px-3 py-2.5 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700/50 rounded-xl text-slate-800 dark:text-slate-200 text-sm focus:outline-none focus:border-blue-500"
               >
                 <option value="all">All Status</option>
                 <option value="active">Active Staff</option>
                 <option value="disabled">Disabled Staff</option>
               </select>
             </div>
-            <div className="flex items-center justify-end text-slate-500 text-xs font-medium">
-              Total Staff: <span className="text-blue-400 ml-1 font-bold">{staff.length}</span>
+            <div className="flex items-center justify-end text-slate-500 dark:text-slate-400 text-xs font-medium">
+              Total Staff: <span className="text-blue-600 dark:text-blue-400 ml-1 font-bold">{staff.length}</span>
             </div>
           </div>
           {/* Staff Table */}
-          <div className="bg-slate-800/60 backdrop-blur-xl rounded-[2.5rem] border border-slate-700/50 shadow-2xl overflow-hidden">
+          <div className="bg-white dark:bg-slate-800/60 backdrop-blur-xl rounded-[2.5rem] border border-slate-200 dark:border-slate-700/50 shadow-2xl overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-slate-700/30 border-b border-slate-700/50">
-                    <th className="p-5 text-slate-400 font-bold text-[10px] uppercase tracking-widest">Staff Member</th>
-                    <th className="p-5 text-slate-400 font-bold text-[10px] uppercase tracking-widest">Contact</th>
-                    <th className="p-5 text-slate-400 font-bold text-[10px] uppercase tracking-widest">Status</th>
-                    <th className="p-5 text-slate-400 font-bold text-[10px] uppercase tracking-widest font-sans">Performance</th>
-                    <th className="p-5 text-slate-400 font-bold text-[10px] uppercase tracking-widest">Joined</th>
-                    <th className="p-5 text-slate-400 font-bold text-[10px] uppercase tracking-widest text-right">Actions</th>
+                  <tr className="bg-slate-50 dark:bg-slate-700/30 border-b border-slate-200 dark:border-slate-700/50">
+                    <th className="p-5 text-slate-600 dark:text-slate-400 font-bold text-[10px] uppercase tracking-widest">Staff Member</th>
+                    <th className="p-5 text-slate-600 dark:text-slate-400 font-bold text-[10px] uppercase tracking-widest">Contact</th>
+                    <th className="p-5 text-slate-600 dark:text-slate-400 font-bold text-[10px] uppercase tracking-widest">Status</th>
+                    <th className="p-5 text-slate-600 dark:text-slate-400 font-bold text-[10px] uppercase tracking-widest font-sans">Performance</th>
+                    <th className="p-5 text-slate-600 dark:text-slate-400 font-bold text-[10px] uppercase tracking-widest">Joined</th>
+                    <th className="p-5 text-slate-600 dark:text-slate-400 font-bold text-[10px] uppercase tracking-widest text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-700/30">
+                <tbody className="divide-y divide-slate-200 dark:divide-slate-700/30">
                   {loading ? (
                     <tr>
                       <td colSpan={5} className="p-20 text-center">
                         <div className="flex flex-col items-center gap-3">
                           <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                          <span className="text-slate-400 text-sm font-medium">Loading staff...</span>
+                          <span className="text-slate-500 dark:text-slate-400 text-sm font-medium">Loading staff...</span>
                         </div>
                       </td>
                     </tr>
@@ -698,7 +699,7 @@ const StaffManagement = () => {
                     </tr>
                   ) : (
                     paginated.map(item => (
-                      <tr key={item.id} className="hover:bg-slate-700/20 transition-colors group">
+                      <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/20 transition-colors group">
                         <td className="p-5">
                             <div className="flex items-center gap-4">
                               <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 to-blue-800 border border-blue-500/30 flex items-center justify-center text-lg font-bold text-white shadow-lg shadow-blue-500/10 overflow-hidden">
@@ -709,32 +710,32 @@ const StaffManagement = () => {
                                 )}
                               </div>
                               <div>
-                                <div className="text-slate-200 font-bold text-sm">{item.name || 'Unknown Staff'}</div>
+                                <div className="text-slate-800 dark:text-slate-200 font-bold text-sm">{item.name || 'Unknown Staff'}</div>
                                 <div className="text-[10px] text-slate-500 font-mono mt-0.5">{item.staff_id || item.id}</div>
                               </div>
                             </div>
                         </td>
                         <td className="p-5">
                           <div className="space-y-1">
-                            <div className="flex items-center gap-2 text-slate-300 text-xs">
-                              <Mail size={12} className="text-slate-500" />
+                            <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300 text-xs">
+                              <Mail size={12} className="text-slate-400 dark:text-slate-500" />
                               {item.email}
                             </div>
-                            <div className="flex items-center gap-2 text-slate-400 text-xs">
-                              <Phone size={12} className="text-slate-500" />
+                            <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs">
+                              <Phone size={12} className="text-slate-400 dark:text-slate-500" />
                               {item.phone || 'No phone'}
                             </div>
                           </div>
                         </td>
                         <td className="p-5">
                           <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
-                            item.status === 'active' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                            item.status === 'active' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20'
                           }`}>
                             {item.status === 'active' ? <UserCheck size={10} /> : <UserMinus size={10} />}
                             {item.status || 'active'}
                           </span>
                         </td>
-                        <td className="p-5 text-slate-300">
+                        <td className="p-5 text-slate-700 dark:text-slate-300">
                           {(() => {
                             const staffApps = applications.filter(app => 
                               app.assigned_to === item.id || 
@@ -750,33 +751,33 @@ const StaffManagement = () => {
                             
                             return (
                               <div className="space-y-1 text-xs">
-                                <div className="text-slate-300 flex justify-between gap-4 max-w-[140px]">
+                                <div className="text-slate-700 dark:text-slate-300 flex justify-between gap-4 max-w-[140px]">
                                   <span className="text-slate-500 font-bold uppercase text-[9px]">Assigned:</span>
-                                  <span className="font-bold text-blue-400">{staffApps.length}</span>
+                                  <span className="font-bold text-blue-600 dark:text-blue-400">{staffApps.length}</span>
                                 </div>
-                                <div className="text-slate-400 flex justify-between gap-4 max-w-[140px]">
+                                <div className="text-slate-600 dark:text-slate-400 flex justify-between gap-4 max-w-[140px]">
                                   <span className="text-slate-500 font-bold uppercase text-[9px]">Completed:</span>
-                                  <span className="font-bold text-emerald-400">{completedCount}</span>
+                                  <span className="font-bold text-emerald-600 dark:text-emerald-400">{completedCount}</span>
                                 </div>
-                                <div className="text-slate-400 flex justify-between gap-4 max-w-[140px]">
+                                <div className="text-slate-600 dark:text-slate-400 flex justify-between gap-4 max-w-[140px]">
                                   <span className="text-slate-500 font-bold uppercase text-[9px]">Pending:</span>
-                                  <span className="font-bold text-amber-500">{pendingCount}</span>
+                                  <span className="font-bold text-amber-600 dark:text-amber-500">{pendingCount}</span>
                                 </div>
                               </div>
                             );
                           })()}
                         </td>
                         <td className="p-5">
-                          <div className="flex items-center gap-2 text-slate-400 text-xs">
-                            <Calendar size={12} className="text-slate-500" />
+                          <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs">
+                            <Calendar size={12} className="text-slate-400 dark:text-slate-500" />
                             {safeFormat(item.created_at, 'dd MMM, yyyy')}
                           </div>
                         </td>
                         <td className="p-5 text-right">
-                          <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="flex items-center justify-end gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                             <button 
                               onClick={() => openEditModal(item)}
-                              className="p-2 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 rounded-xl transition-all"
+                              className="p-2 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-500/10 rounded-xl transition-all"
                               title="Edit Staff"
                             >
                               <Edit2 size={16} />
@@ -784,7 +785,7 @@ const StaffManagement = () => {
                             <button 
                               onClick={() => handleToggleStatus(item)}
                               className={`p-2 transition-all rounded-xl ${
-                                item.status === 'active' ? 'text-slate-400 hover:text-rose-400 hover:bg-rose-500/10' : 'text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10'
+                                item.status === 'active' ? 'text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-500/10' : 'text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-500/10'
                               }`}
                               title={item.status === 'active' ? 'Disable Staff' : 'Enable Staff'}
                             >
@@ -792,14 +793,14 @@ const StaffManagement = () => {
                             </button>
                             <button 
                               onClick={() => handleResetPassword(item.id)}
-                              className="p-2 text-slate-400 hover:text-amber-400 hover:bg-amber-500/10 rounded-xl transition-all"
+                              className="p-2 text-slate-500 dark:text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-500/10 rounded-xl transition-all"
                               title="Reset Password"
                             >
                               <Key size={16} />
                             </button>
                             <button 
                               onClick={() => handleDelete(item.id)}
-                              className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 rounded-xl transition-all"
+                              className="p-2 text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-500 hover:bg-rose-500/10 rounded-xl transition-all"
                               title="Remove Staff"
                             >
                               <Trash2 size={16} />
@@ -815,15 +816,15 @@ const StaffManagement = () => {
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="p-5 border-t border-slate-700/30 flex items-center justify-between bg-slate-800/20">
+              <div className="p-5 border-t border-slate-200 dark:border-slate-700/30 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/20">
                 <span className="text-xs text-slate-500">
-                  Showing <span className="text-slate-300 font-bold">{(page - 1) * itemsPerPage + 1}</span> to <span className="text-slate-300 font-bold">{Math.min(page * itemsPerPage, filtered.length)}</span> of <span className="text-slate-300 font-bold">{filtered.length}</span> staff
+                  Showing <span className="text-slate-800 dark:text-slate-300 font-bold">{(page - 1) * itemsPerPage + 1}</span> to <span className="text-slate-800 dark:text-slate-300 font-bold">{Math.min(page * itemsPerPage, filtered.length)}</span> of <span className="text-slate-800 dark:text-slate-300 font-bold">{filtered.length}</span> staff
                 </span>
                 <div className="flex items-center gap-2">
                   <button 
                     onClick={() => setPage(p => Math.max(1, p - 1))}
                     disabled={page === 1}
-                    className="p-2 bg-slate-900/50 border border-slate-700/50 rounded-xl text-slate-400 hover:text-white disabled:opacity-50 transition-all"
+                    className="p-2 bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700/50 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white disabled:opacity-50 transition-all"
                   >
                     <ChevronLeft size={18} />
                   </button>
@@ -833,7 +834,7 @@ const StaffManagement = () => {
                         key={i}
                         onClick={() => setPage(i + 1)}
                         className={`w-8 h-8 rounded-xl text-xs font-bold transition-all ${
-                          page === i + 1 ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'bg-slate-900/50 text-slate-500 hover:text-white border border-slate-700/50'
+                          page === i + 1 ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'bg-white dark:bg-slate-900/50 text-slate-500 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-700/50'
                         }`}
                       >
                         {i + 1}
@@ -843,7 +844,7 @@ const StaffManagement = () => {
                   <button 
                     onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                     disabled={page === totalPages}
-                    className="p-2 bg-slate-900/50 border border-slate-700/50 rounded-xl text-slate-400 hover:text-white disabled:opacity-50 transition-all"
+                    className="p-2 bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700/50 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white disabled:opacity-50 transition-all"
                   >
                     <ChevronRight size={18} />
                   </button>
@@ -855,7 +856,7 @@ const StaffManagement = () => {
       ) : activeView === 'attendance' ? (
         <div className="space-y-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
               <Clock className="text-amber-500" /> Staff Attendance
             </h2>
             <button 
@@ -867,35 +868,35 @@ const StaffManagement = () => {
             </button>
           </div>
           
-          <div className="bg-slate-800/60 backdrop-blur-xl rounded-[2.5rem] border border-white/5 shadow-2xl overflow-hidden">
+          <div className="bg-white dark:bg-slate-800/60 backdrop-blur-xl rounded-[2.5rem] border border-slate-200 dark:border-white/5 shadow-2xl overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left">
                 <thead>
-                  <tr className="bg-white/5 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                  <tr className="bg-slate-50 dark:bg-white/5 text-[10px] font-black uppercase tracking-widest text-slate-500">
                     <th className="px-6 py-4">Date</th>
                     <th className="px-6 py-4">Staff Member</th>
                     <th className="px-6 py-4">Session Timing (Last Login / Logout)</th>
                     <th className="px-6 py-4 text-right">Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/5">
+                <tbody className="divide-y divide-slate-200 dark:divide-white/5">
                   {attendance.map((at, i) => (
-                    <tr key={i} className="hover:bg-white/5 transition-colors">
-                      <td className="px-6 py-4 text-sm font-bold text-white">
+                    <tr key={i} className="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
+                      <td className="px-6 py-4 text-sm font-bold text-slate-800 dark:text-white">
                         {at.date}
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-[10px] font-bold text-white">
+                          <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-[10px] font-bold text-slate-800 dark:text-white">
                             {at.staff_name.charAt(0)}
                           </div>
                           <div>
-                            <div className="text-xs font-bold text-slate-200">{at.staff_name}</div>
+                            <div className="text-xs font-bold text-slate-800 dark:text-slate-200">{at.staff_name}</div>
                             <div className="text-[10px] text-slate-500">{at.staff_id}</div>
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-xs font-medium text-slate-300">
+                      <td className="px-6 py-4 text-xs font-medium text-slate-600 dark:text-slate-300">
                         {(() => {
                           const sUser = staff.find(s => s.id === at.userId);
                           if (!sUser) return <span className="text-slate-500 italic">No session active</span>;
@@ -1005,11 +1006,11 @@ const StaffManagement = () => {
             </div>
           </div>
 
-          <div className="bg-slate-800/60 backdrop-blur-xl rounded-[2.5rem] border border-white/5 shadow-2xl overflow-hidden">
+          <div className="bg-white dark:bg-slate-800/60 backdrop-blur-xl rounded-[2.5rem] border border-slate-200 dark:border-white/5 shadow-2xl overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left">
                 <thead>
-                  <tr className="bg-white/5 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                  <tr className="bg-slate-50 dark:bg-white/5 text-[10px] font-black uppercase tracking-widest text-slate-500">
                     <th className="px-6 py-4">Staff Member</th>
                     <th className="px-6 py-4">Base Salary</th>
                     <th className="px-6 py-4">Attendance</th>
@@ -1018,26 +1019,26 @@ const StaffManagement = () => {
                     <th className="px-6 py-4 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/5">
+                <tbody className="divide-y divide-slate-200 dark:divide-white/5">
                   {salaries.map((s, i) => (
-                    <tr key={i} className="hover:bg-white/5 transition-colors">
+                    <tr key={i} className="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-[10px] font-bold text-white">
+                          <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-[10px] font-bold text-slate-800 dark:text-white">
                             {s.staff_name.charAt(0)}
                           </div>
                           <div>
-                            <div className="text-xs font-bold text-slate-200">{s.staff_name}</div>
+                            <div className="text-xs font-bold text-slate-800 dark:text-slate-200">{s.staff_name}</div>
                             <div className="text-[10px] text-slate-500">{s.staff_id}</div>
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-xs text-slate-400">₹{s.base_salary}</td>
-                      <td className="px-6 py-4 text-xs text-slate-400">{s.present_days} / {s.total_days} Days</td>
-                      <td className="px-6 py-4 text-sm font-black text-white">₹{s.payable_salary}</td>
+                      <td className="px-6 py-4 text-xs text-slate-600 dark:text-slate-400">₹{s.base_salary}</td>
+                      <td className="px-6 py-4 text-xs text-slate-600 dark:text-slate-400">{s.present_days} / {s.total_days} Days</td>
+                      <td className="px-6 py-4 text-sm font-black text-slate-900 dark:text-white">₹{s.payable_salary}</td>
                       <td className="px-6 py-4">
                         <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase ${
-                          s.status === 'Paid' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'
+                          s.status === 'Paid' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-red-500/10 text-red-600 dark:text-red-400'
                         }`}>
                           {s.status}
                         </span>
@@ -1054,13 +1055,13 @@ const StaffManagement = () => {
                         {currentUser?.role === 'admin' && (
                           <button 
                             onClick={() => generateSalarySlip(s)}
-                            className="px-3 py-1.5 bg-slate-600 hover:bg-slate-500 text-white rounded-lg text-[10px] font-bold transition-all ml-1"
+                            className="px-3 py-1.5 bg-slate-200 dark:bg-slate-600 hover:bg-slate-300 dark:hover:bg-slate-500 text-slate-800 dark:text-white rounded-lg text-[10px] font-bold transition-all ml-1"
                           >
                             Slip
                           </button>
                         )}
                         {s.status === 'Paid' && (
-                          <span className="text-emerald-400 flex items-center justify-end gap-1 text-[10px] font-bold uppercase ml-1">
+                          <span className="text-emerald-600 dark:text-emerald-400 flex items-center justify-end gap-1 text-[10px] font-bold uppercase ml-1">
                             <CheckCircle2 size={14} /> Paid
                           </span>
                         )}
@@ -1094,17 +1095,17 @@ const StaffManagement = () => {
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-lg bg-slate-900 border border-slate-700 rounded-[2.5rem] shadow-2xl overflow-hidden"
+              className="relative w-full max-w-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-[2.5rem] shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto"
             >
               <div className="p-8">
                 <div className="flex justify-between items-center mb-8">
                   <div>
-                    <h2 className="text-2xl font-bold text-white">{showAddModal ? 'Add Staff Member' : 'Edit Staff Details'}</h2>
-                    <p className="text-slate-400 text-sm mt-1">{showAddModal ? 'Create a new staff account with system access.' : 'Update staff information and credentials.'}</p>
+                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white">{showAddModal ? 'Add Staff Member' : 'Edit Staff Details'}</h2>
+                    <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">{showAddModal ? 'Create a new staff account with system access.' : 'Update staff information and credentials.'}</p>
                   </div>
                   <button 
                     onClick={() => { setShowAddModal(false); setShowEditModal(false); }}
-                    className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-full transition-all"
+                    className="p-2 text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-all"
                   >
                     <X size={24} />
                   </button>
@@ -1114,13 +1115,13 @@ const StaffManagement = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="md:col-span-2 flex flex-col items-center justify-center mb-4">
                       <div className="relative group">
-                        <div className="w-32 h-32 rounded-3xl bg-slate-800 border-2 border-dashed border-slate-700 flex items-center justify-center overflow-hidden transition-all group-hover:border-blue-500/50">
+                        <div className="w-32 h-32 rounded-3xl bg-slate-100 dark:bg-slate-800 border-2 border-dashed border-slate-300 dark:border-slate-700 flex items-center justify-center overflow-hidden transition-all group-hover:border-blue-500/50">
                           {isUploadingPhoto ? (
                             <div className="w-8 h-8 border-3 border-blue-500 border-t-transparent rounded-full animate-spin" />
                           ) : photoPreview ? (
                             <img src={photoPreview} alt="Preview" className="w-full h-full object-cover" />
                           ) : (
-                            <UserCircle size={48} className="text-slate-600" />
+                            <UserCircle size={48} className="text-slate-400 dark:text-slate-600" />
                           )}
                         </div>
                         <label className="absolute -bottom-2 -right-2 p-3 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl shadow-xl cursor-pointer transition-all hover:scale-110 active:scale-95 group-hover:rotate-6">
@@ -1141,7 +1142,7 @@ const StaffManagement = () => {
                       <input 
                         type="text"
                         value={formData.staff_id || ''} onChange={e => setFormData({...formData, staff_id: e.target.value})}
-                        className="w-full px-5 py-3 bg-slate-800/50 border border-slate-700 rounded-2xl text-white focus:border-blue-500 outline-none transition-all"
+                        className="w-full px-5 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-white focus:border-blue-500 outline-none transition-all"
                         placeholder="Leave blank to auto-generate"
                       />
                     </div>
@@ -1150,7 +1151,7 @@ const StaffManagement = () => {
                       <input 
                         type="text" required
                         value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})}
-                        className="w-full px-5 py-3 bg-slate-800/50 border border-slate-700 rounded-2xl text-white focus:border-blue-500 outline-none transition-all"
+                        className="w-full px-5 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-white focus:border-blue-500 outline-none transition-all"
                         placeholder="Staff Name"
                       />
                     </div>
@@ -1159,7 +1160,7 @@ const StaffManagement = () => {
                       <input 
                         type="email" required
                         value={formData.email || ''} onChange={e => setFormData({...formData, email: e.target.value})}
-                        className="w-full px-5 py-3 bg-slate-800/50 border border-slate-700 rounded-2xl text-white focus:border-blue-500 outline-none transition-all"
+                        className="w-full px-5 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-white focus:border-blue-500 outline-none transition-all"
                         placeholder="staff@example.com"
                       />
                     </div>
@@ -1168,7 +1169,7 @@ const StaffManagement = () => {
                       <input 
                         type="tel" required
                         value={formData.phone || ''} onChange={e => setFormData({...formData, phone: e.target.value})}
-                        className="w-full px-5 py-3 bg-slate-800/50 border border-slate-700 rounded-2xl text-white focus:border-blue-500 outline-none transition-all"
+                        className="w-full px-5 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-white focus:border-blue-500 outline-none transition-all"
                         placeholder="+91 9876543210"
                       />
                     </div>
@@ -1177,15 +1178,26 @@ const StaffManagement = () => {
                       <input 
                         type="text" 
                         value={formData.designation || ''} onChange={e => setFormData({...formData, designation: e.target.value})}
-                        className="w-full px-5 py-3 bg-slate-800/50 border border-slate-700 rounded-2xl text-white focus:border-blue-500 outline-none transition-all"
+                        className="w-full px-5 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-white focus:border-blue-500 outline-none transition-all"
                         placeholder="e.g. Sales Executive"
                       />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] text-slate-500 uppercase font-bold tracking-widest ml-1">Account Role</label>
+                      <select 
+                        value={formData.role || 'staff'} onChange={e => setFormData({...formData, role: e.target.value})}
+                        className="w-full px-5 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-white focus:border-blue-500 outline-none transition-all text-sm"
+                      >
+                        <option value="user">User</option>
+                        <option value="staff">Staff</option>
+                        <option value="admin">Admin</option>
+                      </select>
                     </div>
                     <div className="space-y-2">
                       <label className="text-[10px] text-slate-500 uppercase font-bold tracking-widest ml-1">Blood Group</label>
                       <select 
                         value={formData.blood_group || ''} onChange={e => setFormData({...formData, blood_group: e.target.value})}
-                        className="w-full px-5 py-3 bg-slate-800/50 border border-slate-700 rounded-2xl text-white focus:border-blue-500 outline-none transition-all"
+                        className="w-full px-5 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-white focus:border-blue-500 outline-none transition-all"
                       >
                         <option value="">Select Blood Group</option>
                         {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map(bg => (
@@ -1198,14 +1210,14 @@ const StaffManagement = () => {
                       <input 
                         type="date" 
                         value={formData.joining_date || ''} onChange={e => setFormData({...formData, joining_date: e.target.value})}
-                        className="w-full px-5 py-3 bg-slate-800/50 border border-slate-700 rounded-2xl text-white focus:border-blue-500 outline-none transition-all"
+                        className="w-full px-5 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-white focus:border-blue-500 outline-none transition-all"
                       />
                     </div>
                     <div className="space-y-2 md:col-span-2">
                       <label className="text-[10px] text-slate-500 uppercase font-bold tracking-widest ml-1">Address</label>
                       <textarea 
                         value={formData.address || ''} onChange={e => setFormData({...formData, address: e.target.value})}
-                        className="w-full px-5 py-3 bg-slate-800/50 border border-slate-700 rounded-2xl text-white focus:border-blue-500 outline-none transition-all min-h-[100px]"
+                        className="w-full px-5 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-white focus:border-blue-500 outline-none transition-all min-h-[100px]"
                         placeholder="Enter full address"
                       />
                     </div>
@@ -1214,7 +1226,7 @@ const StaffManagement = () => {
                       <input 
                         type="number" required
                         value={formData.salary_amount || 0} onChange={e => setFormData({...formData, salary_amount: Number(e.target.value)})}
-                        className="w-full px-5 py-3 bg-slate-800/50 border border-slate-700 rounded-2xl text-white focus:border-blue-500 outline-none transition-all"
+                        className="w-full px-5 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-white focus:border-blue-500 outline-none transition-all"
                         placeholder="15000"
                       />
                     </div>
@@ -1224,7 +1236,7 @@ const StaffManagement = () => {
                         <input 
                           type="password" required
                           value={formData.password || ''} onChange={e => setFormData({...formData, password: e.target.value})}
-                          className="w-full px-5 py-3 bg-slate-800/50 border border-slate-700 rounded-2xl text-white focus:border-blue-500 outline-none transition-all"
+                          className="w-full px-5 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-white focus:border-blue-500 outline-none transition-all"
                           placeholder="••••••••"
                         />
                       </div>
@@ -1235,7 +1247,7 @@ const StaffManagement = () => {
                     <button 
                       type="button" 
                       onClick={() => { setShowAddModal(false); setShowEditModal(false); }}
-                      className="flex-1 py-4 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-2xl transition-all"
+                      className="flex-1 py-4 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-300 font-bold rounded-2xl transition-all"
                     >
                       Cancel
                     </button>
@@ -1276,15 +1288,15 @@ const StaffManagement = () => {
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-lg bg-slate-900 border border-slate-700 rounded-[2.5rem] shadow-2xl overflow-hidden"
+              className="relative w-full max-w-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-[2.5rem] shadow-2xl overflow-hidden"
             >
               <div className="p-8">
                 <div className="flex justify-between items-center mb-8">
                   <div>
-                    <h2 className="text-2xl font-bold text-white">Manual Attendance</h2>
-                    <p className="text-slate-400 text-sm mt-1">Manually record or correct staff attendance.</p>
+                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Manual Attendance</h2>
+                    <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Manually record or correct staff attendance.</p>
                   </div>
-                  <button onClick={() => setShowAttendanceModal(false)} className="p-2 text-slate-400 hover:text-white">
+                  <button onClick={() => setShowAttendanceModal(false)} className="p-2 text-slate-400 hover:text-slate-800 dark:hover:text-white">
                     <X size={24} />
                   </button>
                 </div>
@@ -1297,7 +1309,7 @@ const StaffManagement = () => {
                         required
                         value={attendanceData.userId} 
                         onChange={e => setAttendanceData({...attendanceData, userId: e.target.value})}
-                        className="w-full px-5 py-3 bg-slate-800/50 border border-slate-700 rounded-2xl text-white focus:border-amber-500 outline-none transition-all"
+                        className="w-full px-5 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-white focus:border-amber-500 outline-none transition-all"
                       >
                         <option value="">Select Staff</option>
                         {staff.filter(s => s.role === 'staff').map(s => (
@@ -1311,7 +1323,7 @@ const StaffManagement = () => {
                         type="date" required
                         value={attendanceData.date} 
                         onChange={e => setAttendanceData({...attendanceData, date: e.target.value})}
-                        className="w-full px-5 py-3 bg-slate-800/50 border border-slate-700 rounded-2xl text-white focus:border-amber-500 outline-none transition-all"
+                        className="w-full px-5 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-white focus:border-amber-500 outline-none transition-all"
                       />
                     </div>
                     <div className="space-y-2">
@@ -1320,7 +1332,7 @@ const StaffManagement = () => {
                         required
                         value={attendanceData.status} 
                         onChange={e => setAttendanceData({...attendanceData, status: e.target.value})}
-                        className="w-full px-5 py-3 bg-slate-800/50 border border-slate-700 rounded-2xl text-white focus:border-amber-500 outline-none transition-all"
+                        className="w-full px-5 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-white focus:border-amber-500 outline-none transition-all"
                       >
                         <option value="Full Day">Full Day</option>
                         <option value="Half Day">Half Day</option>
@@ -1330,7 +1342,7 @@ const StaffManagement = () => {
                   </div>
 
                   <div className="flex gap-3 pt-4">
-                    <button type="button" onClick={() => setShowAttendanceModal(false)} className="flex-1 py-4 bg-slate-800 text-slate-300 font-bold rounded-2xl">Cancel</button>
+                    <button type="button" onClick={() => setShowAttendanceModal(false)} className="flex-1 py-4 bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-300 font-bold rounded-2xl">Cancel</button>
                     <button type="submit" className="flex-1 py-4 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-2xl transition-all shadow-lg shadow-amber-600/20">Save Record</button>
                   </div>
                 </form>

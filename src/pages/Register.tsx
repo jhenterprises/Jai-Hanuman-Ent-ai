@@ -70,69 +70,69 @@ const Register = () => {
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="glass rounded-[2.5rem] p-10 space-y-8"
+        className="glass bg-white dark:bg-slate-900/40 border border-slate-200/50 dark:border-white/5 rounded-[2.5rem] p-10 space-y-8"
       >
         <div className="text-center space-y-2">
           <div className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl shadow-blue-500/10 overflow-hidden border border-slate-200 dark:border-white/10">
             <img src={config.logo_url || "/logo.svg"} alt="JH Logo" className="w-full h-full object-contain p-2" />
           </div>
           <h2 className="text-3xl font-black text-slate-900 dark:text-white">Create Account</h2>
-          <p className="text-slate-600 dark:text-slate-500">Join Jharkhand's digital citizen network</p>
+          <p className="text-slate-600 dark:text-slate-400">Join Jharkhand's digital citizen network</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1">
-            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Full Name</label>
+            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 ml-1">Full Name</label>
             <div className="relative">
-              <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+              <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400" size={18} />
               <input 
                 type="text" required
                 value={formData.name}
                 onChange={(e) => setFormData({...formData, name: e.target.value})}
-                className="w-full bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-white/10 rounded-2xl py-3.5 pl-12 pr-4 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors"
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-white/10 rounded-2xl py-3.5 pl-12 pr-4 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors"
                 placeholder="John Doe"
               />
             </div>
           </div>
 
           <div className="space-y-1">
-            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Email Address</label>
+            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 ml-1">Email Address</label>
             <div className="relative">
-              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400" size={18} />
               <input 
                 type="email" required
                 value={formData.email}
                 onChange={(e) => setFormData({...formData, email: e.target.value})}
-                className="w-full bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-white/10 rounded-2xl py-3.5 pl-12 pr-4 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors"
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-white/10 rounded-2xl py-3.5 pl-12 pr-4 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors"
                 placeholder="name@example.com"
               />
             </div>
           </div>
 
           <div className="space-y-1">
-            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Phone Number</label>
+            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 ml-1">Phone Number</label>
             <div className="relative">
-              <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+              <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400" size={18} />
               <input 
                 type="tel" required
                 value={formData.phone}
                 onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                className="w-full bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-white/10 rounded-2xl py-3.5 pl-12 pr-4 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors"
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-white/10 rounded-2xl py-3.5 pl-12 pr-4 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors"
                 placeholder="+91 00000 00000"
               />
             </div>
           </div>
 
           <div className="space-y-1">
-            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Password</label>
+            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 ml-1">Password</label>
             <div className="relative">
-              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400" size={18} />
               <input 
                 type={showPassword ? "text" : "password"}
                 required
                 value={formData.password}
                 onChange={(e) => setFormData({...formData, password: e.target.value})}
-                className="w-full bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-white/10 rounded-2xl py-3.5 pl-12 pr-12 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors"
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-white/10 rounded-2xl py-3.5 pl-12 pr-12 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors"
                 placeholder="••••••••"
               />
               <button
@@ -158,7 +158,7 @@ const Register = () => {
               <div className="w-full border-t border-slate-200 dark:border-white/10"></div>
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-white dark:bg-slate-900 px-2 text-slate-500 dark:text-slate-500 font-bold tracking-widest">Or continue with</span>
+              <span className="bg-white dark:bg-slate-900 px-2 text-slate-500 dark:text-slate-400 font-bold tracking-widest">Or continue with</span>
             </div>
           </div>
 
@@ -185,7 +185,7 @@ const Register = () => {
         </form>
 
         <div className="text-center">
-          <p className="text-slate-500 text-sm">
+          <p className="text-slate-500 dark:text-slate-400 text-sm">
             Already have an account? <Link to="/login" className="text-accent font-bold hover:underline">Sign In</Link>
           </p>
         </div>

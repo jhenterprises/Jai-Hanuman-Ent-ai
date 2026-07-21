@@ -83,9 +83,9 @@ const PublicNavbar = () => {
                   className="!px-6 !py-2.5 !text-xs !rounded-xl ripple-effect"
                 />
                 <button 
-                  onClick={() => {
-                    logout();
-                    navigate('/login?loggedOut=true');
+                  onClick={async () => {
+                    await logout();
+                    navigate('/login?loggedOut=true', { replace: true });
                   }}
                   className="text-slate-400 hover:text-red-400 transition-all p-2 hover:bg-red-500/10 rounded-xl"
                   title="Logout"
@@ -149,10 +149,10 @@ const PublicNavbar = () => {
                     className="w-full !py-4"
                   />
                   <button
-                    onClick={() => {
+                    onClick={async () => {
                       setIsOpen(false);
-                      logout();
-                      navigate('/login?loggedOut=true');
+                      await logout();
+                      navigate('/login?loggedOut=true', { replace: true });
                     }}
                     className="flex items-center justify-center gap-2 w-full py-4 rounded-2xl text-red-400 font-bold border border-red-500/20 hover:bg-red-500/10 transition-colors"
                   >

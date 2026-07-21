@@ -12,10 +12,6 @@ export default defineConfig(({ mode }) => {
 
   return {
     resolve: {
-      alias: {
-        'react': path.resolve(process.cwd(), './node_modules/react'),
-        'react-dom': path.resolve(process.cwd(), './node_modules/react-dom'),
-      },
       dedupe: ['react', 'react-dom']
     },
     plugins: [
@@ -24,7 +20,7 @@ export default defineConfig(({ mode }) => {
       VitePWA({
         registerType: 'autoUpdate',
         devOptions: {
-          enabled: true
+          enabled: false
         },
         includeAssets: ['logo.svg'],
         manifest: {
@@ -55,7 +51,7 @@ export default defineConfig(({ mode }) => {
       sourcemap: false
     },
     optimizeDeps: {
-      include: ['recharts']
+      include: ['recharts', 'react-pdf', 'pdfjs-dist', 'exceljs', 'xlsx']
     },
     define: {
       'import.meta.env.VITE_FIREBASE_API_KEY': JSON.stringify(getEnv('VITE_FIREBASE_API_KEY') || getEnv('FIREBASE_API_KEY')),

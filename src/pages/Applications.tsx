@@ -55,6 +55,14 @@ const Applications = () => {
     }
   }, [location, applications]);
 
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const statusParam = params.get('status');
+    if (statusParam) {
+      setFilters(prev => ({ ...prev, status: statusParam }));
+    }
+  }, [location.search]);
+
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
   const handleDownloadPDF = async () => {
@@ -78,7 +86,7 @@ const Applications = () => {
         return;
       }
 
-      if (filters.status && filters.status !== 'All') {
+      if (filters.status && filters.status !== 'All' && filters.status !== 'Pending') {
         q = query(q, where('status', '==', filters.status));
       }
       
@@ -89,7 +97,12 @@ const Applications = () => {
       q = query(q, orderBy('created_at', 'desc'));
 
       const snapshot = await getDocs(q);
-      const apps = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+      let apps = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+      
+      if (filters.status === 'Pending') {
+        const pendingStatuses = ['Submitted', 'Under Review', 'Processing', 'Documents Required', 'Pending'];
+        apps = apps.filter(app => pendingStatuses.includes(app.status));
+      }
       
       // Apply client-side search if needed
       if (search) {
@@ -312,31 +325,31 @@ const Applications = () => {
     return <Clock size={12} />;
   };
 
-  const statuses = ['All', 'Submitted', 'Under Review', 'Processing', 'Documents Required', 'Approved', 'Rejected', 'Completed'];
+  const statuses = ['All', 'Submitted', 'Under Review', 'Processing', 'Documents Required', 'Approved', 'Rejected', 'Completed', 'Pending'];
   const paymentStatuses = ['All', 'Paid', 'Pending'];
 
   return (
     <div className="space-y-8">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Applications</h1>
-          <p className="text-slate-500 text-xs sm:text-sm mt-1">Manage and track service application requests</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">Applications</h1>
+          <p className="text-slate-500 dark:text-slate-400 text-xs sm:text-sm mt-1">Manage and track service application requests</p>
         </div>
         <div className="flex flex-col sm:flex-row items-center gap-4">
           <div className="relative w-full sm:w-72">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" size={18} />
             <input 
               type="text" 
               placeholder="Application ID, Name, Mobile..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && fetchApplications()}
-              className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-sm"
+              className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700/50 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-sm"
             />
           </div>
           <button 
             onClick={() => exportToCSV(filtered, 'Applications_Report')}
-            className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white text-xs font-bold rounded-xl hover:bg-slate-800 transition-all shadow-sm"
+            className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 dark:bg-slate-800 text-white dark:text-slate-200 text-xs font-bold rounded-xl hover:bg-slate-800 dark:hover:bg-slate-700 transition-all shadow-sm"
           >
             <Download size={16} /> Export CSV
           </button>
@@ -344,107 +357,107 @@ const Applications = () => {
       </div>
 
       {(user?.role === 'admin' || user?.role === 'staff') && (
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="bg-white dark:bg-slate-900/40 p-4 rounded-2xl border border-slate-200 dark:border-slate-700/50 shadow-sm grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">Service</label>
+            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Service</label>
             <select 
               value={filters.service_id}
               onChange={(e) => setFilters({...filters, service_id: e.target.value})}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
             >
-              <option value="">All Services</option>
-              {services.map(s => <option key={s.service_id} value={s.service_id}>{s.name}</option>)}
+              <option value="" className="bg-white dark:bg-slate-900">All Services</option>
+              {services.map(s => <option key={s.service_id} value={s.service_id} className="bg-white dark:bg-slate-900">{s.name}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">Status</label>
+            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Status</label>
             <select 
               value={filters.status}
               onChange={(e) => setFilters({...filters, status: e.target.value})}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
             >
-              {statuses.map(s => <option key={s} value={s}>{s}</option>)}
+              {statuses.map(s => <option key={s} value={s} className="bg-white dark:bg-slate-900">{s}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">Payment Status</label>
+            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Payment Status</label>
             <select 
               value={filters.payment_status}
               onChange={(e) => setFilters({...filters, payment_status: e.target.value})}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
             >
-              {paymentStatuses.map(s => <option key={s} value={s}>{s}</option>)}
+              {paymentStatuses.map(s => <option key={s} value={s} className="bg-white dark:bg-slate-900">{s}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">Start Date</label>
+            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Start Date</label>
             <input 
               type="date" 
               value={filters.start_date}
               onChange={(e) => setFilters({...filters, start_date: e.target.value})}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">End Date</label>
+            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">End Date</label>
             <input 
               type="date" 
               value={filters.end_date}
               onChange={(e) => setFilters({...filters, end_date: e.target.value})}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
             />
           </div>
         </div>
       )}
 
-      <div className="bg-white rounded-[2rem] border border-slate-200 shadow-xl shadow-slate-200/50 overflow-hidden">
+      <div className="bg-white dark:bg-slate-900/50 rounded-[2rem] border border-slate-200 dark:border-slate-700/50 shadow-xl dark:shadow-none overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="p-5 text-slate-500 font-bold text-[10px] uppercase tracking-widest">Application ID & Date</th>
-                {(user?.role === 'admin' || user?.role === 'staff') && <th className="p-5 text-slate-500 font-bold text-[10px] uppercase tracking-widest">Applicant</th>}
-                <th className="p-5 text-slate-500 font-bold text-[10px] uppercase tracking-widest">Service Type</th>
-                <th className="p-5 text-slate-500 font-bold text-[10px] uppercase tracking-widest">Payment</th>
-                <th className="p-5 text-slate-500 font-bold text-[10px] uppercase tracking-widest">Status</th>
-                {(user?.role === 'admin' || user?.role === 'staff') && <th className="p-5 text-slate-500 font-bold text-[10px] uppercase tracking-widest">Completed By</th>}
-                <th className="p-5 text-slate-500 font-bold text-[10px] uppercase tracking-widest text-right">Action</th>
+              <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700/50">
+                <th className="p-5 text-slate-500 dark:text-slate-400 font-bold text-[10px] uppercase tracking-widest">Application ID & Date</th>
+                {(user?.role === 'admin' || user?.role === 'staff') && <th className="p-5 text-slate-500 dark:text-slate-400 font-bold text-[10px] uppercase tracking-widest">Applicant</th>}
+                <th className="p-5 text-slate-500 dark:text-slate-400 font-bold text-[10px] uppercase tracking-widest">Service Type</th>
+                <th className="p-5 text-slate-500 dark:text-slate-400 font-bold text-[10px] uppercase tracking-widest">Payment</th>
+                <th className="p-5 text-slate-500 dark:text-slate-400 font-bold text-[10px] uppercase tracking-widest">Status</th>
+                {(user?.role === 'admin' || user?.role === 'staff') && <th className="p-5 text-slate-500 dark:text-slate-400 font-bold text-[10px] uppercase tracking-widest">Completed By</th>}
+                <th className="p-5 text-slate-500 dark:text-slate-400 font-bold text-[10px] uppercase tracking-widest text-right">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={(user?.role === 'admin' || user?.role === 'staff') ? 7 : 5} className="p-12 text-center text-slate-400 italic">No applications found matching your criteria.</td>
+                  <td colSpan={(user?.role === 'admin' || user?.role === 'staff') ? 7 : 5} className="p-12 text-center text-slate-400 dark:text-slate-500 italic">No applications found matching your criteria.</td>
                 </tr>
               ) : (
                 filtered.map(item => (
-                  <tr key={item.id} className="hover:bg-slate-50/80 transition-colors group">
+                  <tr key={item.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors group">
+                     <td className="p-5">
+                       <div className="text-slate-900 dark:text-white font-bold font-mono text-sm tracking-tight">{item.reference_number}</div>
+                       <div className="text-slate-500 dark:text-slate-400 text-xs mt-1">{safeFormat(item.created_at, 'dd MMM, yyyy')}</div>
+                       {item.created_by === 'staff' && (
+                         <span className="text-[9px] bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full border border-amber-100 dark:border-amber-500/20 mt-1.5 inline-block font-bold uppercase tracking-tighter">Staff Assisted</span>
+                       )}
+                     </td>
+                     {(user?.role === 'admin' || user?.role === 'staff') && (
+                       <td className="p-5">
+                         <div className="text-slate-900 dark:text-white font-bold text-sm">{item.user_name}</div>
+                         <div className="text-xs text-slate-400 dark:text-slate-500">{item.user_phone}</div>
+                         <div className="text-[10px] text-slate-400 dark:text-slate-500">{item.userEmail || item.user_email}</div>
+                       </td>
+                     )}
                     <td className="p-5">
-                      <div className="text-slate-900 font-bold font-mono text-sm tracking-tight">{item.reference_number}</div>
-                      <div className="text-slate-500 text-xs mt-1">{safeFormat(item.created_at, 'dd MMM, yyyy')}</div>
-                      {item.created_by === 'staff' && (
-                        <span className="text-[9px] bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full border border-amber-100 mt-1.5 inline-block font-bold uppercase tracking-tighter">Staff Assisted</span>
-                      )}
-                    </td>
-                    {(user?.role === 'admin' || user?.role === 'staff') && (
-                      <td className="p-5">
-                        <div className="text-slate-900 font-bold text-sm">{item.user_name}</div>
-                        <div className="text-xs text-slate-400">{item.user_phone}</div>
-                        <div className="text-[10px] text-slate-400">{item.userEmail || item.user_email}</div>
-                      </td>
-                    )}
-                    <td className="p-5">
-                      <span className="text-slate-700 font-medium text-sm capitalize">{(item.service_name || item.name || item.service_type || '').replace(/-/g, ' ')}</span>
+                      <span className="text-slate-700 dark:text-slate-300 font-medium text-sm capitalize">{(item.service_name || item.name || item.service_type || '').replace(/-/g, ' ')}</span>
                     </td>
                     <td className="p-5">
                       {item.payment_required ? (
                         <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
-                          item.payment_status === 'Paid' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'
+                          item.payment_status === 'Paid' ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/20' : 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-500/20'
                         }`}>
                           {item.payment_status || 'Pending'}
                         </span>
                       ) : (
-                        <span className="text-xs text-slate-400">N/A</span>
+                        <span className="text-xs text-slate-450 dark:text-slate-500">N/A</span>
                       )}
                     </td>
                     <td className="p-5">
@@ -453,22 +466,22 @@ const Applications = () => {
                         {item.status}
                       </span>
                     </td>
-                    {(user?.role === 'admin' || user?.role === 'staff') && (
-                      <td className="p-5">
-                        <div className="space-y-1">
-                          <div className="text-slate-700 text-sm">
-                            <span className="text-[10px] uppercase text-slate-400 block">Staff:</span>
-                            {item.assignedToName || item.staff_name || <span className="text-slate-400 italic">Unassigned</span>}
-                          </div>
-                          {item.completed_by_name && (
-                            <div className="text-emerald-600 text-sm">
-                              <span className="text-[10px] uppercase text-slate-400 block">Completed by:</span>
-                              {item.completed_by_name}
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                    )}
+                     {(user?.role === 'admin' || user?.role === 'staff') && (
+                       <td className="p-5">
+                         <div className="space-y-1">
+                           <div className="text-slate-700 dark:text-slate-300 text-sm">
+                             <span className="text-[10px] uppercase text-slate-400 dark:text-slate-500 block">Staff:</span>
+                             {item.assignedToName || item.staff_name || <span className="text-slate-400 dark:text-slate-500 italic">Unassigned</span>}
+                           </div>
+                           {item.completed_by_name && (
+                             <div className="text-emerald-600 dark:text-emerald-400 text-sm">
+                               <span className="text-[10px] uppercase text-slate-400 dark:text-slate-500 block">Completed by:</span>
+                               {item.completed_by_name}
+                             </div>
+                           )}
+                         </div>
+                       </td>
+                     )}
                     <td className="p-5 text-right flex items-center justify-end gap-2">
                       {downloadingId === item.id && (
                         <div className="absolute left-[-9999px] top-0 overflow-hidden" style={{ width: '800px' }}>
@@ -477,7 +490,7 @@ const Applications = () => {
                       )}
                       <button 
                         onClick={() => setSelectedApp(item)}
-                        className="p-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-all shadow-sm group-hover:shadow-md"
+                        className="p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-xl hover:bg-slate-900 hover:dark:bg-white hover:text-white hover:dark:text-slate-900 hover:border-slate-900 hover:dark:border-white transition-all shadow-sm group-hover:shadow-md"
                         title="View Details"
                       >
                         <Eye size={18} />
@@ -492,7 +505,7 @@ const Applications = () => {
                           }, 500);
                         }}
                         disabled={downloadingId === item.id}
-                        className="p-2.5 bg-white border border-slate-200 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all shadow-sm group-hover:shadow-md disabled:opacity-50"
+                        className="p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-blue-600 dark:text-blue-450 rounded-xl hover:bg-blue-600 hover:dark:bg-blue-500 hover:text-white hover:dark:text-white hover:border-blue-600 hover:dark:border-blue-500 transition-all shadow-sm group-hover:shadow-md disabled:opacity-50"
                         title="Download Acknowledgement"
                       >
                         {downloadingId === item.id ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
@@ -500,7 +513,7 @@ const Applications = () => {
                       {(user?.role === 'admin' || user?.role === 'staff') && (
                         <button 
                           onClick={() => handleSoftDelete(item)}
-                          className="p-2.5 bg-white border border-slate-200 text-red-600 rounded-xl hover:bg-red-600 hover:text-white hover:border-red-600 transition-all shadow-sm group-hover:shadow-md"
+                          className="p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-red-600 dark:text-red-450 rounded-xl hover:bg-red-600 hover:dark:bg-red-500 hover:text-white hover:dark:text-white hover:border-red-600 hover:dark:border-red-500 transition-all shadow-sm group-hover:shadow-md"
                           title="Move to Recycle Bin"
                         >
                           <Trash2 size={18} />
@@ -532,18 +545,18 @@ const Applications = () => {
               </button>
             </div>
             
-            <div className="p-6 overflow-y-auto flex-1 space-y-8 bg-slate-50">
+            <div className="p-6 overflow-y-auto flex-1 space-y-8 bg-slate-50 dark:bg-slate-900">
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Left Column: Info & Form */}
                 <div className="lg:col-span-2 space-y-8">
                     {/* Government Style Application Form View */}
                     <AcknowledgementReceipt application={selectedApp} id="receipt-applications" />
                     
-                    <div className="p-6 bg-[#f8fafc] border-t border-[#e2e8f0] flex justify-center gap-4 no-print">
+                    <div className="p-6 bg-[#f8fafc] dark:bg-slate-800/50 border-t border-[#e2e8f0] dark:border-slate-700 flex justify-center gap-4 no-print">
                       <button 
                         onClick={handleDownloadPDF} 
                         disabled={isGeneratingPDF}
-                        className="px-6 py-2 bg-slate-900 text-white text-xs font-bold rounded-lg hover:bg-slate-800 transition-all flex items-center gap-2 disabled:opacity-50"
+                        className="px-6 py-2 bg-slate-900 dark:bg-slate-700 text-white text-xs font-bold rounded-lg hover:bg-slate-800 dark:hover:bg-slate-600 transition-all flex items-center gap-2 disabled:opacity-50"
                       >
                         {isGeneratingPDF ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
                         {isGeneratingPDF ? 'Generating...' : 'Download Application Record'}
@@ -569,31 +582,31 @@ const Applications = () => {
                   {/* Right Column: Timeline & Actions */}
                   <div className="space-y-8">
                   {/* Documents */}
-                  <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-                    <h3 className="text-sm font-bold text-slate-900 mb-6 flex items-center gap-2 uppercase tracking-widest">
-                      <FileText size={16} className="text-blue-600" /> Uploaded Documents
+                  <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2 uppercase tracking-widest">
+                      <FileText size={16} className="text-blue-600 dark:text-blue-400" /> Uploaded Documents
                     </h3>
                     <div className="space-y-3">
                       {selectedApp.documents && selectedApp.documents.length > 0 ? (
                         selectedApp.documents?.map((doc: any) => (
                           <div 
                             key={doc.id}
-                            className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all group cursor-pointer"
+                            className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl hover:border-blue-500 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/20 transition-all group cursor-pointer"
                             onClick={() => setPreviewDoc(doc)}
                           >
-                            <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-400 group-hover:text-blue-600 group-hover:border-blue-200">
+                            <div className="w-8 h-8 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-400 dark:text-slate-500 group-hover:text-blue-600 group-hover:border-blue-200">
                               <FileText size={16} />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <div className="text-xs font-bold text-slate-700 group-hover:text-blue-700 truncate">{doc.file_name}</div>
-                              <div className="text-[9px] text-slate-400 uppercase tracking-widest mt-0.5">Uploaded {safeFormat(doc.uploaded_at, 'dd/MM/yyyy')}</div>
+                              <div className="text-xs font-bold text-slate-700 dark:text-slate-300 group-hover:text-blue-700 dark:group-hover:text-blue-400 truncate">{doc.file_name}</div>
+                              <div className="text-[9px] text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-0.5">Uploaded {safeFormat(doc.uploaded_at, 'dd/MM/yyyy')}</div>
                             </div>
                             <a 
                               href={doc.file_url || doc.url || '#'}
                               target="_blank"
                               rel="noopener noreferrer"
                               onClick={(e) => e.stopPropagation()}
-                              className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-100 rounded-md transition-colors"
+                              className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-md transition-colors"
                               title="Download/Open"
                             >
                               <ExternalLink size={14} />
@@ -601,28 +614,28 @@ const Applications = () => {
                           </div>
                         ))
                       ) : (
-                        <p className="text-xs text-slate-400 italic text-center py-4">No documents uploaded.</p>
+                        <p className="text-xs text-slate-400 dark:text-slate-500 italic text-center py-4">No documents uploaded.</p>
                       )}
                     </div>
                   </div>
 
                   {/* Timeline */}
-                  <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-                    <h3 className="text-sm font-bold text-slate-900 mb-6 flex items-center gap-2 uppercase tracking-widest">
-                      <Activity size={16} className="text-blue-600" /> Timeline
+                  <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2 uppercase tracking-widest">
+                      <Activity size={16} className="text-blue-600 dark:text-blue-400" /> Timeline
                     </h3>
-                    <div className="space-y-6 relative before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-100">
+                    <div className="space-y-6 relative before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-150 dark:before:bg-slate-700">
                       {selectedApp.updates && selectedApp.updates?.map((update: any, idx: number) => (
                         <div key={update.id} className="relative pl-8">
-                          <div className={`absolute left-0 top-1 w-6 h-6 rounded-full border-4 border-white flex items-center justify-center z-10 shadow-sm ${idx === 0 ? 'bg-blue-600' : 'bg-slate-200'}`}>
-                            <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                          <div className={`absolute left-0 top-1 w-6 h-6 rounded-full border-4 border-white dark:border-slate-800 flex items-center justify-center z-10 shadow-sm ${idx === 0 ? 'bg-blue-600' : 'bg-slate-200 dark:bg-slate-700'}`}>
+                            <div className="w-1.5 h-1.5 rounded-full bg-white dark:bg-slate-300" />
                           </div>
                           <div>
                             <div className="flex items-center justify-between mb-1">
-                              <div className="text-xs font-bold text-slate-900">{update.status}</div>
-                              <div className="text-[10px] text-slate-400">{safeFormat(update.updated_at, 'dd/MM/yyyy')}</div>
+                              <div className="text-xs font-bold text-slate-900 dark:text-slate-100">{update.status}</div>
+                              <div className="text-[10px] text-slate-400 dark:text-slate-500">{safeFormat(update.updated_at, 'dd/MM/yyyy')}</div>
                             </div>
-                            <p className="text-[10px] text-slate-500 line-clamp-2">{update.comment}</p>
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400 line-clamp-2">{update.comment}</p>
                           </div>
                         </div>
                       ))}
@@ -632,30 +645,30 @@ const Applications = () => {
                   {/* Admin/Staff Actions */}
                   {(user?.role === 'admin' || user?.role === 'staff') && (
                     <div className="space-y-6">
-                      <div className="bg-white p-6 rounded-3xl border border-blue-100 shadow-sm">
-                        <h3 className="text-sm font-bold text-blue-600 mb-4 flex items-center gap-2 uppercase tracking-widest">
+                      <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-blue-100 dark:border-slate-700 shadow-sm">
+                        <h3 className="text-sm font-bold text-blue-600 dark:text-blue-400 mb-4 flex items-center gap-2 uppercase tracking-widest">
                           <MessageSquare size={16} /> Update Status
                         </h3>
                         <form onSubmit={handleStatusUpdate} className="space-y-4">
                           <div>
-                            <label className="text-[10px] text-slate-400 uppercase font-bold mb-2 block">New Status</label>
+                            <label className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-bold mb-2 block">New Status</label>
                             <select 
                               required
                               value={updateData.status}
                               onChange={e => setUpdateData({...updateData, status: e.target.value})}
-                              className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:border-blue-500 outline-none text-xs"
+                              className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:border-blue-500 outline-none text-xs"
                             >
-                              <option value="">Select Status</option>
-                              {statuses.filter(s => s !== 'All').map(s => <option key={s} value={s}>{s}</option>)}
+                              <option value="" className="bg-white dark:bg-slate-900">Select Status</option>
+                              {statuses.filter(s => s !== 'All').map(s => <option key={s} value={s} className="bg-white dark:bg-slate-900">{s}</option>)}
                             </select>
                           </div>
                           <div>
-                            <label className="text-[10px] text-slate-400 uppercase font-bold mb-2 block">Remarks</label>
+                            <label className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-bold mb-2 block">Remarks</label>
                             <textarea 
                               placeholder="Add internal remarks or notes for user..."
                               value={updateData.comment}
                               onChange={e => setUpdateData({...updateData, comment: e.target.value})}
-                              className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:border-blue-500 outline-none h-24 resize-none text-xs"
+                              className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:border-blue-500 outline-none h-24 resize-none text-xs"
                             />
                           </div>
                           <button 

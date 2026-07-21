@@ -268,7 +268,7 @@ const IDCardSettings = () => {
             <Calendar size={14} style={{ color: settings.accent_color }} />
             <div className="flex-1">
               <p className="text-[9px] font-black opacity-40 uppercase tracking-widest" style={{ color: settings.text_color }}>Joined On</p>
-              <p style={{ color: settings.text_color, fontSize: `${settings.font_size_details}px`, fontWeight: 600 }}>{member?.joining_date || '01-01-2024'}</p>
+              <p style={{ color: settings.text_color, fontSize: `${settings.font_size_details}px`, fontWeight: 600 }}>{member?.joining_date || '01-01-2026'}</p>
             </div>
           </div>
         )}
@@ -377,16 +377,16 @@ const IDCardSettings = () => {
   );
 
   return (
-    <div className="max-w-[1600px] mx-auto p-4 lg:p-8 space-y-8 min-h-screen bg-[#0a0c10]">
+    <div className="max-w-[1600px] mx-auto p-4 lg:p-8 space-y-8 min-h-screen">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-slate-900/50 p-8 rounded-[2.5rem] border border-white/5 backdrop-blur-xl">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white dark:bg-slate-900/50 p-8 rounded-[2.5rem] border border-slate-200 dark:border-white/5 shadow-xl">
         <div className="flex items-center gap-6">
           <div className="w-16 h-16 rounded-3xl bg-blue-600/20 flex items-center justify-center text-blue-500 border border-blue-500/20 shadow-2xl shadow-blue-600/20">
             <IdCard size={32} />
           </div>
           <div>
-            <h1 className="text-3xl font-black text-white tracking-tight">ID Card Designer</h1>
-            <p className="text-slate-400 mt-1 font-medium italic">Architect your professional staff identity system.</p>
+            <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">ID Card Designer</h1>
+            <p className="text-slate-500 dark:text-slate-400 mt-1 font-medium italic">Architect your professional staff identity system.</p>
           </div>
         </div>
         <div className="flex gap-4">
@@ -404,7 +404,7 @@ const IDCardSettings = () => {
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
         {/* Editor Controls */}
         <div className="xl:col-span-4 space-y-6">
-          <div className="bg-slate-900/50 rounded-[2rem] border border-white/5 p-2 overflow-hidden backdrop-blur-xl">
+          <div className="bg-white dark:bg-slate-900/50 rounded-[2rem] border border-slate-200 dark:border-white/5 p-2 overflow-hidden shadow-lg">
              <div className="grid grid-cols-4 gap-1 p-1">
                {[
                  { id: 'front', label: 'Front', icon: ImageIcon },
@@ -415,7 +415,7 @@ const IDCardSettings = () => {
                  <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex flex-col items-center gap-1.5 py-4 rounded-xl transition-all ${activeTab === tab.id ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'}`}
+                  className={`flex flex-col items-center gap-1.5 py-4 rounded-xl transition-all ${activeTab === tab.id ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5'}`}
                  >
                    <tab.icon size={18} />
                    <span className="text-[10px] font-black uppercase tracking-widest">{tab.label}</span>
@@ -424,16 +424,16 @@ const IDCardSettings = () => {
              </div>
           </div>
 
-          <div className="bg-slate-900/50 rounded-[2.5rem] border border-white/5 p-8 backdrop-blur-xl max-h-[70vh] overflow-y-auto custom-scrollbar">
+          <div className="bg-white dark:bg-slate-900/50 rounded-[2.5rem] border border-slate-200 dark:border-white/5 p-8 shadow-xl max-h-[70vh] overflow-y-auto custom-scrollbar">
             {activeTab === 'front' && (
               <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-300">
-                <h3 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2">
+                <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest flex items-center gap-2">
                   <ImageIcon size={16} className="text-blue-500" />
                   Front Design
                 </h3>
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Card Background Color</label>
+                    <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">Card Background Color</label>
                     <div className="flex gap-4 items-center">
                       <input 
                         type="color" 
@@ -445,15 +445,15 @@ const IDCardSettings = () => {
                         type="text"
                         value={settings.front_bg_color}
                         onChange={e => setSettings({...settings, front_bg_color: e.target.value})}
-                        className="flex-1 bg-slate-950 border border-white/5 rounded-xl px-4 py-3 text-white text-sm font-mono"
+                        className="flex-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-slate-900 dark:text-white text-sm font-mono focus:outline-none"
                       />
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Front Background Image</label>
+                    <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">Front Background Image</label>
                     <div className="relative">
                       <div 
-                        className="group relative h-24 rounded-2xl border-2 border-dashed border-white/10 hover:border-blue-500/50 overflow-hidden cursor-pointer transition-all flex items-center justify-center bg-slate-950"
+                        className="group relative h-24 rounded-2xl border-2 border-dashed border-slate-200 dark:border-white/10 hover:border-blue-500/50 overflow-hidden cursor-pointer transition-all flex items-center justify-center bg-slate-50 dark:bg-slate-950"
                         onClick={() => document.getElementById('front-bg-upload')?.click()}
                       >
                         {settings.front_bg_image ? (
@@ -482,10 +482,10 @@ const IDCardSettings = () => {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Company logo</label>
+                    <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">Company logo</label>
                     <div className="flex items-center gap-4">
                       <div 
-                        className="w-16 h-16 rounded-2xl border-2 border-dashed border-white/10 flex items-center justify-center cursor-pointer bg-slate-950 overflow-hidden"
+                        className="w-16 h-16 rounded-2xl border-2 border-dashed border-slate-200 dark:border-white/10 flex items-center justify-center cursor-pointer bg-slate-50 dark:bg-slate-950 overflow-hidden"
                         onClick={() => document.getElementById('logo-upload')?.click()}
                       >
                         {settings.company_logo ? (
@@ -507,13 +507,13 @@ const IDCardSettings = () => {
 
             {activeTab === 'back' && (
               <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-300">
-                <h3 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2">
+                <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest flex items-center gap-2">
                   <Layout size={16} className="text-amber-500" />
                   Back Design
                 </h3>
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Back Background Color</label>
+                    <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">Back Background Color</label>
                     <input 
                       type="color" 
                       value={settings.back_bg_color}
@@ -522,18 +522,18 @@ const IDCardSettings = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Instructions / Terms</label>
+                    <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">Instructions / Terms</label>
                     <textarea 
                       value={settings.instructions}
                       onChange={e => setSettings({...settings, instructions: e.target.value})}
-                      className="w-full bg-slate-950 border border-white/5 rounded-2xl px-5 py-4 text-white text-xs h-32 focus:border-amber-500/50 outline-none transition-all leading-relaxed"
+                      className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-white/5 rounded-2xl px-5 py-4 text-slate-900 dark:text-white text-xs h-32 focus:border-amber-500/50 outline-none transition-all leading-relaxed"
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Authorized Signature</label>
+                    <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">Authorized Signature</label>
                     <div className="flex items-center gap-4">
                       <div 
-                        className="w-full h-24 rounded-2xl border-2 border-dashed border-white/10 flex items-center justify-center cursor-pointer bg-slate-950 group relative"
+                        className="w-full h-24 rounded-2xl border-2 border-dashed border-slate-200 dark:border-white/10 flex items-center justify-center cursor-pointer bg-slate-50 dark:bg-slate-950 group relative"
                         onClick={() => document.getElementById('signature-upload')?.click()}
                       >
                          {settings.signature_url ? (
@@ -554,22 +554,22 @@ const IDCardSettings = () => {
 
             {activeTab === 'global' && (
               <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-300">
-                <h3 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2">
+                <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest flex items-center gap-2">
                   <Palette size={16} className="text-emerald-500" />
                   Global Branding
                 </h3>
                 <div className="space-y-5">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Organization Name</label>
+                    <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">Organization Name</label>
                     <input 
                       type="text"
                       value={settings.company_name}
                       onChange={e => setSettings({...settings, company_name: e.target.value})}
-                      className="w-full bg-slate-950 border border-white/5 rounded-2xl px-5 py-3.5 text-white font-bold tracking-tight focus:border-emerald-500/50 outline-none transition-all"
+                      className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-white/5 rounded-2xl px-5 py-3.5 text-slate-900 dark:text-white font-bold tracking-tight focus:border-emerald-500/50 outline-none transition-all"
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Card Accent Color</label>
+                    <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">Card Accent Color</label>
                     <input 
                       type="color" 
                       value={settings.accent_color}
@@ -578,7 +578,7 @@ const IDCardSettings = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Primary Text Color</label>
+                    <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">Primary Text Color</label>
                     <input 
                       type="color" 
                       value={settings.text_color}
@@ -588,21 +588,21 @@ const IDCardSettings = () => {
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Name Font Size</label>
+                      <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">Name Font Size</label>
                       <input 
                         type="number"
                         value={settings.font_size_name}
                         onChange={e => setSettings({...settings, font_size_name: Number(e.target.value)})}
-                        className="w-full bg-slate-950 border border-white/5 rounded-xl px-4 py-3 text-white text-sm"
+                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-white/5 rounded-xl px-4 py-3 text-slate-900 dark:text-white text-sm focus:outline-none"
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Detail Font Size</label>
+                      <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">Detail Font Size</label>
                       <input 
                         type="number"
                         value={settings.font_size_details}
                         onChange={e => setSettings({...settings, font_size_details: Number(e.target.value)})}
-                        className="w-full bg-slate-950 border border-white/5 rounded-xl px-4 py-3 text-white text-sm"
+                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-white/5 rounded-xl px-4 py-3 text-slate-900 dark:text-white text-sm focus:outline-none"
                       />
                     </div>
                   </div>
@@ -612,7 +612,7 @@ const IDCardSettings = () => {
 
             {activeTab === 'fields' && (
               <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-300">
-                <h3 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2">
+                <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest flex items-center gap-2">
                   <Type size={16} className="text-purple-500" />
                   Staff Field Visibility
                 </h3>
@@ -625,12 +625,12 @@ const IDCardSettings = () => {
                     { id: 'joining_date', label: 'Joining Date', icon: Calendar },
                     { id: 'email', label: 'Email Address', icon: Mail },
                   ].map(field => (
-                    <label key={field.id} className="flex items-center justify-between p-4 bg-slate-950/50 hover:bg-slate-950 rounded-2xl border border-white/5 cursor-pointer group transition-all">
+                    <label key={field.id} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-950/50 hover:bg-slate-100 dark:hover:bg-slate-950 rounded-2xl border border-slate-200 dark:border-white/5 cursor-pointer group transition-all">
                       <div className="flex items-center gap-4">
-                        <div className={`p-2 rounded-xl transition-all ${settings.enabled_fields.includes(field.id) ? 'bg-purple-600/20 text-purple-400' : 'bg-slate-800 text-slate-600'}`}>
+                        <div className={`p-2 rounded-xl transition-all ${settings.enabled_fields.includes(field.id) ? 'bg-purple-600/20 text-purple-400' : 'bg-slate-200 dark:bg-slate-800 text-slate-600'}`}>
                           <field.icon size={16} />
                         </div>
-                        <span className={`text-sm font-bold ${settings.enabled_fields.includes(field.id) ? 'text-white' : 'text-slate-500'}`}>{field.label}</span>
+                        <span className={`text-sm font-bold ${settings.enabled_fields.includes(field.id) ? 'text-slate-900 dark:text-white' : 'text-slate-400 dark:text-slate-600'}`}>{field.label}</span>
                       </div>
                       <input 
                         type="checkbox"
@@ -653,22 +653,22 @@ const IDCardSettings = () => {
 
         {/* Live Preview & Staff Selection */}
         <div className="xl:col-span-8 flex flex-col gap-8 h-full">
-           <div className="flex-1 bg-slate-900 border border-white/5 rounded-[3rem] p-8 lg:p-12 shadow-[0_0_100px_rgba(0,0,0,0.5)] flex flex-col items-center justify-center relative overflow-hidden">
+           <div className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-[3rem] p-8 lg:p-12 shadow-2xl flex flex-col items-center justify-center relative overflow-hidden">
               {/* Animated Background Gradients */}
               <div className="absolute top-0 -left-1/4 w-[1000px] h-[1000px] bg-blue-600/10 blur-[150px] rounded-full animate-pulse" />
               <div className="absolute bottom-0 -right-1/4 w-[1000px] h-[1000px] bg-purple-600/10 blur-[150px] rounded-full animate-pulse delay-700" />
               
               {/* Preview Toggle */}
-              <div className="absolute top-10 flex gap-1 p-1 bg-slate-950/80 rounded-2xl border border-white/10 backdrop-blur-md z-10">
+              <div className="absolute top-10 flex gap-1 p-1 bg-slate-200/80 dark:bg-slate-950/80 rounded-2xl border border-slate-300 dark:border-white/10 backdrop-blur-md z-10">
                 <button 
                   onClick={() => setPreviewSide('front')}
-                  className={`px-8 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${previewSide === 'front' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-slate-500 hover:text-slate-300'}`}
+                  className={`px-8 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${previewSide === 'front' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}
                 >
                   Front
                 </button>
                 <button 
                   onClick={() => setPreviewSide('back')}
-                  className={`px-8 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${previewSide === 'back' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-slate-500 hover:text-slate-300'}`}
+                  className={`px-8 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${previewSide === 'back' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}
                 >
                   Back
                 </button>
@@ -693,13 +693,13 @@ const IDCardSettings = () => {
               <div className="mt-12 flex flex-wrap gap-4 z-10 justify-center">
                 <button 
                   onClick={() => downloadCard('front')}
-                  className="px-6 py-4 bg-slate-950 hover:bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest border border-white/10 flex items-center gap-2 transition-all hover:scale-105"
+                  className="px-6 py-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-950 dark:hover:bg-slate-900 text-slate-800 dark:text-white rounded-2xl font-black text-xs uppercase tracking-widest border border-slate-200 dark:border-white/10 flex items-center gap-2 transition-all hover:scale-105"
                 >
                   <Download size={16} /> Front (PNG)
                 </button>
                 <button 
                   onClick={() => downloadCard('back')}
-                  className="px-6 py-4 bg-slate-950 hover:bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest border border-white/10 flex items-center gap-2 transition-all hover:scale-105"
+                  className="px-6 py-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-950 dark:hover:bg-slate-900 text-slate-800 dark:text-white rounded-2xl font-black text-xs uppercase tracking-widest border border-slate-200 dark:border-white/10 flex items-center gap-2 transition-all hover:scale-105"
                 >
                   <Download size={16} /> Back (PNG)
                 </button>
@@ -713,17 +713,17 @@ const IDCardSettings = () => {
            </div>
 
            {/* Staff Selector */}
-           <div className="bg-slate-900/50 rounded-[2.5rem] border border-white/5 p-8 backdrop-blur-xl">
+           <div className="bg-white dark:bg-slate-900/50 rounded-[2.5rem] border border-slate-200 dark:border-white/5 p-8 shadow-xl">
              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div>
-                  <h3 className="text-lg font-black text-white uppercase tracking-tight">Preview Staff Member</h3>
-                  <p className="text-slate-500 text-sm font-medium">Select a staff member to see how their card looks.</p>
+                  <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Preview Staff Member</h3>
+                  <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Select a staff member to see how their card looks.</p>
                 </div>
                 <div className="relative w-full md:w-72">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
                   <select 
                     onChange={e => setPreviewStaff(staff.find(s => s.id === e.target.value))}
-                    className="w-full bg-slate-950 border border-white/10 rounded-2xl pl-12 pr-6 py-4 text-white text-sm font-bold appearance-none focus:border-blue-500 outline-none transition-all cursor-pointer"
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-white/10 rounded-2xl pl-12 pr-6 py-4 text-slate-900 dark:text-white text-sm font-bold appearance-none focus:border-blue-500 outline-none transition-all cursor-pointer"
                   >
                     {staff.map(s => (
                       <option key={s.id} value={s.id}>{s.name} ({s.staff_id})</option>

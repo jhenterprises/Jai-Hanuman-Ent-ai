@@ -13,11 +13,13 @@ import morgan from "morgan";
 const expressApp = express();
 
 // Security and utility Middlewares
-expressApp.use(helmet({
-  contentSecurityPolicy: false, // disabled for vite dev
-  crossOriginEmbedderPolicy: false,
-  crossOriginResourcePolicy: false,
-}));
+if (env.NODE_ENV === "production" || process.env.VERCEL) {
+  expressApp.use(helmet({
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: false,
+  }));
+}
 expressApp.use(cors({ origin: true, credentials: true }));
 expressApp.use(express.json());
 expressApp.set('trust proxy', 1);
@@ -83,11 +85,8 @@ expressApp.get("/api/proxy-file", async (req, res) => {
 });
 expressApp.use('/api', apiRouter);
 
-// Global Error Handler
-expressApp.use(errorHandler);
-
 async function startServer() {
-  const PORT = Number(env.PORT || 3000);
+  const PORT = 3000;
 
   if (env.NODE_ENV !== "production" && !process.env.VERCEL) {
     const vite = await createViteServer({
@@ -98,7 +97,8 @@ async function startServer() {
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     expressApp.use(express.static(distPath));
-    expressApp.get('*all', (req, res) => {
+    expressApp.use((req, res, next) => {
+      if (req.method !== 'GET') return next();
       if (path.extname(req.path)) {
         res.status(404).send('Not Found');
       } else {
@@ -106,6 +106,9 @@ async function startServer() {
       }
     });
   }
+
+  // Global Error Handler
+  expressApp.use(errorHandler);
 
   if (!process.env.VERCEL) {
     expressApp.listen(PORT, "0.0.0.0", () => {

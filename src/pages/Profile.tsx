@@ -185,18 +185,18 @@ const ProfileSettings = () => {
       initial={{ opacity: 0, y: 30 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: "easeOut" }}
-      className="max-w-3xl mx-auto space-y-8 pb-32"
+      className="max-w-3xl mx-auto space-y-8 pb-32 text-slate-800 dark:text-slate-100"
     >
       <header className="space-y-1">
-        <h1 className="text-4xl font-black text-white tracking-tight">Account <span className="text-blue-500">Settings</span></h1>
-        <p className="text-slate-500">Manage your profile information and security.</p>
+        <h1 className="text-4xl font-black text-slate-800 dark:text-white tracking-tight">Account <span className="text-blue-500">Settings</span></h1>
+        <p className="text-slate-500 dark:text-slate-400">Manage your profile information and security.</p>
       </header>
       
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
         <div className="lg:col-span-2 space-y-8">
           <GlassCard className="p-8 flex flex-col items-center text-center space-y-6">
             <div className="relative group">
-              <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-white/5 ring-4 ring-blue-500/20 group-hover:ring-blue-500/50 transition-all shadow-2xl relative">
+              <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-slate-200 dark:border-white/5 ring-4 ring-blue-500/20 group-hover:ring-blue-500/50 transition-all shadow-2xl relative">
                 <img 
                   src={photoPreview || profile.photoURL || `https://api.dicebear.com/7.x/initials/svg?seed=${profile.name}`} 
                   alt="Profile" 
@@ -213,21 +213,21 @@ const ProfileSettings = () => {
             </div>
             
             <div className="space-y-1">
-              <h2 className="text-2xl font-black text-white tracking-tight">{profile.name}</h2>
-              <p className="text-slate-500 text-sm flex items-center justify-center gap-2">
+              <h2 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight">{profile.name}</h2>
+              <p className="text-slate-500 dark:text-slate-400 text-sm flex items-center justify-center gap-2">
                 <Mail size={14} /> {profile.email}
               </p>
-              <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-600/10 text-blue-400 text-[10px] font-black uppercase tracking-widest rounded-full border border-blue-500/20 mt-4">
+              <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-50 dark:bg-blue-600/10 text-blue-600 dark:text-blue-400 text-[10px] font-black uppercase tracking-widest rounded-full border border-blue-200 dark:border-blue-500/20 mt-4">
                 {profile.role} account
               </div>
             </div>
           </GlassCard>
 
-          <GlassCard className="p-8 space-y-6 bg-red-500/5 border-red-500/10">
-            <h3 className="text-lg font-black text-red-500 uppercase tracking-widest flex items-center gap-2">
+          <GlassCard className="p-8 space-y-6 bg-red-500/5 border-red-200 dark:border-red-500/10">
+            <h3 className="text-lg font-black text-red-600 dark:text-red-500 uppercase tracking-widest flex items-center gap-2">
               <AlertCircle size={18} /> Account Status
             </h3>
-            <p className="text-xs text-slate-400 leading-relaxed">
+            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
               Your account is currently active and verified. If you wish to deactivate or delete your account, please contact JH Portal support.
             </p>
           </GlassCard>
@@ -235,8 +235,8 @@ const ProfileSettings = () => {
 
         <div className="lg:col-span-3 space-y-8">
           <GlassCard className="p-8 space-y-8">
-            <h3 className="text-xl font-bold text-white flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-600/20 rounded-xl flex items-center justify-center text-blue-400 border border-blue-500/20">
+            <h3 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
+              <div className="w-10 h-10 bg-blue-50 dark:bg-blue-600/20 rounded-xl flex items-center justify-center text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-500/20">
                 <User size={20} />
               </div>
               Personal Information
@@ -244,26 +244,26 @@ const ProfileSettings = () => {
             
             <div className="space-y-6">
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Full Name</label>
+                <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">Full Name</label>
                 <div className="relative group">
-                  <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-500 transition-colors" />
+                  <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
                   <input 
                     value={name} 
                     onChange={e => setName(e.target.value)} 
-                    className="w-full pl-12 pr-4 py-4 bg-white/5 border border-white/5 rounded-2xl text-white outline-none focus:ring-2 ring-blue-500 transition-all font-bold placeholder:text-slate-600" 
+                    className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-2xl text-slate-800 dark:text-white outline-none focus:ring-2 ring-blue-500 transition-all font-bold placeholder:text-slate-400" 
                     placeholder="Enter full name" 
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Mobile Number</label>
+                <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">Mobile Number</label>
                 <div className="relative group">
-                  <Phone size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-500 transition-colors" />
+                  <Phone size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
                   <input 
                     value={phone} 
                     onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} 
-                    className="w-full pl-12 pr-4 py-4 bg-white/5 border border-white/5 rounded-2xl text-white outline-none focus:ring-2 ring-blue-500 transition-all font-bold placeholder:text-slate-600" 
+                    className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-2xl text-slate-800 dark:text-white outline-none focus:ring-2 ring-blue-500 transition-all font-bold placeholder:text-slate-400" 
                     placeholder="10-digit mobile number" 
                   />
                 </div>
@@ -274,7 +274,7 @@ const ProfileSettings = () => {
                 whileTap={{ scale: 0.99 }}
                 onClick={updateProfile} 
                 disabled={loading} 
-                className="w-full flex items-center justify-center gap-3 py-5 blue-gradient text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-blue-600/20 disabled:grayscale transition-all"
+                className="w-full flex items-center justify-center gap-3 py-5 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-blue-600/20 disabled:grayscale transition-all"
               >
                 {loading ? <Loader2 className="animate-spin" /> : <Save size={18} />} Save Profile Changes
               </motion.button>
@@ -282,8 +282,8 @@ const ProfileSettings = () => {
           </GlassCard>
 
           <GlassCard className="p-8 space-y-8">
-            <h3 className="text-xl font-bold text-white flex items-center gap-3">
-              <div className="w-10 h-10 bg-amber-500/20 rounded-xl flex items-center justify-center text-amber-500 border border-amber-500/20">
+            <h3 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
+              <div className="w-10 h-10 bg-amber-50 dark:bg-amber-500/20 rounded-xl flex items-center justify-center text-amber-600 dark:text-amber-500 border border-amber-100 dark:border-amber-500/20">
                 <Lock size={20} />
               </div>
               Security & Password
@@ -291,23 +291,23 @@ const ProfileSettings = () => {
             
             <div className="space-y-6">
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Current Password</label>
+                <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">Current Password</label>
                 <input 
                   type="password" 
                   value={password} 
                   onChange={e => setPassword(e.target.value)} 
-                  className="w-full p-4 bg-white/5 border border-white/5 rounded-2xl text-white outline-none focus:ring-2 ring-amber-500 transition-all font-bold" 
+                  className="w-full p-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-2xl text-slate-800 dark:text-white outline-none focus:ring-2 ring-amber-500 transition-all font-bold placeholder:text-slate-400" 
                   placeholder="••••••••" 
                 />
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">New Password</label>
+                <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">New Password</label>
                 <input 
                   type="password"
                   value={newPassword} 
                   onChange={e => setNewPassword(e.target.value)} 
-                  className="w-full p-4 bg-white/5 border border-white/5 rounded-2xl text-white outline-none focus:ring-2 ring-amber-500 transition-all font-bold" 
+                  className="w-full p-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-2xl text-slate-800 dark:text-white outline-none focus:ring-2 ring-amber-500 transition-all font-bold placeholder:text-slate-400" 
                   placeholder="Min 6 characters" 
                 />
               </div>
@@ -317,7 +317,7 @@ const ProfileSettings = () => {
                 whileTap={{ scale: 0.99 }}
                 onClick={handlePasswordChange} 
                 disabled={passwordLoading}
-                className="w-full py-5 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl font-black uppercase tracking-widest text-xs transition-all border border-white/10"
+                className="w-full py-5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-white rounded-2xl font-black uppercase tracking-widest text-xs transition-all border border-slate-200 dark:border-white/10"
               >
                 {passwordLoading ? <Loader2 className="animate-spin mx-auto" /> : 'Update Password'}
               </motion.button>
@@ -325,36 +325,36 @@ const ProfileSettings = () => {
           </GlassCard>
 
           <GlassCard className="p-8 space-y-8">
-            <h3 className="text-xl font-bold text-white flex items-center gap-3">
-              <div className="w-10 h-10 bg-emerald-500/20 rounded-xl flex items-center justify-center text-emerald-500 border border-emerald-500/20">
+            <h3 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
+              <div className="w-10 h-10 bg-emerald-50 dark:bg-emerald-500/20 rounded-xl flex items-center justify-center text-emerald-600 dark:text-emerald-500 border border-emerald-100 dark:border-emerald-500/20">
                 <Lock size={20} />
               </div>
               Setup 6-Digit Login PIN
             </h3>
             
             <div className="space-y-6">
-              <p className="text-xs text-slate-400">Set a 6-digit PIN to use as an alternative way to log in. Note: This will replace your current password with the PIN.</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Set a 6-digit PIN to use as an alternative way to log in. Note: This will replace your current password with the PIN.</p>
               
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Current Password</label>
+                <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">Current Password</label>
                 <input 
                   type="password" 
                   value={pinPassword} 
                   onChange={e => setPinPassword(e.target.value)} 
-                  className="w-full p-4 bg-white/5 border border-white/5 rounded-2xl text-white outline-none focus:ring-2 ring-emerald-500 transition-all font-bold" 
+                  className="w-full p-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-2xl text-slate-800 dark:text-white outline-none focus:ring-2 ring-emerald-500 transition-all font-bold placeholder:text-slate-400" 
                   placeholder="••••••••" 
                 />
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">6-Digit PIN</label>
+                <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">6-Digit PIN</label>
                 <input 
                   type="password"
                   value={newPin} 
                   maxLength={6}
                   inputMode="numeric"
                   onChange={e => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  className="w-full p-4 bg-white/5 border border-white/5 rounded-2xl text-white outline-none focus:ring-2 ring-emerald-500 transition-all font-bold font-mono tracking-[0.5em] text-center" 
+                  className="w-full p-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-2xl text-slate-800 dark:text-white outline-none focus:ring-2 ring-emerald-500 transition-all font-bold font-mono tracking-[0.5em] text-center placeholder:text-slate-400" 
                   placeholder="••••••" 
                 />
               </div>
@@ -364,7 +364,7 @@ const ProfileSettings = () => {
                 whileTap={{ scale: 0.99 }}
                 onClick={handlePinChange} 
                 disabled={pinLoading}
-                className="w-full py-5 bg-slate-800 hover:bg-slate-700 text-emerald-400 rounded-2xl font-black uppercase tracking-widest text-xs transition-all border border-emerald-500/20 hover:border-emerald-500/40"
+                className="w-full py-5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-emerald-600 dark:text-emerald-400 rounded-2xl font-black uppercase tracking-widest text-xs transition-all border border-slate-200 dark:border-emerald-500/20 hover:border-emerald-500/40"
               >
                 {pinLoading ? <Loader2 className="animate-spin mx-auto" /> : 'Set 6-Digit PIN'}
               </motion.button>

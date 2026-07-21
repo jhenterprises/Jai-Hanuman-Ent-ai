@@ -40,6 +40,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const activeUserUnsubscribeRef = React.useRef<(() => void) | null>(null);
 
   useEffect(() => {
     getRedirectResult(auth).catch((error) => {
@@ -47,6 +48,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (activeUserUnsubscribeRef.current) {
+        activeUserUnsubscribeRef.current();
+        activeUserUnsubscribeRef.current = null;
+      }
+
       if (firebaseUser) {
         setLoading(true);
         
@@ -58,27 +64,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         let isMounted = true;
-        let unsubscribeUser: () => void = () => {};
         let retryCount = 0;
         const maxRetries = 5;
 
         const startUserListener = () => {
-          unsubscribeUser = onSnapshot(doc(db, 'users', firebaseUser.uid), async (userDoc) => {
+          const unsub = onSnapshot(doc(db, 'users', firebaseUser.uid), async (userDoc) => {
             if (!isMounted) return;
             
              try {
               const isAdminEmail = firebaseUser.email && (
-                /admin@jhportal.gov.in/i.test(firebaseUser.email)
+                /admin@jhportal.gov.in|pancardjhc2018@gmail.com/i.test(firebaseUser.email)
               );
               const isStaffEmail = firebaseUser.email && (
-                /pancardjhc2018@gmail.com|shahisthabanu78@gmail.com/i.test(firebaseUser.email)
+                /shahisthabanu78@gmail.com/i.test(firebaseUser.email)
               );
 
               if (userDoc.exists()) {
                 const userData = userDoc.data() as User;
                 userData.uid = firebaseUser.uid;
+                if (userData.role) {
+                  userData.role = userData.role.toLowerCase() as any;
+                }
                 
-                if (firebaseUser.email === 'pancardjhc2018@gmail.com' || firebaseUser.email === 'shahisthabanu78@gmail.com') {
+                if (firebaseUser.email === 'shahisthabanu78@gmail.com') {
                   if (userData.role !== 'staff') {
                     userData.role = 'staff';
                     try {
@@ -140,7 +148,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   name: existingData?.name || firebaseUser.displayName || (isAdminEmail ? 'JH Admin' : (isStaffEmail ? 'JH Staff' : 'User')),
                   email: firebaseUser.email || '',
                   photoURL: firebaseUser.photoURL || undefined,
-                  role: isAdminEmail ? 'admin' : (isStaffEmail ? 'staff' : (existingData?.role || 'user')),
+                  role: (isAdminEmail ? 'admin' : (isStaffEmail ? 'staff' : (existingData?.role || 'user'))).toLowerCase(),
                   phone: existingData?.phone || '',
                   status: existingData?.status || 'active',
                   staff_id: existingData?.staff_id || undefined,
@@ -194,8 +202,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               console.warn(`User listener got temporary permission-denied. Retrying in ${Math.round(delay)}ms... (Attempt ${retryCount}/${maxRetries})`);
               setTimeout(() => {
                 if (isMounted) {
-                  if (typeof unsubscribeUser === 'function') {
-                    unsubscribeUser();
+                  if (activeUserUnsubscribeRef.current) {
+                    activeUserUnsubscribeRef.current();
                   }
                   startUserListener();
                 }
@@ -206,23 +214,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               setLoading(false);
             }
           });
+          activeUserUnsubscribeRef.current = unsub;
         };
 
         startUserListener();
-
-        return () => {
-          isMounted = false;
-          if (typeof unsubscribeUser === 'function') {
-            unsubscribeUser();
-          }
-        };
       } else {
+        if (activeUserUnsubscribeRef.current) {
+          activeUserUnsubscribeRef.current();
+          activeUserUnsubscribeRef.current = null;
+        }
         setUser(null);
         setLoading(false);
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      if (activeUserUnsubscribeRef.current) {
+        activeUserUnsubscribeRef.current();
+        activeUserUnsubscribeRef.current = null;
+      }
+      unsubscribe();
+    };
   }, []);
 
   const loginWithGoogle = async () => {
@@ -251,9 +263,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const loginWithEmail = async (email: string, password: string) => {
+  const loginWithEmail = async (emailOrPhone: string, password: string) => {
+    let resolvedEmail = emailOrPhone.trim();
+    if (resolvedEmail && !resolvedEmail.includes('@')) {
+      try {
+        const usersRef = collection(db, 'users');
+        const q = query(usersRef, where('phone', '==', resolvedEmail));
+        const querySnap = await getDocs(q);
+        if (!querySnap.empty) {
+          const userData = querySnap.docs[0].data();
+          if (userData.email) {
+            resolvedEmail = userData.email;
+          }
+        } else {
+          const cleanPhone = resolvedEmail.replace(/\D/g, '');
+          if (cleanPhone) {
+            const q2 = query(usersRef, where('phone', 'in', [cleanPhone, `+91${cleanPhone}`, `+91 ${cleanPhone}`]));
+            const querySnap2 = await getDocs(q2);
+            if (!querySnap2.empty) {
+              const userData = querySnap2.docs[0].data();
+              if (userData.email) {
+                resolvedEmail = userData.email;
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Could not resolve phone number to email:', err);
+      }
+    }
+
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      await signInWithEmailAndPassword(auth, resolvedEmail, password);
     } catch (error: any) {
       const errorCode = error?.code || '';
       
@@ -278,11 +319,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const firebaseUser = userCredential.user;
       
       const isAdminEmail = email && (
-        /admin@jhportal.gov.in/i.test(email)
+        /admin@jhportal.gov.in|pancardjhc2018@gmail.com/i.test(email)
       );
 
       const isStaffEmail = email && (
-        /pancardjhc2018@gmail.com|shahisthabanu78@gmail.com/i.test(email)
+        /shahisthabanu78@gmail.com/i.test(email)
       );
 
       const newUser: User = {
@@ -359,14 +400,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     try {
-      if (user && user.uid) {
-        await setDoc(doc(db, 'users', user.uid), {
+      if (activeUserUnsubscribeRef.current) {
+        activeUserUnsubscribeRef.current();
+        activeUserUnsubscribeRef.current = null;
+      }
+      const currentUid = user?.uid;
+      setUser(null);
+      if (currentUid) {
+        setDoc(doc(db, 'users', currentUid), {
           last_logout_at: new Date().toISOString()
         }, { merge: true }).catch(err => console.warn('Logout track error:', err));
       }
       await signOut(auth);
     } catch (error) {
       console.error('Logout failed:', error);
+      setUser(null);
     }
   };
 

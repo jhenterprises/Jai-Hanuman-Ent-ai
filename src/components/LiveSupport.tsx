@@ -158,9 +158,9 @@ const LiveSupport = () => {
 
       {/* Chat Window */}
       {isOpen && (
-        <div className="fixed bottom-6 right-6 w-80 sm:w-96 h-[500px] bg-white border border-slate-200 rounded-2xl shadow-2xl flex flex-col z-50 overflow-hidden">
+        <div className="fixed bottom-6 right-6 w-80 sm:w-96 h-[500px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl flex flex-col z-50 overflow-hidden">
           {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-gradient-to-r from-green-600 to-teal-500 text-white">
+          <div className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800 bg-gradient-to-r from-green-600 to-teal-500 text-white">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-sm shadow-inner">
                 <Headphones size={20} />
@@ -182,15 +182,15 @@ const LiveSupport = () => {
           </div>
 
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50">
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50 dark:bg-slate-950/50">
             {messages.length === 0 && (
               <div className="flex flex-col items-center justify-center h-full text-center p-6 space-y-3">
-                <div className="w-12 h-12 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center text-green-500">
+                <div className="w-12 h-12 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex items-center justify-center text-green-500">
                   <MessageSquare size={24} />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-slate-800">Welcome to Support</p>
-                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Welcome to Support</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
                     How can we help you today? Send a message to start chatting with our team.
                   </p>
                 </div>
@@ -200,7 +200,7 @@ const LiveSupport = () => {
               <div key={msg.id || idx} className={`flex gap-2.5 ${msg.senderId === user.uid ? 'flex-row-reverse' : 'flex-row'}`}>
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-sm ${
                   msg.senderId === user.uid 
-                  ? 'bg-slate-100 text-slate-600 border border-slate-200' 
+                  ? 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700' 
                   : 'bg-green-100 text-green-700 border border-green-200'
                 }`}>
                   {msg.senderId === user.uid ? <UserIcon size={14} /> : <Headphones size={14} />}
@@ -208,10 +208,10 @@ const LiveSupport = () => {
                 <div className={`max-w-[80%] rounded-2xl px-3.5 py-2 text-sm shadow-sm transition-all duration-300 ${
                   msg.senderId === user.uid 
                     ? 'bg-green-600 text-white rounded-tr-none' 
-                    : 'bg-white text-slate-800 rounded-tl-none border border-slate-100'
+                    : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-tl-none border border-slate-100 dark:border-slate-700'
                 }`}>
                   <p className="leading-relaxed">{msg.text}</p>
-                  <p className={`text-[10px] mt-1 opacity-70 text-right ${msg.senderId === user.uid ? 'text-green-100' : 'text-slate-400'}`}>
+                  <p className={`text-[10px] mt-1 opacity-70 text-right ${msg.senderId === user.uid ? 'text-green-100' : 'text-slate-400 dark:text-slate-500'}`}>
                     {msg.timestamp?.toDate ? msg.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                   </p>
                 </div>
@@ -219,10 +219,10 @@ const LiveSupport = () => {
             ))}
             {isLoading && (
               <div className="flex gap-3 flex-row animate-pulse">
-                <div className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0">
+                <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center shrink-0">
                   <Loader2 size={14} className="animate-spin text-slate-400" />
                 </div>
-                <div className="bg-white rounded-2xl rounded-tl-none px-4 py-2 border border-slate-100 shadow-sm">
+                <div className="bg-white dark:bg-slate-800 rounded-2xl rounded-tl-none px-4 py-2 border border-slate-100 dark:border-slate-700 shadow-sm">
                   <span className="text-sm text-slate-400">Sending...</span>
                 </div>
               </div>
@@ -231,7 +231,7 @@ const LiveSupport = () => {
           </div>
 
           {/* Input */}
-          <div className="p-4 border-t border-slate-100 bg-white">
+          <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900">
             <form onSubmit={handleSend} className="flex items-center gap-2 group">
               <div className="flex-1 relative">
                 <input
@@ -239,7 +239,7 @@ const LiveSupport = () => {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   placeholder="Type your message..."
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-green-500 focus:ring-4 focus:ring-green-500/10 transition-all"
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:border-green-500 focus:ring-4 focus:ring-green-500/10 transition-all"
                   disabled={isLoading}
                 />
               </div>

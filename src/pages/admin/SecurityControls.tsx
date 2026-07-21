@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { Shield, Save, Lock, Eye, EyeOff, AlertTriangle } from 'lucide-react';
 import { useConfig } from '../../context/ConfigContext';
@@ -18,7 +18,7 @@ const SecurityControls = () => {
 
   const fetchConfig = async () => {
     try {
-      const { getDoc } = await import('firebase/firestore');
+      
       const docRef = doc(db, 'settings', 'portal');
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {

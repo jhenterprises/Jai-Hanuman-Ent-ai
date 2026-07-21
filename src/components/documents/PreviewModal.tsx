@@ -7,9 +7,10 @@ import printJS from 'print-js';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
+import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
 // Set up the worker for react-pdf
-pdfjs.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+pdfjs.GlobalWorkerOptions.workerSrc = pdfWorker;
 
 interface PreviewModalProps {
   file: DocumentFile | null;

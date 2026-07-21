@@ -3,6 +3,7 @@ import { collection, getDocs, query, orderBy, doc, updateDoc, addDoc, serverTime
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import { useConfig } from '../context/ConfigContext';
+import { useTheme } from '../context/ThemeContext';
 import { motion, AnimatePresence } from 'motion/react';
 import toast, { Toaster } from 'react-hot-toast';
 import { Plus, Trash2, Edit2, CheckCircle, XCircle, Download, FileText, Printer, Search, Sparkles, Receipt, CheckCircle2, AlertCircle, ArrowUpDown, TrendingUp, Layers, PieChart, Eye, Calendar } from 'lucide-react';
@@ -12,6 +13,7 @@ import autoTable from 'jspdf-autotable';
 
 const Ledger = () => {
   const { config } = useConfig();
+  const { theme } = useTheme();
   const [ledger, setLedger] = useState<any[]>([]);
   const [fieldConfigs, setFieldConfigs] = useState<any[]>([]);
   const [dateRange, setDateRange] = useState({ 
@@ -709,7 +711,7 @@ const Ledger = () => {
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="bg-slate-900 border border-slate-800 rounded-[2.5rem] p-8 max-w-sm w-full shadow-2xl overflow-hidden relative"
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2.5rem] p-8 max-w-sm w-full shadow-2xl overflow-hidden relative"
             >
               <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
                 <Sparkles size={120} className="text-blue-500" />
@@ -721,29 +723,29 @@ const Ledger = () => {
                 </div>
                 
                 <div>
-                  <h3 className="text-2xl font-black text-white">Record Saved!</h3>
-                  <p className="text-slate-400">Transaction ID: #{successData.id.slice(0, 8)}</p>
+                  <h3 className="text-2xl font-black text-slate-900 dark:text-white">Record Saved!</h3>
+                  <p className="text-slate-500 dark:text-slate-400">Transaction ID: #{successData.id.slice(0, 8)}</p>
                 </div>
 
-                <div className="w-full bg-slate-800/50 rounded-2xl p-4 space-y-2 text-left border border-slate-700/50">
+                <div className="w-full bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-4 space-y-2 text-left border border-slate-200 dark:border-slate-700/50">
                   <div className="flex justify-between text-sm">
-                    <span className="text-slate-500">Customer</span>
-                    <span className="text-white font-medium">{successData.customer_name}</span>
+                    <span className="text-slate-500 dark:text-slate-400">Customer</span>
+                    <span className="text-slate-800 dark:text-white font-medium">{successData.customer_name}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-slate-500">Service</span>
-                    <span className="text-white font-medium">{successData.service_name}</span>
+                    <span className="text-slate-500 dark:text-slate-400">Service</span>
+                    <span className="text-slate-800 dark:text-white font-medium">{successData.service_name}</span>
                   </div>
-                  <div className="flex justify-between text-lg font-bold border-t border-slate-700 pt-2 mt-2">
-                    <span className="text-slate-400">Total</span>
-                    <span className="text-green-400">₹{Math.abs(successData.total_amount).toLocaleString()}</span>
+                  <div className="flex justify-between text-lg font-bold border-t border-slate-200 dark:border-slate-750 pt-2 mt-2">
+                    <span className="text-slate-600 dark:text-slate-400">Total</span>
+                    <span className="text-green-600 dark:text-green-400">₹{Math.abs(successData.total_amount).toLocaleString()}</span>
                   </div>
                 </div>
 
                 <div className="flex w-full gap-3">
                   <button 
                     onClick={() => printInvoice(successData)}
-                    className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold transition-all"
+                    className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-white rounded-xl font-bold transition-all"
                   >
                     <Printer size={18} /> Print
                   </button>
@@ -763,32 +765,32 @@ const Ledger = () => {
       <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6">
         <div>
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 bg-white text-slate-900 rounded-full flex items-center justify-center shrink-0 shadow-lg">
+            <div className="w-10 h-10 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white rounded-full flex items-center justify-center shrink-0 shadow-lg">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
             </div>
-            <h1 className="text-3xl font-bold text-white">Professional Ledger ✨</h1>
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Professional Ledger ✨</h1>
           </div>
-          <p className="text-slate-400 pl-13">Complete financial tracking for your digital services.</p>
+          <p className="text-slate-600 dark:text-slate-400 pl-13">Complete financial tracking for your digital services.</p>
         </div>
         
         <div className="flex flex-wrap items-center gap-4">
-          <div className="flex items-center bg-transparent border border-slate-700/60 rounded-xl p-1 shadow-inner">
+          <div className="flex items-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/60 rounded-xl p-1 shadow-inner">
             <div className="flex items-center text-slate-400 px-3 py-1.5"><Calendar size={14} className="mr-2"/></div>
-            <input type="date" value={dateRange.from} onChange={e => setDateRange({...dateRange, from: e.target.value})} className="bg-transparent text-slate-300 border-0 focus:ring-0 text-sm outline-none [color-scheme:dark]" />
+            <input type="date" value={dateRange.from} onChange={e => setDateRange({...dateRange, from: e.target.value})} className="bg-transparent text-slate-800 dark:text-slate-300 border-0 focus:ring-0 text-sm outline-none [color-scheme:light] dark:[color-scheme:dark]" />
             <span className="text-slate-500 px-3 text-sm">to</span>
             <div className="flex items-center text-slate-400 px-3 py-1.5"><Calendar size={14} className="mr-2"/></div>
-            <input type="date" value={dateRange.to} onChange={e => setDateRange({...dateRange, to: e.target.value})} className="bg-transparent text-slate-300 border-0 focus:ring-0 text-sm outline-none [color-scheme:dark]" />
+            <input type="date" value={dateRange.to} onChange={e => setDateRange({...dateRange, to: e.target.value})} className="bg-transparent text-slate-800 dark:text-slate-300 border-0 focus:ring-0 text-sm outline-none [color-scheme:light] dark:[color-scheme:dark]" />
             <button onClick={fetchData} className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-sm font-medium transition-colors ml-2 shadow-[inset_0_1px_rgba(255,255,255,0.1)]">Search</button>
           </div>
 
           <div className="flex items-center gap-3">
-            <button onClick={exportToExcel} className="flex items-center gap-2 px-5 py-2.5 bg-[#052e16]/40 hover:bg-[#052e16]/60 text-emerald-400 border border-emerald-900/50 rounded-lg transition-all text-sm font-medium">
+            <button onClick={exportToExcel} className="flex items-center gap-2 px-5 py-2.5 bg-emerald-50 dark:bg-[#052e16]/40 hover:bg-emerald-100 dark:hover:bg-[#052e16]/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/50 rounded-lg transition-all text-sm font-medium">
               <Download size={16} /> Excel
             </button>
-            <button onClick={exportToPDF} className="flex items-center gap-2 px-5 py-2.5 bg-[#450a0a]/40 hover:bg-[#450a0a]/60 text-red-500 border border-red-900/50 rounded-lg transition-all text-sm font-medium">
+            <button onClick={exportToPDF} className="flex items-center gap-2 px-5 py-2.5 bg-rose-50 dark:bg-[#450a0a]/40 hover:bg-rose-100 dark:hover:bg-[#450a0a]/60 text-rose-700 dark:text-red-500 border border-rose-200 dark:border-red-900/50 rounded-lg transition-all text-sm font-medium">
               <FileText size={16} /> PDF
             </button>
-            <button onClick={() => { setShowAdd(true); setEditingEntry(null); }} className="flex items-center gap-2 px-5 py-2.5 bg-indigo-900/40 hover:bg-indigo-900/60 text-indigo-300 border border-indigo-700/50 rounded-lg text-sm font-medium transition-all ml-2">
+            <button onClick={() => { setShowAdd(true); setEditingEntry(null); }} className="flex items-center gap-2 px-5 py-2.5 bg-indigo-50 dark:bg-indigo-900/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-700/50 rounded-lg text-sm font-medium transition-all ml-2">
               <Plus size={16} /> Add Entry
             </button>
           </div>
@@ -797,32 +799,32 @@ const Ledger = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Period Balance Card */}
-        <div className="lg:col-span-4 bg-gradient-to-br from-indigo-600/30 via-slate-800 to-slate-900 p-6 rounded-[2rem] border border-indigo-500/20 shadow-2xl relative overflow-hidden flex flex-col justify-between min-h-[160px]">
+        <div className="lg:col-span-4 bg-gradient-to-br from-indigo-50/80 dark:from-indigo-600/30 via-white dark:via-slate-800 to-slate-50/80 dark:to-slate-900 p-6 rounded-[2rem] border border-slate-200 dark:border-indigo-500/20 shadow-xl dark:shadow-2xl relative overflow-hidden flex flex-col justify-between min-h-[160px]">
           <div className="absolute top-0 right-0 p-8 opacity-20 pointer-events-none">
-            <Sparkles size={120} className="text-indigo-400" />
+            <Sparkles size={120} className="text-indigo-600 dark:text-indigo-400" />
           </div>
           <div className="relative z-10 flex items-center gap-4 mb-2">
-            <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 flex items-center justify-center border border-indigo-500/30">
-              <Receipt className="text-indigo-400" size={24} />
+            <div className="w-12 h-12 rounded-2xl bg-indigo-100 dark:bg-indigo-500/20 flex items-center justify-center border border-indigo-200 dark:border-indigo-500/30">
+              <Receipt className="text-indigo-600 dark:text-indigo-400" size={24} />
             </div>
-            <p className="text-slate-300 font-medium">Period Balance</p>
+            <p className="text-slate-700 dark:text-slate-300 font-medium">Period Balance</p>
           </div>
           <div className="relative z-10">
-            <p className={`text-5xl font-black ${dailyTotalBalance >= 0 ? 'text-green-500 drop-shadow-[0_0_15px_rgba(34,197,94,0.3)]' : 'text-red-500 drop-shadow-[0_0_15px_rgba(239,68,68,0.3)]'}`}>
-              ₹{dailyTotalBalance.toLocaleString()}
+            <p className={`text-5xl font-black ${dailyTotalBalance >= 0 ? 'text-green-600 dark:text-green-500 drop-shadow-[0_0_15px_rgba(34,197,94,0.3)]' : 'text-red-600 dark:text-red-500 drop-shadow-[0_0_15px_rgba(239,68,68,0.3)]'}`}>
+               ₹{dailyTotalBalance.toLocaleString()}
             </p>
-            <p className="text-slate-400 text-sm mt-3">This is your closing balance for the selected period</p>
+            <p className="text-slate-500 dark:text-slate-400 text-sm mt-3">This is your closing balance for the selected period</p>
           </div>
         </div>
 
         {/* Balance Split Card */}
-        <div className="lg:col-span-4 bg-slate-800/80 backdrop-blur-md p-6 rounded-[2rem] border border-slate-700 shadow-xl overflow-hidden flex flex-col justify-between min-h-[160px]">
-          <p className="text-slate-300 font-medium mb-4">Balance Split</p>
+        <div className="lg:col-span-4 bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 shadow-lg dark:shadow-xl p-6 rounded-[2rem] overflow-hidden flex flex-col justify-between min-h-[160px]">
+          <p className="text-slate-700 dark:text-slate-300 font-medium mb-4">Balance Split</p>
           <div className="flex items-center gap-6">
             {/* Visual Donut representation */}
             <div className="relative w-20 h-20 shrink-0">
               <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-                <circle cx="18" cy="18" r="16" fill="transparent" stroke="#1E293B" strokeWidth="4" />
+                <circle cx="18" cy="18" r="16" fill="transparent" stroke={theme === 'dark' ? '#1E293B' : '#F1F5F9'} strokeWidth="4" />
                 {(() => {
                   const absCash = Math.abs(paymentTotals['Cash'] || 0);
                   const absPhonePe = Math.abs(paymentTotals['PhonePe'] || 0);
@@ -845,25 +847,25 @@ const Ledger = () => {
             </div>
             <div className="flex-1 space-y-3">
               <div className="flex justify-between items-center">
-                <span className="text-[10px] text-green-400 font-bold uppercase tracking-wider">Cash</span>
-                <span className="text-sm font-bold text-white">₹{paymentTotals['Cash']?.toLocaleString() || 0}</span>
+                <span className="text-[10px] text-green-600 dark:text-green-400 font-bold uppercase tracking-wider">Cash</span>
+                <span className="text-sm font-bold text-slate-800 dark:text-white">₹{paymentTotals['Cash']?.toLocaleString() || 0}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-[10px] text-purple-400 font-bold uppercase tracking-wider">PhonePe</span>
-                <span className="text-sm font-bold text-white">₹{paymentTotals['PhonePe']?.toLocaleString() || 0}</span>
+                <span className="text-[10px] text-purple-600 dark:text-purple-400 font-bold uppercase tracking-wider">PhonePe</span>
+                <span className="text-sm font-bold text-slate-800 dark:text-white">₹{paymentTotals['PhonePe']?.toLocaleString() || 0}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-[10px] text-blue-400 font-bold uppercase tracking-wider">GPay</span>
-                <span className="text-sm font-bold text-white">₹{paymentTotals['GPay']?.toLocaleString() || 0}</span>
+                <span className="text-[10px] text-blue-600 dark:text-blue-400 font-bold uppercase tracking-wider">GPay</span>
+                <span className="text-sm font-bold text-slate-800 dark:text-white">₹{paymentTotals['GPay']?.toLocaleString() || 0}</span>
               </div>
             </div>
           </div>
         </div>
 
         {/* Quick Search Card */}
-        <div className="lg:col-span-4 bg-slate-800/80 backdrop-blur-md p-6 rounded-[2rem] border border-slate-700 shadow-xl overflow-hidden flex flex-col justify-between min-h-[160px]">
-          <div className="flex items-center gap-2 mb-4 text-slate-300 font-medium">
-            <Search size={18} className="text-blue-400" />
+        <div className="lg:col-span-4 bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 shadow-lg dark:shadow-xl p-6 rounded-[2rem] overflow-hidden flex flex-col justify-between min-h-[160px]">
+          <div className="flex items-center gap-2 mb-4 text-slate-700 dark:text-slate-300 font-medium">
+            <Search size={18} className="text-blue-600 dark:text-blue-400" />
             <p>Quick Search</p>
           </div>
           <div className="space-y-3">
@@ -872,16 +874,16 @@ const Ledger = () => {
               placeholder="Search custom or service..." 
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-white focus:ring-2 focus:ring-blue-500 transition-all outline-none text-sm"
+              className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-blue-500 transition-all outline-none text-sm"
             />
             <div className="flex gap-2">
-              <select className="flex-1 bg-slate-900 border border-slate-700 text-slate-300 text-xs rounded-lg px-2 py-2 outline-none">
+              <select className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs rounded-lg px-2 py-2 outline-none">
                 <option>All Services</option>
               </select>
-              <select className="flex-1 bg-slate-900 border border-slate-700 text-slate-300 text-xs rounded-lg px-2 py-2 outline-none">
+              <select className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs rounded-lg px-2 py-2 outline-none">
                 <option>All Types</option>
               </select>
-              <select className="flex-1 bg-slate-900 border border-slate-700 text-slate-300 text-xs rounded-lg px-2 py-2 outline-none">
+              <select className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs rounded-lg px-2 py-2 outline-none">
                 <option>All Payments</option>
               </select>
             </div>
@@ -890,17 +892,17 @@ const Ledger = () => {
       </div>
 
       {showAdd && (
-        <div className="bg-slate-800 rounded-3xl p-8 border border-slate-700 shadow-2xl animate-in fade-in slide-in-from-top-4 duration-300">
+        <div className="bg-white dark:bg-slate-800 rounded-3xl p-8 border border-slate-200 dark:border-slate-700 shadow-2xl animate-in fade-in slide-in-from-top-4 duration-300">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold text-white">{editingEntry ? 'Edit Transaction' : 'Record New Transaction'}</h2>
-            <button onClick={() => { setShowAdd(false); setEditingEntry(null); }} className="text-slate-400 hover:text-white p-2">
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white">{editingEntry ? 'Edit Transaction' : 'Record New Transaction'}</h2>
+            <button onClick={() => { setShowAdd(false); setEditingEntry(null); }} className="text-slate-400 hover:text-slate-600 dark:hover:text-white p-2">
               <XCircle size={24} />
             </button>
           </div>
           <form onSubmit={editingEntry ? handleUpdate : handleSaveEntry} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {fieldConfigs.map((field) => (
               <div key={field.id} className="space-y-2">
-                <label className="text-sm font-medium text-slate-400 flex items-center justify-between">
+                <label className="text-sm font-medium text-slate-600 dark:text-slate-400 flex items-center justify-between">
                   {field.label}
                   {field.required && <span className="text-[10px] text-red-500 font-bold uppercase tracking-wider">Required</span>}
                 </label>
@@ -909,7 +911,7 @@ const Ledger = () => {
                   <select 
                     value={dynamicData[field.key] || ''} 
                     onChange={e => handleFieldChange(field.key, e.target.value)} 
-                    className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
                     required={field.required}
                   >
                     {field.options?.map((opt: string) => (
@@ -921,7 +923,7 @@ const Ledger = () => {
                     type="date" 
                     value={dynamicData[field.key] || ''} 
                     onChange={e => handleFieldChange(field.key, e.target.value)} 
-                    className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-white focus:ring-2 focus:ring-blue-500 outline-none" 
+                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none [color-scheme:light] dark:[color-scheme:dark]" 
                     required={field.required}
                   />
                 ) : (
@@ -933,7 +935,7 @@ const Ledger = () => {
                       placeholder={`Enter ${field.label.toLowerCase()}...`}
                       value={dynamicData[field.key] || ''} 
                       onChange={e => handleFieldChange(field.key, e.target.value)} 
-                      className={`w-full ${field.type === 'number' ? 'pl-8' : 'px-4'} py-3 bg-slate-900 border border-slate-700 rounded-xl text-white focus:ring-2 focus:ring-blue-500 outline-none`} 
+                      className={`w-full ${field.type === 'number' ? 'pl-8' : 'px-4'} py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none`} 
                       required={field.required}
                     />
                   </div>
@@ -945,7 +947,7 @@ const Ledger = () => {
               <button 
                 type="button" 
                 onClick={() => { setShowAdd(false); setEditingEntry(null); }} 
-                className="px-6 py-3 text-slate-400 hover:text-white font-medium transition-colors"
+                className="px-6 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-medium transition-colors"
               >
                 Cancel
               </button>
@@ -966,55 +968,55 @@ const Ledger = () => {
         </div>
       )}
       
-      <div className="bg-slate-800 rounded-3xl border border-slate-700 overflow-hidden shadow-2xl">
+      <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-2xl">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-800/80 sticky top-0 backdrop-blur-md z-10">
-                <th className="p-4 text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-700 whitespace-nowrap"># SN</th>
-                <th className="p-4 text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-700 whitespace-nowrap">📅 DATE & TIME</th>
-                <th className="p-4 text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-700 whitespace-nowrap">👤 CUSTOMER</th>
-                <th className="p-4 text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-700 whitespace-nowrap">💼 SERVICE</th>
-                <th className="p-4 text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-700 text-right whitespace-nowrap">🪙 PRINCIPAL</th>
-                <th className="p-4 text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-700 text-right whitespace-nowrap">📈 PROFIT</th>
-                <th className="p-4 text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-700 text-right whitespace-nowrap">📄 TOTAL</th>
-                <th className="p-4 text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-700 text-right whitespace-nowrap">👝 BALANCE</th>
-                <th className="p-4 text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-700 text-right whitespace-nowrap">⚙️ ACTIONS</th>
+              <tr className="bg-slate-50 dark:bg-slate-800/80 sticky top-0 backdrop-blur-md z-10">
+                <th className="p-4 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700 whitespace-nowrap"># SN</th>
+                <th className="p-4 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700 whitespace-nowrap">📅 DATE & TIME</th>
+                <th className="p-4 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700 whitespace-nowrap">👤 CUSTOMER</th>
+                <th className="p-4 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700 whitespace-nowrap">💼 SERVICE</th>
+                <th className="p-4 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700 text-right whitespace-nowrap">🪙 PRINCIPAL</th>
+                <th className="p-4 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700 text-right whitespace-nowrap">📈 PROFIT</th>
+                <th className="p-4 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700 text-right whitespace-nowrap">📄 TOTAL</th>
+                <th className="p-4 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700 text-right whitespace-nowrap">👝 BALANCE</th>
+                <th className="p-4 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700 text-right whitespace-nowrap">⚙️ ACTIONS</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-700/30">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-700/30">
               {filtered.map((item, index) => {
                 const isWithdrawal = item.type === 'withdrawal';
                 return (
-                  <tr key={item.id} className={`${index % 2 === 0 ? 'bg-transparent' : 'bg-slate-800/30'} hover:bg-slate-700/40 transition-colors group`}>
-                    <td className="p-4 text-sm font-mono text-slate-300">{item.serial_number}</td>
-                    <td className="p-4 text-xs text-slate-300">
+                  <tr key={item.id} className={`${index % 2 === 0 ? 'bg-transparent' : 'bg-slate-50/50 dark:bg-slate-800/30'} hover:bg-slate-100/60 dark:hover:bg-slate-700/40 transition-colors group`}>
+                    <td className="p-4 text-sm font-mono text-slate-600 dark:text-slate-300">{item.serial_number}</td>
+                    <td className="p-4 text-xs text-slate-600 dark:text-slate-300">
                       {item.created_at && typeof item.created_at.toDate === 'function' ? item.created_at.toDate().toLocaleDateString() : (item.created_at ? new Date(item.created_at).toLocaleDateString() : 'N/A')}<br/>
-                      <span className="text-slate-500">{item.created_at && typeof item.created_at.toDate === 'function' ? item.created_at.toDate().toLocaleTimeString() : (item.created_at ? new Date(item.created_at).toLocaleTimeString() : '')}</span>
+                      <span className="text-slate-400 dark:text-slate-500">{item.created_at && typeof item.created_at.toDate === 'function' ? item.created_at.toDate().toLocaleTimeString() : (item.created_at ? new Date(item.created_at).toLocaleTimeString() : '')}</span>
                     </td>
                     <td className="p-4">
-                      <span className="text-sm font-medium text-slate-200 block">{item.customer_name}</span>
-                      <span className="text-[10px] text-blue-400 uppercase font-bold tracking-wider">{item.payment_mode}</span>
+                      <span className="text-sm font-medium text-slate-800 dark:text-slate-200 block">{item.customer_name}</span>
+                      <span className="text-[10px] text-blue-600 dark:text-blue-400 uppercase font-bold tracking-wider">{item.payment_mode}</span>
                     </td>
                     <td className="p-4 text-sm">
                       <div className="flex flex-col items-start gap-1">
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider
                           ${item.service_type?.toLowerCase().includes('withdrawal') 
-                            ? 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/20' 
+                            ? 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-500 border border-yellow-200 dark:border-yellow-500/20' 
                             : item.service_type?.toLowerCase().includes('transfer')
-                            ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
-                            : 'bg-purple-500/10 text-purple-400 border border-purple-500/20'}`}>
+                            ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-500/20'
+                            : 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-500/20'}`}>
                           {item.service_type || 'OTHERS'}
                         </span>
-                        <span className="text-slate-400 text-xs">{item.service_name}</span>
+                        <span className="text-slate-500 dark:text-slate-400 text-xs">{item.service_name}</span>
                       </div>
                     </td>
-                    <td className="p-4 text-sm text-slate-300 text-right font-mono">₹{Math.abs(item.principle_amount || 0).toLocaleString()}</td>
-                    <td className="p-4 text-sm text-green-400 text-right font-mono">₹{(item.profit_amount || 0).toLocaleString()}</td>
-                    <td className={`p-4 text-sm font-bold text-right font-mono ${isWithdrawal ? 'text-red-400' : 'text-green-400'}`}>
+                    <td className="p-4 text-sm text-slate-600 dark:text-slate-300 text-right font-mono">₹{Math.abs(item.principle_amount || 0).toLocaleString()}</td>
+                    <td className="p-4 text-sm text-green-600 dark:text-green-400 text-right font-mono">₹{(item.profit_amount || 0).toLocaleString()}</td>
+                    <td className={`p-4 text-sm font-bold text-right font-mono ${isWithdrawal ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
                       {isWithdrawal ? '-' : '+'}₹{Math.abs(item.total_amount || 0).toLocaleString()}
                     </td>
-                    <td className="p-4 text-sm font-bold text-right font-mono text-blue-400">
+                    <td className="p-4 text-sm font-bold text-right font-mono text-blue-600 dark:text-blue-400">
                       ₹{item.runningBalance?.toLocaleString()}
                     </td>
                     <td className="p-4 text-right">
@@ -1026,18 +1028,18 @@ const Ledger = () => {
                               .join('\n');
                             alert(`Custom Fields:\n${details || 'No custom fields'}`);
                           }} 
-                          className="p-2 text-blue-400 border border-blue-900/30 bg-blue-900/10 hover:bg-blue-600 hover:text-white rounded-lg transition-colors" 
+                          className="p-2 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/30 bg-blue-50 dark:bg-blue-900/10 hover:bg-blue-600 hover:text-white rounded-lg transition-colors" 
                           title="View Details"
                         >
                           <Eye size={14} />
                         </button>
-                        <button onClick={() => handleEdit(item)} className="p-2 text-orange-400 border border-orange-900/30 bg-orange-900/10 hover:bg-orange-600 hover:text-white rounded-lg transition-colors" title="Edit">
+                        <button onClick={() => handleEdit(item)} className="p-2 text-orange-600 dark:text-orange-400 border border-orange-200 dark:border-orange-900/30 bg-orange-50 dark:bg-orange-900/10 hover:bg-orange-600 hover:text-white rounded-lg transition-colors" title="Edit">
                           <Edit2 size={14} />
                         </button>
                         {(user?.role === 'admin' || user?.uid === item.staff_id) && (
                           <button 
                             onClick={() => handleDelete(item.id, 'ledger')} 
-                            className="p-2 text-red-500 border border-red-900/30 bg-red-900/10 hover:bg-red-600 hover:text-white rounded-lg transition-all active:scale-90" 
+                            className="p-2 text-red-600 dark:text-red-500 border border-red-200 dark:border-red-900/30 bg-rose-50 dark:bg-red-900/10 hover:bg-red-600 hover:text-white rounded-lg transition-all active:scale-90" 
                             title="Delete Action"
                           >
                             <Trash2 size={14} />
@@ -1049,21 +1051,21 @@ const Ledger = () => {
                 );
               })}
               {filtered.length > 0 && (
-                <tr className="bg-slate-900/50 font-bold border-t-2 border-slate-700">
-                  <td colSpan={4} className="p-4 text-right text-slate-200">TOTAL</td>
-                  <td className="p-4 text-sm text-slate-200 text-right font-mono">₹{filtered.reduce((sum, item) => sum + Math.abs(item.principle_amount || 0), 0).toLocaleString()}</td>
-                  <td className="p-4 text-sm text-green-400 text-right font-mono">₹{filtered.reduce((sum, item) => sum + (item.profit_amount || 0), 0).toLocaleString()}</td>
-                  <td className="p-4 text-sm text-slate-200 text-right font-mono">₹{filtered.reduce((sum, item) => sum + (item.total_amount || 0), 0).toLocaleString()}</td>
-                  <td className="p-4 text-sm text-blue-400 text-right font-mono">₹{filtered[filtered.length - 1].runningBalance.toLocaleString()}</td>
+                <tr className="bg-slate-50 dark:bg-slate-900/50 font-bold border-t-2 border-slate-200 dark:border-slate-700">
+                  <td colSpan={4} className="p-4 text-right text-slate-800 dark:text-slate-200">TOTAL</td>
+                  <td className="p-4 text-sm text-slate-800 dark:text-slate-200 text-right font-mono">₹{filtered.reduce((sum, item) => sum + Math.abs(item.principle_amount || 0), 0).toLocaleString()}</td>
+                  <td className="p-4 text-sm text-green-600 dark:text-green-400 text-right font-mono">₹{filtered.reduce((sum, item) => sum + (item.profit_amount || 0), 0).toLocaleString()}</td>
+                  <td className="p-4 text-sm text-slate-800 dark:text-slate-200 text-right font-mono">₹{filtered.reduce((sum, item) => sum + (item.total_amount || 0), 0).toLocaleString()}</td>
+                  <td className="p-4 text-sm text-blue-600 dark:text-blue-400 text-right font-mono">₹{filtered[filtered.length - 1].runningBalance.toLocaleString()}</td>
                   <td className="p-4"></td>
                 </tr>
               )}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="p-20 text-center text-slate-500">
+                  <td colSpan={9} className="p-20 text-center text-slate-500 dark:text-slate-400">
                     <div className="flex flex-col items-center gap-2">
-                      <Search className="text-slate-700" size={48} />
-                      <p className="text-xl font-medium">No transactions found for the selected range</p>
+                      <Search className="text-slate-300 dark:text-slate-700" size={48} />
+                      <p className="text-xl font-medium text-slate-700 dark:text-slate-300">No transactions found for the selected range</p>
                       <p className="text-sm">Try adjusting your filters or record a new transaction.</p>
                     </div>
                   </td>
@@ -1073,13 +1075,13 @@ const Ledger = () => {
           </table>
         </div>
         {/* Pagination placeholder matching the design */}
-        <div className="bg-slate-800/80 p-4 border-t border-slate-700 flex items-center justify-between text-slate-400 text-sm">
+        <div className="bg-slate-50 dark:bg-slate-800/80 p-4 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between text-slate-500 dark:text-slate-400 text-sm">
           <p>Showing 1 to {filtered.length} of {filtered.length} entries</p>
           <div className="flex items-center gap-2">
-            <button className="px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors">&larr;</button>
+            <button className="px-3 py-1 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 rounded-lg transition-colors">&larr;</button>
             <button className="px-3 py-1 bg-indigo-600 text-white rounded-lg">1</button>
-            <button className="px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors">&rarr;</button>
-            <select className="bg-slate-700 border border-slate-600 text-slate-300 rounded-lg px-2 py-1 outline-none ml-4">
+            <button className="px-3 py-1 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 rounded-lg transition-colors">&rarr;</button>
+            <select className="bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-lg px-2 py-1 outline-none ml-4">
               <option>10 / page</option>
             </select>
           </div>
@@ -1088,56 +1090,56 @@ const Ledger = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {/* Total Entries */}
-        <div className="bg-slate-800/80 backdrop-blur-md p-6 rounded-3xl border border-slate-700 shadow-xl flex items-center gap-4 relative overflow-hidden group">
+        <div className="bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 shadow-lg dark:shadow-xl p-6 rounded-3xl flex items-center gap-4 relative overflow-hidden group">
           <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-          <div className="w-14 h-14 rounded-2xl bg-purple-500/20 flex items-center justify-center border border-purple-500/30 shrink-0">
-            <ArrowUpDown className="text-purple-400" size={24} />
+          <div className="w-14 h-14 rounded-2xl bg-purple-50 dark:bg-purple-500/20 flex items-center justify-center border border-purple-100 dark:border-purple-500/30 shrink-0">
+            <ArrowUpDown className="text-purple-600 dark:text-purple-400" size={24} />
           </div>
           <div>
-            <p className="text-slate-400 text-xs font-medium uppercase tracking-wider mb-1">Total Entries</p>
-            <p className="text-2xl font-bold text-white">{filtered.length}</p>
-            <p className="text-slate-500 text-[10px] uppercase mt-1">In selected period</p>
+            <p className="text-slate-500 dark:text-slate-400 text-xs font-medium uppercase tracking-wider mb-1">Total Entries</p>
+            <p className="text-2xl font-bold text-slate-800 dark:text-white">{filtered.length}</p>
+            <p className="text-slate-400 dark:text-slate-500 text-[10px] uppercase mt-1">In selected period</p>
           </div>
         </div>
 
         {/* Total Principal */}
-        <div className="bg-slate-800/80 backdrop-blur-md p-6 rounded-3xl border border-slate-700 shadow-xl flex items-center gap-4 relative overflow-hidden group">
+        <div className="bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 shadow-lg dark:shadow-xl p-6 rounded-3xl flex items-center gap-4 relative overflow-hidden group">
           <div className="absolute inset-0 bg-gradient-to-r from-emerald-600/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-          <div className="w-14 h-14 rounded-2xl bg-emerald-500/20 flex items-center justify-center border border-emerald-500/30 shrink-0">
-            <TrendingUp className="text-emerald-400" size={24} />
+          <div className="w-14 h-14 rounded-2xl bg-emerald-50 dark:bg-emerald-500/20 flex items-center justify-center border border-emerald-100 dark:border-emerald-500/30 shrink-0">
+            <TrendingUp className="text-emerald-600 dark:text-emerald-400" size={24} />
           </div>
           <div>
-            <p className="text-slate-400 text-xs font-medium uppercase tracking-wider mb-1">Total Principal</p>
-            <p className="text-2xl font-bold text-emerald-400">₹{filtered.reduce((sum, item) => sum + Math.abs(item.principle_amount || 0), 0).toLocaleString()}</p>
-            <p className="text-slate-500 text-[10px] uppercase mt-1">Total amount processed</p>
+            <p className="text-slate-500 dark:text-slate-400 text-xs font-medium uppercase tracking-wider mb-1">Total Principal</p>
+            <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">₹{filtered.reduce((sum, item) => sum + Math.abs(item.principle_amount || 0), 0).toLocaleString()}</p>
+            <p className="text-slate-400 dark:text-slate-500 text-[10px] uppercase mt-1">Total amount processed</p>
           </div>
         </div>
 
         {/* Total Profit */}
-        <div className="bg-slate-800/80 backdrop-blur-md p-6 rounded-3xl border border-slate-700 shadow-xl flex items-center gap-4 relative overflow-hidden group">
+        <div className="bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 shadow-lg dark:shadow-xl p-6 rounded-3xl flex items-center gap-4 relative overflow-hidden group">
           <div className="absolute inset-0 bg-gradient-to-r from-orange-600/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-          <div className="w-14 h-14 rounded-2xl bg-orange-500/20 flex items-center justify-center border border-orange-500/30 shrink-0">
-            <Layers className="text-orange-400" size={24} />
+          <div className="w-14 h-14 rounded-2xl bg-orange-50 dark:bg-orange-500/20 flex items-center justify-center border border-orange-100 dark:border-orange-500/30 shrink-0">
+            <Layers className="text-orange-600 dark:text-orange-400" size={24} />
           </div>
           <div>
-            <p className="text-slate-400 text-xs font-medium uppercase tracking-wider mb-1">Total Profit</p>
-            <p className="text-2xl font-bold text-orange-400">₹{filtered.reduce((sum, item) => sum + (item.profit_amount || 0), 0).toLocaleString()}</p>
-            <p className="text-slate-500 text-[10px] uppercase mt-1">Total earnings</p>
+            <p className="text-slate-500 dark:text-slate-400 text-xs font-medium uppercase tracking-wider mb-1">Total Profit</p>
+            <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">₹{filtered.reduce((sum, item) => sum + (item.profit_amount || 0), 0).toLocaleString()}</p>
+            <p className="text-slate-400 dark:text-slate-500 text-[10px] uppercase mt-1">Total earnings</p>
           </div>
         </div>
 
         {/* Success Rate */}
-        <div className="bg-slate-800/80 backdrop-blur-md p-6 rounded-3xl border border-slate-700 shadow-xl flex items-center gap-4 relative overflow-hidden group">
+        <div className="bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 shadow-lg dark:shadow-xl p-6 rounded-3xl flex items-center gap-4 relative overflow-hidden group">
           <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-          <div className="w-14 h-14 rounded-2xl bg-blue-500/20 flex items-center justify-center border border-blue-500/30 shrink-0">
-            <PieChart className="text-blue-400" size={24} />
+          <div className="w-14 h-14 rounded-2xl bg-blue-50 dark:bg-blue-500/20 flex items-center justify-center border border-blue-100 dark:border-blue-500/30 shrink-0">
+            <PieChart className="text-blue-600 dark:text-blue-400" size={24} />
           </div>
           <div>
-            <p className="text-slate-400 text-xs font-medium uppercase tracking-wider mb-1">Success Rate</p>
-            <p className="text-2xl font-bold text-blue-400">
+            <p className="text-slate-500 dark:text-slate-400 text-xs font-medium uppercase tracking-wider mb-1">Success Rate</p>
+            <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
               {filtered.length > 0 ? Math.round((filtered.filter(item => (item.profit_amount || 0) > 0).length / filtered.length) * 100) : 100}%
             </p>
-            <p className="text-slate-500 text-[10px] uppercase mt-1">Profitable transactions</p>
+            <p className="text-slate-400 dark:text-slate-500 text-[10px] uppercase mt-1">Profitable transactions</p>
           </div>
         </div>
       </div>

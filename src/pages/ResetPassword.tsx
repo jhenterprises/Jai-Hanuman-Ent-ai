@@ -59,10 +59,10 @@ const ResetPassword = () => {
   if (!oobCode && status !== 'success') {
     return (
       <div className="max-w-md mx-auto mt-12 px-4">
-        <div className="glass rounded-[2.5rem] p-10 text-center space-y-6">
+        <div className="glass bg-white dark:bg-slate-900/40 border border-slate-200/50 dark:border-white/5 rounded-[2.5rem] p-10 text-center space-y-6">
           <AlertCircle className="text-red-500 dark:text-red-400 mx-auto" size={48} />
           <h2 className="text-2xl font-black text-slate-900 dark:text-white">Invalid Link</h2>
-          <p className="text-slate-600 dark:text-slate-500">This password reset link is invalid or has expired.</p>
+          <p className="text-slate-600 dark:text-slate-400">This password reset link is invalid or has expired.</p>
           <Link to="/forgot-password" className="inline-block py-3 px-6 blue-gradient text-white font-bold rounded-xl">
             Request New Link
           </Link>
@@ -76,14 +76,14 @@ const ResetPassword = () => {
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="glass rounded-[2.5rem] p-8 md:p-10 space-y-8 relative"
+        className="glass bg-white dark:bg-slate-900/40 border border-slate-200/50 dark:border-white/5 rounded-[2.5rem] p-8 md:p-10 space-y-8 relative"
       >
         <div className="text-center space-y-2">
           <div className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl shadow-blue-500/10 overflow-hidden border border-slate-200 dark:border-white/10">
             <img src={config.logo_url || "/logo.svg"} alt="JH Logo" className="w-full h-full object-contain p-2" />
           </div>
           <h2 className="text-3xl font-black text-slate-900 dark:text-white">New Password</h2>
-          <p className="text-slate-600 dark:text-slate-500">Set a strong password for your account</p>
+          <p className="text-slate-600 dark:text-slate-400">Set a strong password for your account</p>
         </div>
 
         {status === 'success' ? (
@@ -114,22 +114,22 @@ const ResetPassword = () => {
             )}
 
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-slate-500 ml-1">New Password</label>
+              <label className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 ml-1">New Password</label>
               <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400" size={18} />
                 <input 
                   type={showPassword ? "text" : "password"} 
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-white/10 rounded-2xl py-4 pl-12 pr-12 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors"
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-white/10 rounded-2xl py-4 pl-12 pr-12 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors"
                   placeholder="••••••••"
                   disabled={status === 'loading'}
                 />
                 <button 
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 dark:hover:text-slate-200 transition-colors"
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
@@ -137,15 +137,15 @@ const ResetPassword = () => {
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-slate-500 ml-1">Confirm Password</label>
+              <label className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 ml-1">Confirm Password</label>
               <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400" size={18} />
                 <input 
                   type={showPassword ? "text" : "password"} 
                   required
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-white/10 rounded-2xl py-4 pl-12 pr-12 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors"
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-white/10 rounded-2xl py-4 pl-12 pr-12 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors"
                   placeholder="••••••••"
                   disabled={status === 'loading'}
                 />

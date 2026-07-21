@@ -220,8 +220,7 @@ const PortalConfig = () => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
-    // @ts-ignore
-    const val = type === 'number' ? parseInt(value) : value;
+    const val = type === 'number' ? (value ? parseInt(value) : 0) : type === 'checkbox' ? (e.target as HTMLInputElement).checked : value;
     setFormData({ ...formData, [name]: val });
   };
 
@@ -321,10 +320,10 @@ const PortalConfig = () => {
     <div className="space-y-8">
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
-          <h1 className="text-4xl font-black text-white flex items-center gap-3">
+          <h1 className="text-4xl font-black text-slate-900 dark:text-white flex items-center gap-3">
             <Settings className="text-blue-500" /> Portal Configuration
           </h1>
-          <p className="text-slate-500">Full control over website branding, theme, and features.</p>
+          <p className="text-slate-500 dark:text-slate-400">Full control over website branding, theme, and features.</p>
         </div>
         <button 
           onClick={handleSubmit}
@@ -360,7 +359,7 @@ const PortalConfig = () => {
               className={`w-full flex items-center gap-3 px-6 py-4 rounded-2xl font-bold transition-all ${
                 activeTab === tab.id 
                   ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' 
-                  : 'text-slate-400 hover:bg-white/5'
+                  : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               <tab.icon size={20} />
@@ -370,17 +369,17 @@ const PortalConfig = () => {
         </div>
 
         {/* Content Area */}
-        <div className="flex-1 glass rounded-[2.5rem] p-10">
+        <div className="flex-1 bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/50 rounded-[2.5rem] p-10 shadow-xl">
           <form onSubmit={handleSubmit} className="space-y-10">
             {activeTab === 'branding' && (
               <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
                 <div className="space-y-6">
                   <div>
-                    <h3 className="text-xl font-bold text-white mb-2 border-b border-slate-700 pb-2">Logo Upload</h3>
-                    <p className="text-sm text-slate-400 mb-6">Upload your company logo. Displayed on Navbar, Invoices, and Login page. (Max 2MB. PNG, JPG, SVG allowed)</p>
+                    <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2 border-b border-slate-200 dark:border-slate-700 pb-2">Logo Upload</h3>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">Upload your company logo. Displayed on Navbar, Invoices, and Login page. (Max 2MB. PNG, JPG, SVG allowed)</p>
                     
                     <div className="flex flex-col md:flex-row gap-8 items-start">
-                      <div className="w-48 h-48 rounded-2xl bg-slate-900 border-2 border-dashed border-slate-700 flex flex-col items-center justify-center p-4 relative overflow-hidden">
+                      <div className="w-48 h-48 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-dashed border-slate-200 dark:border-slate-700 flex flex-col items-center justify-center p-4 relative overflow-hidden">
                         {formData.logo_url ? (
                           <img src={formData.logo_url} alt="Logo Preview" className="max-w-full max-h-full object-contain" />
                         ) : (
@@ -433,10 +432,10 @@ const PortalConfig = () => {
                 {/* Configuration Section */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
                   <div className="space-y-6">
-                    <h3 className="text-xl font-bold text-white mb-2 border-b border-slate-700 pb-2">PVC ID Card Configuration</h3>
+                    <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2 border-b border-slate-200 dark:border-slate-700 pb-2">PVC ID Card Configuration</h3>
                     <div className="space-y-4">
                       <div className="space-y-2">
-                        <label className="text-sm font-bold text-slate-400 uppercase tracking-widest">Card Header Title</label>
+                        <label className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Card Header Title</label>
                         <input 
                           type="text" 
                           value={pvcTitle}
@@ -445,11 +444,11 @@ const PortalConfig = () => {
                             setFormData({...formData, pvc_title: e.target.value});
                           }}
                           placeholder="e.g. JH Digital Seva Kendra"
-                          className="w-full px-6 py-4 bg-slate-900/50 border border-slate-700/50 rounded-2xl text-white focus:outline-none focus:border-blue-500 transition-all font-medium"
+                          className="w-full px-6 py-4 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700/50 rounded-2xl text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-all font-medium"
                         />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-sm font-bold text-slate-400 uppercase tracking-widest">Card Footer Text</label>
+                        <label className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Card Footer Text</label>
                         <input 
                           type="text" 
                           value={pvcFooter}
@@ -458,15 +457,15 @@ const PortalConfig = () => {
                             setFormData({...formData, pvc_footer: e.target.value});
                           }}
                           placeholder="e.g. OFFICIAL IDENTITY CARD"
-                          className="w-full px-6 py-4 bg-slate-900/50 border border-slate-700/50 rounded-2xl text-white focus:outline-none focus:border-blue-500 transition-all font-medium"
+                          className="w-full px-6 py-4 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700/50 rounded-2xl text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-all font-medium"
                         />
                       </div>
                     </div>
                   </div>
 
                   {/* Preview Section */}
-                  <div className="flex flex-col items-center justify-center p-6 bg-slate-900/30 rounded-[2rem] border border-white/5">
-                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-6">Live Card Preview</p>
+                  <div className="flex flex-col items-center justify-center p-6 bg-slate-100 dark:bg-slate-900/30 rounded-[2rem] border border-slate-200 dark:border-white/5 shadow-inner">
+                    <p className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-[0.2em] mb-6">Live Card Preview</p>
                     <div className="scale-75 origin-center">
                       <div style={{ width: '325px', height: '512px', background: 'linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%)', borderRadius: '20px', position: 'relative', fontFamily: 'sans-serif', overflow: 'hidden', color: 'white', border: '4px solid #3b82f6' }}>
                         <div style={{ background: 'rgba(255, 255, 255, 0.05)', padding: '20px', textAlign: 'center', borderBottom: '1px solid rgba(59, 130, 246, 0.3)' }}>
@@ -490,9 +489,9 @@ const PortalConfig = () => {
                   </div>
                 </div>
 
-                <div className="space-y-4 pt-6 border-t border-slate-800">
-                  <h3 className="text-xl font-bold text-white mb-2 pb-2">PVC ID Card Generator</h3>
-                  <p className="text-sm text-slate-400">Search for an existing staff member to generate and download their official PVC ID card.</p>
+                <div className="space-y-4 pt-6 border-t border-slate-200 dark:border-slate-800">
+                  <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2 pb-2">PVC ID Card Generator</h3>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Search for an existing staff member to generate and download their official PVC ID card.</p>
                   
                   <div className="relative mt-6 max-w-md">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
@@ -501,7 +500,7 @@ const PortalConfig = () => {
                       placeholder="Search staff by name or ID..."
                       value={staffSearch}
                       onChange={(e) => setStaffSearch(e.target.value)}
-                      className="w-full pl-12 pr-6 py-4 bg-slate-900/50 border border-slate-700/50 rounded-2xl text-white focus:outline-none focus:border-blue-500 transition-all shadow-inner"
+                      className="w-full pl-12 pr-6 py-4 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700/50 rounded-2xl text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-all shadow-inner"
                     />
                   </div>
 
@@ -516,9 +515,9 @@ const PortalConfig = () => {
                     {staffMembers
                       .filter(s => s.name?.toLowerCase().includes(staffSearch.toLowerCase()) || s.staff_id?.toLowerCase().includes(staffSearch.toLowerCase()))
                       .map(member => (
-                        <div key={member.id} className="p-6 glass rounded-3xl border border-white/5 flex items-center justify-between group hover:border-blue-500/30 transition-all hover:shadow-2xl hover:shadow-blue-500/5">
+                        <div key={member.id} className="p-6 bg-slate-50 dark:bg-slate-900/40 rounded-3xl border border-slate-200 dark:border-white/5 flex items-center justify-between group hover:border-blue-500/30 transition-all hover:shadow-2xl hover:shadow-blue-500/5">
                           <div className="flex items-center gap-4">
-                            <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden relative">
+                            <div className="w-14 h-14 rounded-2xl bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-center overflow-hidden relative">
                               {isUploadingPhoto === member.id ? (
                                 <div className="absolute inset-0 bg-slate-900/80 flex items-center justify-center">
                                   <Loader2 className="animate-spin text-blue-500" size={20} />
@@ -540,7 +539,7 @@ const PortalConfig = () => {
                               </button>
                             </div>
                             <div>
-                              <h4 className="font-bold text-white text-lg">{member.name}</h4>
+                              <h4 className="font-bold text-slate-900 dark:text-white text-lg">{member.name}</h4>
                               <p className="text-xs text-blue-500 font-mono font-bold tracking-wider">{member.staff_id || 'NO ID SET'}</p>
                             </div>
                           </div>
@@ -567,8 +566,8 @@ const PortalConfig = () => {
                   </div>
 
                   {staffMembers.length === 0 && (
-                    <div className="text-center py-20 p-10 bg-slate-900/20 rounded-[2.5rem] border border-dashed border-slate-800">
-                      <p className="text-slate-500">No active staff found. Manage your staff in the Staff Management section.</p>
+                    <div className="text-center py-20 p-10 bg-slate-50 dark:bg-slate-900/20 rounded-[2.5rem] border border-dashed border-slate-200 dark:border-slate-800">
+                      <p className="text-slate-500 dark:text-slate-400">No active staff found. Manage your staff in the Staff Management section.</p>
                     </div>
                   )}
                 </div>
@@ -579,54 +578,54 @@ const PortalConfig = () => {
               <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
                 <div className="grid md:grid-cols-2 gap-8">
                   <div className="space-y-2">
-                    <label className="text-sm font-bold text-slate-400 uppercase tracking-widest">Portal Name</label>
+                    <label className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Portal Name</label>
                     <input 
                       type="text" 
                       name="portal_name"
                       value={formData.portal_name}
                       onChange={handleInputChange}
-                      className="w-full px-6 py-4 bg-white/5 border border-white/10 rounded-2xl text-white focus:outline-none focus:border-blue-500 transition-all"
+                      className="w-full px-6 py-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-all"
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-bold text-slate-400 uppercase tracking-widest">Tagline</label>
+                    <label className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Tagline</label>
                     <input 
                       type="text" 
                       name="tagline"
                       value={formData.tagline}
                       onChange={handleInputChange}
-                      className="w-full px-6 py-4 bg-white/5 border border-white/10 rounded-2xl text-white focus:outline-none focus:border-blue-500 transition-all"
+                      className="w-full px-6 py-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-all"
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-bold text-slate-400 uppercase tracking-widest">Contact Email</label>
+                    <label className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Contact Email</label>
                     <input 
                       type="email" 
                       name="contact_email"
                       value={formData.contact_email}
                       onChange={handleInputChange}
-                      className="w-full px-6 py-4 bg-white/5 border border-white/10 rounded-2xl text-white focus:outline-none focus:border-blue-500 transition-all"
+                      className="w-full px-6 py-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-all"
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-bold text-slate-400 uppercase tracking-widest">Contact Phone</label>
+                    <label className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Contact Phone</label>
                     <input 
                       type="text" 
                       name="contact_phone"
                       value={formData.contact_phone}
                       onChange={handleInputChange}
-                      className="w-full px-6 py-4 bg-white/5 border border-white/10 rounded-2xl text-white focus:outline-none focus:border-blue-500 transition-all"
+                      className="w-full px-6 py-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-all"
                     />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-400 uppercase tracking-widest">Office Address</label>
+                  <label className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Office Address</label>
                   <textarea 
                     name="office_address"
                     value={formData.office_address}
                     onChange={handleInputChange}
                     rows={3}
-                    className="w-full px-6 py-4 bg-white/5 border border-white/10 rounded-2xl text-white focus:outline-none focus:border-blue-500 transition-all"
+                    className="w-full px-6 py-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-all"
                   />
                 </div>
               </div>
@@ -636,7 +635,7 @@ const PortalConfig = () => {
               <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
                 <div className="grid md:grid-cols-2 gap-8">
                   <div className="space-y-2">
-                    <label className="text-sm font-bold text-slate-400 uppercase tracking-widest">Primary Color</label>
+                    <label className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Primary Color</label>
                     <div className="flex gap-4">
                       <input 
                         type="color" 
@@ -650,12 +649,12 @@ const PortalConfig = () => {
                         name="primary_color"
                         value={formData.primary_color}
                         onChange={handleInputChange}
-                        className="flex-1 px-6 py-4 bg-white/5 border border-white/10 rounded-2xl text-white focus:outline-none focus:border-blue-500 transition-all"
+                        className="flex-1 px-6 py-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-all"
                       />
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-bold text-slate-400 uppercase tracking-widest">Secondary Color</label>
+                    <label className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Secondary Color</label>
                     <div className="flex gap-4">
                       <input 
                         type="color" 
@@ -669,7 +668,7 @@ const PortalConfig = () => {
                         name="secondary_color"
                         value={formData.secondary_color}
                         onChange={handleInputChange}
-                        className="flex-1 px-6 py-4 bg-white/5 border border-white/10 rounded-2xl text-white focus:outline-none focus:border-blue-500 transition-all"
+                        className="flex-1 px-6 py-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-all"
                       />
                     </div>
                   </div>
@@ -681,17 +680,17 @@ const PortalConfig = () => {
               <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
                 <div className="grid md:grid-cols-2 gap-8">
                   <div className="space-y-4">
-                    <label className="text-sm font-bold text-slate-400 uppercase tracking-widest">Grid Columns (Desktop)</label>
+                    <label className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Grid Columns (Desktop)</label>
                     <select 
                       name="grid_columns"
                       value={formData.grid_columns || 4}
                       onChange={handleInputChange}
-                      className="w-full px-6 py-4 bg-white/5 border border-white/10 rounded-2xl text-white focus:outline-none focus:border-blue-500 transition-all"
+                      className="w-full px-6 py-4 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-white/10 rounded-2xl text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-all"
                     >
-                      <option value={2}>2 Columns</option>
-                      <option value={3}>3 Columns</option>
-                      <option value={4}>4 Columns</option>
-                      <option value={5}>5 Columns</option>
+                      <option className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white" value={2}>2 Columns</option>
+                      <option className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white" value={3}>3 Columns</option>
+                      <option className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white" value={4}>4 Columns</option>
+                      <option className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white" value={5}>5 Columns</option>
                     </select>
                   </div>
                 </div>
@@ -707,16 +706,16 @@ const PortalConfig = () => {
                   { id: 'enable_notifications', label: 'Enable System Notifications', desc: 'Enable or disable real-time user notifications.' },
                   { id: 'enable_support_tickets', label: 'Enable Support System', desc: 'Enable or disable the help desk / support tickets.' },
                 ].map((feature) => (
-                  <div key={feature.id} className="flex items-center justify-between p-6 glass rounded-2xl border border-white/5">
+                  <div key={feature.id} className="flex items-center justify-between p-6 bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-white/5 rounded-2xl">
                     <div>
-                      <h4 className="font-bold text-white">{feature.label}</h4>
-                      <p className="text-sm text-slate-500">{feature.desc}</p>
+                      <h4 className="font-bold text-slate-900 dark:text-white">{feature.label}</h4>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">{feature.desc}</p>
                     </div>
                     <button
                       type="button"
                       onClick={() => handleToggle(feature.id)}
                       className={`w-14 h-8 rounded-full transition-all relative ${
-                        formData[feature.id] === 1 ? 'bg-blue-600' : 'bg-slate-800'
+                        formData[feature.id] === 1 ? 'bg-blue-600' : 'bg-slate-200 dark:bg-slate-800'
                       }`}
                     >
                       <div className={`absolute top-1 w-6 h-6 rounded-full bg-white transition-all ${

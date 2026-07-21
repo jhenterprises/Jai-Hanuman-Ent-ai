@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { auth, db } from '../lib/firebase';
+import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, query, where, orderBy, limit, getDocs, updateDoc, setDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { useConfig } from '../context/ConfigContext';
+import { useTheme } from '../context/ThemeContext';
 import LiveSupport from '../components/LiveSupport';
 import { safeFormat } from '../utils/dateUtils';
 import { 
@@ -34,10 +35,11 @@ import {
 const DashboardLayout = () => {
   const { user, logout } = useAuth();
   const { config } = useConfig();
+  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isDark, setIsDark] = useState(true);
+  const isDark = theme === 'dark';
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
 
@@ -45,6 +47,7 @@ const DashboardLayout = () => {
   useEffect(() => {
     if (user?.uid) {
       const updatePresence = async () => {
+        if (!auth.currentUser) return;
         try {
           await setDoc(doc(db, 'users', user.uid), {
             last_active: serverTimestamp()
@@ -59,26 +62,16 @@ const DashboardLayout = () => {
     }
   }, [user?.uid]);
 
-  // Initialize theme
   useEffect(() => {
-    const savedTheme = localStorage.getItem('theme');
-    if (savedTheme === 'light') {
-      setIsDark(false);
-      document.documentElement.classList.remove('dark');
-    } else {
-      setIsDark(true);
-      document.documentElement.classList.add('dark');
+    if (user && auth.currentUser) {
+      fetchNotifications();
+      const interval = setInterval(fetchNotifications, 30000);
+      return () => clearInterval(interval);
     }
-  }, []);
-
-  useEffect(() => {
-    fetchNotifications();
-    const interval = setInterval(fetchNotifications, 30000);
-    return () => clearInterval(interval);
   }, [user]);
 
   const fetchNotifications = async () => {
-    if (!auth.currentUser) return;
+    if (!user || !user.uid || !auth.currentUser || !auth.currentUser.uid) return;
     try {
       const currentUid = auth.currentUser.uid;
       const q = query(
@@ -105,6 +98,11 @@ const DashboardLayout = () => {
     } catch (err) {
       console.error('Error fetching notifications:', err);
       setNotifications([]);
+      try {
+        handleFirestoreError(err, OperationType.LIST, 'notifications');
+      } catch (logErr) {
+        // Suppress nested throws during interval poll to avoid crashing UI
+      }
     }
   };
 
@@ -114,24 +112,13 @@ const DashboardLayout = () => {
       fetchNotifications();
     } catch (err) {
       console.error('Error marking notification as read:', err);
+      handleFirestoreError(err, OperationType.UPDATE, `notifications/${id}`);
     }
   };
 
-  const toggleTheme = () => {
-    if (isDark) {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
-      setIsDark(false);
-    } else {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
-      setIsDark(true);
-    }
-  };
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login?loggedOut=true');
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login?loggedOut=true', { replace: true });
   };
 
   const navItems = [
@@ -151,7 +138,7 @@ const DashboardLayout = () => {
   const unreadCount = Array.isArray(notifications) ? notifications.filter(n => !n.is_read).length : 0;
 
   return (
-    <div className="flex h-screen bg-slate-900 text-slate-100 overflow-hidden font-sans">
+    <div className="flex h-screen bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 overflow-hidden font-sans">
       {/* Mobile sidebar backdrop */}
       {sidebarOpen && (
         <div 
@@ -162,26 +149,26 @@ const DashboardLayout = () => {
 
       {/* Sidebar */}
       <aside className={`
-        fixed inset-y-0 left-0 z-30 w-64 bg-slate-800/80 backdrop-blur-xl border-r border-slate-700/50
+        fixed inset-y-0 left-0 z-30 w-64 bg-white/90 dark:bg-slate-900/80 backdrop-blur-xl border-r border-slate-200/50 dark:border-slate-800/50
         transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0
         flex flex-col
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
-        <div className="flex items-center justify-between h-16 px-6 border-b border-slate-700/50 flex-shrink-0">
+        <div className="flex items-center justify-between h-16 px-6 border-b border-slate-200/50 dark:border-slate-700/50 flex-shrink-0">
           <Link to="/app" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-white p-0.5 rounded-lg flex items-center justify-center shadow-lg overflow-hidden">
+            <div className="w-8 h-8 bg-white p-0.5 rounded-lg flex items-center justify-center shadow-lg overflow-hidden border border-slate-200/50">
               <img src={config.logo_url || "/logo.svg"} alt="JH Logo" className="w-full h-full object-contain" />
             </div>
             <div className="flex flex-col">
-              <span className="font-bold text-sm leading-tight tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-gold-400">
+              <span className="font-bold text-sm leading-tight tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-gold-400">
                 {config.portal_name ? config.portal_name.split(' ')[0] : 'Digital'} {config.portal_name ? config.portal_name.split(' ')[1] : 'Seva'}
               </span>
-              <span className="font-bold text-[10px] uppercase tracking-[0.2em] text-gold-500/80">
+              <span className="font-bold text-[10px] uppercase tracking-[0.2em] text-blue-600 dark:text-gold-500/80">
                 {config.portal_name ? config.portal_name.split(' ').slice(2).join(' ') : 'Kendra'}
               </span>
             </div>
           </Link>
-          <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-slate-400 hover:text-white">
+          <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">
             <X size={20} />
           </button>
         </div>
@@ -196,8 +183,8 @@ const DashboardLayout = () => {
                 className={`
                   flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200
                   ${isActive 
-                    ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.1)]' 
-                    : 'text-slate-400 hover:bg-slate-700/50 hover:text-slate-200'}
+                    ? 'bg-blue-600/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.05)] dark:shadow-[0_0_15px_rgba(59,130,246,0.1)] font-bold' 
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'}
                 `}
               >
                 {item.icon}
@@ -209,30 +196,30 @@ const DashboardLayout = () => {
       </aside>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-800 via-slate-900 to-black">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-50 via-slate-100 to-slate-200 dark:from-slate-800 dark:via-slate-900 dark:to-black">
         {/* Topbar */}
-        <header className="relative h-16 flex items-center justify-between px-6 bg-slate-800/40 backdrop-blur-md border-b border-slate-700/50 z-20">
+        <header className="relative h-16 flex items-center justify-between px-6 bg-white/40 dark:bg-slate-800/40 backdrop-blur-md border-b border-slate-200/50 dark:border-slate-700/50 z-20">
           <div className="flex items-center">
             <button
               onClick={() => setSidebarOpen(true)}
-              className="lg:hidden text-slate-400 hover:text-white"
+              className="lg:hidden text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
             >
               <Menu size={24} />
             </button>
           </div>
 
           {/* User Name in Center */}
-          <div className="hidden md:flex items-center gap-3 px-4 py-1.5 rounded-full bg-slate-800/50 border border-slate-700/50">
+          <div className="hidden md:flex items-center gap-3 px-4 py-1.5 rounded-full bg-white/60 dark:bg-slate-800/50 border border-slate-200/50 dark:border-slate-700/50 shadow-sm">
             {user?.photoURL ? (
-              <img src={user.photoURL} alt={user.name} className="w-8 h-8 rounded-full object-cover border border-slate-600" />
+              <img src={user.photoURL} alt={user.name} className="w-8 h-8 rounded-full object-cover border border-slate-200 dark:border-slate-600" />
             ) : (
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-gold-500 flex items-center justify-center font-bold text-xs text-white shadow-lg shadow-blue-500/20">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center font-bold text-xs text-white shadow-lg shadow-blue-500/10">
                 {user?.name?.charAt(0).toUpperCase()}
               </div>
             )}
             <div className="flex flex-col">
-              <span className="text-sm font-bold text-white leading-none">{user?.name}</span>
-              <span className="text-[10px] text-slate-400 uppercase tracking-wider font-medium">{user?.role}</span>
+              <span className="text-sm font-bold text-slate-900 dark:text-white leading-none">{user?.name}</span>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-wider font-medium">{user?.role}</span>
             </div>
           </div>
           
@@ -241,26 +228,26 @@ const DashboardLayout = () => {
             <div className="relative">
               <button 
                 onClick={() => setShowNotifications(!showNotifications)}
-                className="text-slate-400 hover:text-white transition-colors p-2 rounded-full hover:bg-slate-700/50 relative"
+                className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors p-2 rounded-full hover:bg-slate-200/50 dark:hover:bg-slate-700/50 relative"
               >
                 <Bell size={20} />
                 {unreadCount > 0 && (
-                  <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-slate-800">
+                  <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-white dark:border-slate-800">
                     {unreadCount}
                   </span>
                 )}
               </button>
 
               {showNotifications && (
-                <div className="absolute right-0 mt-3 w-80 bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden animate-fade-in z-50">
-                  <div className="p-4 border-b border-slate-700 flex items-center justify-between bg-slate-800/50">
-                    <h3 className="text-sm font-bold text-white">Notifications</h3>
+                <div className="absolute right-0 mt-3 w-80 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl overflow-hidden animate-fade-in z-50">
+                  <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between bg-slate-50 dark:bg-slate-800/50">
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">Notifications</h3>
                     <span className="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-full">{unreadCount} New</span>
                   </div>
                   <div className="max-h-96 overflow-y-auto">
                     {(!notifications || notifications.length === 0) ? (
                       <div className="p-8 text-center">
-                        <Bell size={32} className="text-slate-700 mx-auto mb-2 opacity-20" />
+                        <Bell size={32} className="text-slate-300 dark:text-slate-700 mx-auto mb-2 opacity-20" />
                         <p className="text-slate-500 text-sm">No notifications yet</p>
                       </div>
                     ) : (
@@ -268,17 +255,17 @@ const DashboardLayout = () => {
                         <div 
                           key={n.id} 
                           onClick={() => markAsRead(n.id)}
-                          className={`p-4 border-b border-slate-700/50 cursor-pointer hover:bg-slate-700 transition-colors ${!n.is_read ? 'bg-blue-500/5' : ''}`}
+                          className={`p-4 border-b border-slate-200/50 dark:border-slate-700/50 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors ${!n.is_read ? 'bg-blue-500/5' : ''}`}
                         >
                           <div className="flex gap-3">
-                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${!n.is_read ? 'bg-blue-500/20 text-blue-400' : 'bg-slate-800 text-slate-500'}`}>
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${!n.is_read ? 'bg-blue-500/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400' : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500'}`}>
                               <FileText size={16} />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className={`text-xs leading-tight mb-1 ${!n.is_read ? 'text-slate-200 font-semibold' : 'text-slate-400'}`}>
+                              <p className={`text-xs leading-tight mb-1 ${!n.is_read ? 'text-slate-900 dark:text-slate-200 font-semibold' : 'text-slate-500 dark:text-slate-400'}`}>
                                 {n.message}
                               </p>
-                              <p className="text-[10px] text-slate-500">{safeFormat(n.created_at, 'dd/MM/yyyy, hh:mm a')}</p>
+                              <p className="text-[10px] text-slate-400 dark:text-slate-500">{safeFormat(n.created_at, 'dd/MM/yyyy, hh:mm a')}</p>
                             </div>
                             {!n.is_read && <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mt-1.5 shrink-0" />}
                           </div>
@@ -292,21 +279,21 @@ const DashboardLayout = () => {
 
             <button 
               onClick={toggleTheme}
-              className="text-slate-400 hover:text-white transition-colors p-2 rounded-full hover:bg-slate-700/50"
+              className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors p-2 rounded-full hover:bg-slate-200/50 dark:hover:bg-slate-700/50"
               aria-label="Toggle theme"
             >
               {isDark ? <Sun size={20} /> : <Moon size={20} />}
             </button>
             <button 
               onClick={() => navigate('/app/profile')}
-              className="text-slate-400 hover:text-white transition-colors p-2 rounded-full hover:bg-slate-700/50"
+              className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors p-2 rounded-full hover:bg-slate-200/50 dark:hover:bg-slate-700/50"
               title="Settings"
             >
               <Settings size={20} />
             </button>
             <button 
               onClick={handleLogout}
-              className="text-red-400 hover:text-red-300 transition-colors p-2 rounded-full hover:bg-red-500/10 flex items-center gap-2"
+              className="text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300 transition-colors p-2 rounded-full hover:bg-red-500/10 flex items-center gap-2"
               title="Logout"
             >
               <LogOut size={20} />

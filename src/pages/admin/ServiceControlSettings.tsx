@@ -22,19 +22,9 @@ import GlassCard from '../../components/GlassCard';
 import { toast } from 'react-hot-toast';
 
 const ICON_MAP: Record<string, LucideIcon> = {
-  mobileRecharge: Smartphone,
-  dthRecharge: Tv,
-  electricityBill: Zap,
-  waterBill: Droplets,
-  gasBill: Flame,
-  broadbandBill: Wifi,
-  dmt: Send,
-  aeps: Fingerprint,
-  aadhaarPay: CreditCard,
   wallet: Wallet,
   pan: FileJson,
   aadhaarService: UserCheck,
-  fastag: Database,
 };
 
 const ServiceControlSettings = () => {
@@ -118,12 +108,7 @@ const ServiceControlSettings = () => {
     const defaults = [
       { key: 'pan', name: 'PAN Services', order: 1 },
       { key: 'aadhaarService', name: 'Aadhaar Services', order: 2 },
-      { key: 'mobileRecharge', name: 'Mobile Recharge', order: 3 },
-      { key: 'dthRecharge', name: 'DTH Recharge', order: 4 },
-      { key: 'electricityBill', name: 'BBPS Services', order: 5 },
-      { key: 'aeps', name: 'AEPS Service', order: 6 },
-      { key: 'dmt', name: 'DMT Transfer', order: 7 },
-      { key: 'wallet', name: 'Wallet Transactions', order: 8 },
+      { key: 'wallet', name: 'Wallet Transactions', order: 3 },
     ];
 
     const toastId = toast.loading('Seeding services...');

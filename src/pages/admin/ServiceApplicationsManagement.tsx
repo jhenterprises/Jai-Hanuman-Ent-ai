@@ -621,27 +621,27 @@ export default function ServiceApplicationsManagement() {
       </div>
 
       {/* Control Actions & Filter Panel */}
-      <div className="bg-slate-800/60 backdrop-blur-xl rounded-3xl p-6 border border-slate-700/50 shadow-lg space-y-4">
+      <div className="bg-white dark:bg-slate-800/60 backdrop-blur-xl rounded-3xl p-6 border border-slate-200 dark:border-slate-700/50 shadow-lg space-y-4">
         
         {/* Bulk Management & Global Functions */}
-        <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-700/40">
+        <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-200 dark:border-slate-700/40">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs uppercase tracking-wider font-extrabold text-slate-400 mr-2">Bulk Controls:</span>
+            <span className="text-xs uppercase tracking-wider font-extrabold text-slate-500 dark:text-slate-400 mr-2">Bulk Controls:</span>
             <button 
               onClick={() => handleBulkStatus('active')}
-              className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold px-3 py-1.5 rounded-xl text-xs transition-colors"
+              className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 font-bold px-3 py-1.5 rounded-xl text-xs transition-colors"
             >
               Bulk Enable Active
             </button>
             <button 
               onClick={() => handleBulkStatus('disabled')}
-              className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 font-bold px-3 py-1.5 rounded-xl text-xs transition-colors"
+              className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/30 font-bold px-3 py-1.5 rounded-xl text-xs transition-colors"
             >
               Bulk Disable Cards
             </button>
             <button 
               onClick={handleRestoreHidden}
-              className="bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 font-bold px-3 py-1.5 rounded-xl text-xs transition-colors"
+              className="bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/30 font-bold px-3 py-1.5 rounded-xl text-xs transition-colors"
             >
               Restore Hidden Services
             </button>
@@ -649,7 +649,7 @@ export default function ServiceApplicationsManagement() {
           
           <button 
             onClick={handleSortByCategory}
-            className="flex items-center gap-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 font-black px-4 py-1.5 rounded-xl text-xs transition-colors"
+            className="flex items-center gap-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30 font-black px-4 py-1.5 rounded-xl text-xs transition-colors"
           >
             <Layers className="w-3.5 h-3.5" /> Sort by Category
           </button>
@@ -666,7 +666,7 @@ export default function ServiceApplicationsManagement() {
               placeholder="Search service title, ID, or description..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-100 outline-none focus:border-blue-500 transition-colors text-sm"
+              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 outline-none focus:border-blue-500 transition-colors text-sm"
             />
           </div>
 
@@ -674,7 +674,7 @@ export default function ServiceApplicationsManagement() {
             <select
               value={categoryFilter}
               onChange={e => setCategoryFilter(e.target.value)}
-              className="w-full px-3 py-2.5 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-100 outline-none focus:border-blue-500 text-sm"
+              className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 outline-none focus:border-blue-500 text-sm"
             >
               <option value="all">All Categories</option>
               {categoryList.map(cat => (
@@ -687,7 +687,7 @@ export default function ServiceApplicationsManagement() {
             <select
               value={statusFilter}
               onChange={e => setStatusFilter(e.target.value)}
-              className="w-full px-3 py-2.5 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-100 outline-none focus:border-blue-500 text-sm"
+              className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 outline-none focus:border-blue-500 text-sm"
             >
               <option value="all">All Statuses</option>
               <option value="active">Active</option>
@@ -702,14 +702,14 @@ export default function ServiceApplicationsManagement() {
 
       {/* Main List Grid */}
       {loading ? (
-        <div className="flex flex-col items-center justify-center py-20 bg-slate-800/30 rounded-3xl border border-slate-700/30">
+        <div className="flex flex-col items-center justify-center py-20 bg-white dark:bg-slate-800/30 rounded-3xl border border-slate-200 dark:border-slate-700/30">
           <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-          <p className="mt-4 text-sm text-slate-400">Loading service management structures...</p>
+          <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">Loading service management structures...</p>
         </div>
       ) : filteredList().length === 0 ? (
-        <div className="text-center py-20 bg-slate-800/30 rounded-3xl border border-slate-700/30">
-          <HelpCircle className="w-12 h-12 text-slate-650 mx-auto mb-4" />
-          <h3 className="text-lg font-bold text-slate-300">No services found</h3>
+        <div className="text-center py-20 bg-white dark:bg-slate-800/30 rounded-3xl border border-slate-200 dark:border-slate-700/30">
+          <HelpCircle className="w-12 h-12 text-slate-400 dark:text-slate-600 mx-auto mb-4" />
+          <h3 className="text-lg font-bold text-slate-700 dark:text-slate-300">No services found</h3>
           <p className="text-slate-500 text-sm mt-1">Try resetting search criteria or add a custom service card.</p>
         </div>
       ) : (
@@ -721,7 +721,7 @@ export default function ServiceApplicationsManagement() {
             return (
               <div 
                 key={service.id}
-                className="group bg-slate-800/40 backdrop-blur-xl border border-slate-700/40 rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 hover:border-blue-500/30 hover:bg-slate-800/60 transition-all shadow"
+                className="group bg-white dark:bg-slate-800/40 backdrop-blur-xl border border-slate-200 dark:border-slate-700/40 rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 hover:border-blue-500/30 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-all shadow"
               >
                 {/* Visual Metadata & Drag-Order Details */}
                 <div className="flex items-center gap-4 w-full md:w-auto">
@@ -732,7 +732,7 @@ export default function ServiceApplicationsManagement() {
                       onClick={() => moveOrder(index, 'up')}
                       disabled={isFirst}
                       title="Move Display Order Up"
-                      className={`p-1 rounded-md transition-colors ${isFirst ? 'text-slate-700 cursor-not-allowed' : 'text-slate-400 hover:text-white hover:bg-slate-700'}`}
+                      className={`p-1 rounded-md transition-colors ${isFirst ? 'text-slate-300 dark:text-slate-700 cursor-not-allowed' : 'text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700'}`}
                     >
                       <ArrowUp className="w-4 h-4" />
                     </button>
@@ -740,14 +740,14 @@ export default function ServiceApplicationsManagement() {
                       onClick={() => moveOrder(index, 'down')}
                       disabled={isLast}
                       title="Move Display Order Down"
-                      className={`p-1 rounded-md transition-colors ${isLast ? 'text-slate-700 cursor-not-allowed' : 'text-slate-400 hover:text-white hover:bg-slate-700'}`}
+                      className={`p-1 rounded-md transition-colors ${isLast ? 'text-slate-300 dark:text-slate-700 cursor-not-allowed' : 'text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700'}`}
                     >
                       <ArrowDown className="w-4 h-4" />
                     </button>
                   </div>
 
                   {/* Icon view */}
-                  <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 shrink-0 select-none overflow-hidden">
+                  <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0 select-none overflow-hidden">
                     {service.image ? (
                       <img src={service.image} alt="service banner" className="w-full h-full object-cover" />
                     ) : (
@@ -758,43 +758,43 @@ export default function ServiceApplicationsManagement() {
                   {/* Text labels */}
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <h4 className="font-extrabold text-white text-base leading-tight">
+                      <h4 className="font-extrabold text-slate-900 dark:text-white text-base leading-tight">
                         {service.serviceName || service.name}
                       </h4>
-                      <span className="text-[10px] bg-slate-700/60 border border-slate-600/50 text-slate-300 font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                      <span className="text-[10px] bg-slate-100 dark:bg-slate-700/60 border border-slate-200 dark:border-slate-600/50 text-slate-700 dark:text-slate-300 font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
                         {service.category}
                       </span>
-                      <span className="text-[10px] bg-blue-900/40 text-blue-300 font-mono px-1.5 py-0.5 rounded border border-blue-600/20">
+                      <span className="text-[10px] bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-mono px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-600/20">
                         ID: {service.serviceId || service.id}
                       </span>
                     </div>
-                    <p className="text-sm text-slate-400/90 mt-1 max-w-xl line-clamp-1">{service.description}</p>
+                    <p className="text-sm text-slate-600 dark:text-slate-400/90 mt-1 max-w-xl line-clamp-1">{service.description}</p>
                   </div>
                 </div>
 
                 {/* Right controls: Status, Visibility & Actions */}
-                <div className="flex items-center gap-4 w-full md:w-auto justify-end md:border-l border-slate-700/40 md:pl-6 shrink-0">
+                <div className="flex items-center gap-4 w-full md:w-auto justify-end md:border-l border-slate-200 dark:border-slate-700/40 md:pl-6 shrink-0">
                   
                   {/* Status Badges */}
                   <div className="flex flex-col items-end">
-                    <span className="text-[10px] text-slate-505 font-bold mb-1">Status:</span>
+                    <span className="text-[10px] text-slate-500 font-bold mb-1">Status:</span>
                     {service.status === 'active' && (
-                      <span className="text-xs bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-black px-2.5 py-1 rounded-full uppercase tracking-wider">
+                      <span className="text-xs bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-black px-2.5 py-1 rounded-full uppercase tracking-wider">
                         Active
                       </span>
                     )}
                     {service.status === 'comingSoon' && (
-                      <span className="text-xs bg-amber-500/15 border border-amber-500/30 text-amber-400 font-black px-2.5 py-1 rounded-full uppercase tracking-wider flex items-center gap-1">
+                      <span className="text-xs bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 font-black px-2.5 py-1 rounded-full uppercase tracking-wider flex items-center gap-1">
                         <Sparkles className="w-3 h-3" /> Coming Soon
                       </span>
                     )}
                     {service.status === 'maintenance' && (
-                      <span className="text-xs bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 font-black px-2.5 py-1 rounded-full uppercase tracking-wider flex items-center gap-1">
+                      <span className="text-xs bg-cyan-500/15 border border-cyan-500/30 text-cyan-600 dark:text-cyan-400 font-black px-2.5 py-1 rounded-full uppercase tracking-wider flex items-center gap-1">
                         <Activity className="w-3 h-3" /> Under Maintenance
                       </span>
                     )}
                     {service.status === 'disabled' && (
-                      <span className="text-xs bg-slate-700 border border-slate-600 text-slate-400 font-black px-2.5 py-1 rounded-full uppercase tracking-wider">
+                      <span className="text-xs bg-slate-200 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400 font-black px-2.5 py-1 rounded-full uppercase tracking-wider">
                         Disabled
                       </span>
                     )}
@@ -806,8 +806,8 @@ export default function ServiceApplicationsManagement() {
                     title={service.isVisible ? "Make Hidden" : "Make Visible"}
                     className={`flex flex-col items-center justify-center p-2 rounded-xl transition-all border ${
                       service.isVisible 
-                        ? 'text-blue-400 bg-blue-500/10 border-blue-500/20' 
-                        : 'text-slate-500 bg-slate-800/40 border-slate-700'
+                        ? 'text-blue-600 dark:text-blue-400 bg-blue-500/10 border-blue-500/20' 
+                        : 'text-slate-400 bg-slate-100 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700'
                     }`}
                   >
                     {service.isVisible ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
@@ -817,30 +817,30 @@ export default function ServiceApplicationsManagement() {
                   </button>
 
                   {/* Order Selector Card */}
-                  <div className="bg-slate-900/40 border border-slate-700/50 p-2 rounded-xl text-center min-w-[50px] select-none h-12 flex flex-col justify-center">
+                  <div className="bg-slate-100 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700/50 p-2 rounded-xl text-center min-w-[50px] select-none h-12 flex flex-col justify-center">
                     <span className="text-[7px] text-slate-500 font-extrabold uppercase">Order</span>
-                    <span className="text-sm font-black text-blue-400">{service.displayOrder}</span>
+                    <span className="text-sm font-black text-blue-600 dark:text-blue-400">{service.displayOrder}</span>
                   </div>
 
                   {/* Actions buttons */}
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => navigate(`/app/services/${encodeURIComponent(service.serviceId || service.id)}/builder`)}
-                      className="p-2 text-indigo-400 hover:text-white hover:bg-indigo-500/20 rounded-xl transition-colors"
+                      className="p-2 text-indigo-600 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-white hover:bg-indigo-50 dark:hover:bg-indigo-500/20 rounded-xl transition-colors"
                       title="Edit Service Form Fields"
                     >
                       <LayoutTemplate className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => handleOpenEdit(service)}
-                      className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-xl transition-colors"
+                      className="p-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-colors"
                       title="Edit Service Settings & Visual Elements"
                     >
                       <Edit2 className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => handleDeleteService(service)}
-                      className="p-2 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-xl transition-colors"
+                      className="p-2 text-rose-500 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-xl transition-colors"
                       title="Remove Certificate/Identity Service Card"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -857,17 +857,17 @@ export default function ServiceApplicationsManagement() {
       {/* Edit/Add Service Card Offcanvas Modal Backdrop */}
       {isEditModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="bg-slate-800 border border-slate-700 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col">
+          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col">
             
             {/* Modal Header */}
-            <div className="bg-slate-900/60 px-6 py-4 border-b border-slate-700/50 flex items-center justify-between">
-              <h3 className="text-xl font-extrabold text-white flex items-center gap-2">
-                <Settings className="w-5 h-5 text-blue-400 animate-spin-slow" />
+            <div className="bg-slate-100 dark:bg-slate-900/60 px-6 py-4 border-b border-slate-200 dark:border-slate-700/50 flex items-center justify-between">
+              <h3 className="text-xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                <Settings className="w-5 h-5 text-blue-500 dark:text-blue-400 animate-spin-slow" />
                 {editingService ? 'Edit Service Form Config & Card' : 'Add New Service Card'}
               </h3>
               <button 
                 onClick={() => setIsEditModalOpen(false)}
-                className="text-slate-400 hover:text-white p-1 rounded-lg transition-colors"
+                className="text-slate-400 hover:text-slate-800 dark:hover:text-white p-1 rounded-lg transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -879,7 +879,7 @@ export default function ServiceApplicationsManagement() {
                 
                 {/* ID and Name */}
                 <div className="space-y-1">
-                  <label className="text-xs text-slate-400 font-bold uppercase tracking-wider">Service Unique ID (Lower_case)</label>
+                  <label className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">Service Unique ID (Lower_case)</label>
                   <input
                     type="text"
                     required
@@ -887,7 +887,7 @@ export default function ServiceApplicationsManagement() {
                     disabled={!!editingService}
                     value={formData.serviceId}
                     onChange={e => setFormData({ ...formData, serviceId: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-slate-900/40 border border-slate-700 rounded-xl text-slate-200 outline-none focus:border-blue-500 text-sm disabled:cursor-not-allowed disabled:text-slate-500 font-mono"
+                    className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-200 outline-none focus:border-blue-500 text-sm disabled:cursor-not-allowed disabled:text-slate-400 font-mono"
                   />
                   {!editingService && (
                     <p className="text-[10px] text-slate-500 font-medium">Use lowercase words. Matches existing custom form ID if available.</p>
@@ -895,24 +895,24 @@ export default function ServiceApplicationsManagement() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs text-slate-400 font-bold uppercase tracking-wider">Service Name (Title)</label>
+                  <label className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">Service Name (Title)</label>
                   <input
                     type="text"
                     required
                     placeholder="e.g. Income Certificate"
                     value={formData.serviceName}
                     onChange={e => setFormData({ ...formData, serviceName: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-slate-900/40 border border-slate-700 rounded-xl text-slate-200 outline-none focus:border-blue-500 text-sm"
+                    className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-200 outline-none focus:border-blue-500 text-sm"
                   />
                 </div>
 
                 {/* Categories & displayOrder */}
                 <div className="space-y-1">
-                  <label className="text-xs text-slate-400 font-bold uppercase tracking-wider">Category</label>
+                  <label className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">Category</label>
                   <select
                     value={formData.category}
                     onChange={e => setFormData({ ...formData, category: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-slate-900/40 border border-slate-700 rounded-xl text-slate-200 outline-none focus:border-blue-500 text-sm font-semibold"
+                    className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-200 outline-none focus:border-blue-500 text-sm font-semibold"
                   >
                     <option value="Identity Services">Identity Services (Aadhaar, PAN, Voter ID, Passport etc)</option>
                     <option value="Certificate Services">Certificate Services (Income, Caste, Birth Certificate etc)</option>
@@ -923,29 +923,29 @@ export default function ServiceApplicationsManagement() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs text-slate-400 font-bold uppercase tracking-wider">Display Order (Arrangement Rank)</label>
+                  <label className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">Display Order (Arrangement Rank)</label>
                   <input
                     type="number"
                     min="1"
                     placeholder="e.g. 5"
                     value={formData.displayOrder}
                     onChange={e => setFormData({ ...formData, displayOrder: Number(e.target.value) || 1 })}
-                    className="w-full px-4 py-2.5 bg-slate-900/40 border border-slate-700 rounded-xl text-slate-200 outline-none focus:border-blue-500 text-sm font-semibold"
+                    className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-200 outline-none focus:border-blue-500 text-sm font-semibold"
                   />
                 </div>
 
                 {/* Icon Visual Design (FontAwesome) */}
                 <div className="space-y-1">
-                  <label className="text-xs text-slate-400 font-bold uppercase tracking-wider">Card Icon (FontAwesome Standard)</label>
+                  <label className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">Card Icon (FontAwesome Standard)</label>
                   <div className="flex gap-2">
                     <input
                       type="text"
                       placeholder="e.g. fa-fingerprint, fa-id-card, fa-baby"
                       value={formData.icon}
                       onChange={e => setFormData({ ...formData, icon: e.target.value })}
-                      className="flex-1 px-4 py-2.5 bg-slate-900/40 border border-slate-700 rounded-xl text-slate-200 outline-none focus:border-blue-500 text-sm font-mono"
+                      className="flex-1 px-4 py-2.5 bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-200 outline-none focus:border-blue-500 text-sm font-mono"
                     />
-                    <div className="w-10 h-10 rounded-xl bg-slate-955 border border-slate-750 flex items-center justify-center text-blue-400 shrink-0">
+                    <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-blue-500 dark:text-blue-400 shrink-0">
                       <i className={`fas ${formData.icon || 'fa-file'} text-lg`}></i>
                     </div>
                   </div>
@@ -953,16 +953,16 @@ export default function ServiceApplicationsManagement() {
 
                 {/* Banner Image URL */}
                 <div className="space-y-1">
-                  <label className="text-xs text-slate-400 font-bold uppercase tracking-wider">Banner Image URL (Optional)</label>
+                  <label className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">Banner Image URL (Optional)</label>
                   <div className="flex gap-2">
                     <input
                       type="text"
                       placeholder="e.g. https://images.unsplash.com/... (optional)"
                       value={formData.image}
                       onChange={e => setFormData({ ...formData, image: e.target.value })}
-                      className="flex-1 px-4 py-2.5 bg-slate-900/40 border border-slate-700 rounded-xl text-slate-200 outline-none focus:border-blue-500 text-sm"
+                      className="flex-1 px-4 py-2.5 bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-200 outline-none focus:border-blue-500 text-sm"
                     />
-                    <div className="w-10 h-10 rounded-xl bg-slate-955 border border-slate-750 flex items-center justify-center text-indigo-400 shrink-0">
+                    <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-indigo-500 dark:text-indigo-400 shrink-0">
                       <Image className="w-5 h-5" />
                     </div>
                   </div>
@@ -970,11 +970,11 @@ export default function ServiceApplicationsManagement() {
 
                 {/* Application Type */}
                 <div className="space-y-1">
-                  <label className="text-xs text-slate-400 font-bold uppercase tracking-wider">Application Type</label>
+                  <label className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">Application Type</label>
                   <select
                     value={formData.application_type}
                     onChange={e => setFormData({ ...formData, application_type: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-slate-900/40 border border-slate-700 rounded-xl text-slate-200 outline-none focus:border-blue-500 text-sm font-bold"
+                    className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-200 outline-none focus:border-blue-500 text-sm font-bold"
                   >
                     <option value="internal">Internal Form (Standard Apply)</option>
                     <option value="external">External Link (Opens external portal URL)</option>
@@ -983,24 +983,24 @@ export default function ServiceApplicationsManagement() {
 
                 {/* Service URL */}
                 <div className="space-y-1">
-                  <label className="text-xs text-slate-400 font-bold uppercase tracking-wider">Service Route / URL</label>
+                  <label className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">Service Route / URL</label>
                   <p className="text-[10px] text-slate-500 mb-1">Use /services/SERVICE_ID for internal routes, or https://... for external.</p>
                   <input
                     type="text"
                     placeholder="/services/pan-card or https://..."
                     value={formData.url}
                     onChange={e => setFormData({ ...formData, url: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-slate-900/40 border border-slate-700 rounded-xl text-slate-200 outline-none focus:border-blue-500 text-sm font-semibold"
+                    className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-200 outline-none focus:border-blue-500 text-sm font-semibold"
                   />
                 </div>
 
                 {/* Status Options */}
                 <div className="space-y-1">
-                  <label className="text-xs text-slate-400 font-bold uppercase tracking-wider">Govt Service Status</label>
+                  <label className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">Govt Service Status</label>
                   <select
                     value={formData.status}
                     onChange={e => setFormData({ ...formData, status: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-slate-900/40 border border-slate-700 rounded-xl text-slate-200 outline-none focus:border-blue-500 text-sm font-bold"
+                    className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-200 outline-none focus:border-blue-500 text-sm font-bold"
                   >
                     <option value="active">Active (Renders Apply Form)</option>
                     <option value="comingSoon">Coming Soon Badge</option>
@@ -1016,9 +1016,9 @@ export default function ServiceApplicationsManagement() {
                       type="checkbox"
                       checked={formData.isVisible}
                       onChange={e => setFormData({ ...formData, isVisible: e.target.checked })}
-                      className="rounded border-slate-600 bg-slate-900 text-blue-600 focus:ring-blue-500 w-4 h-4"
+                      className="rounded border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-blue-600 focus:ring-blue-500 w-4 h-4"
                     />
-                    <span className="text-xs text-slate-300 font-bold uppercase tracking-wider">Visible on User Dashboard</span>
+                    <span className="text-xs text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider">Visible on User Dashboard</span>
                   </label>
                 </div>
 
@@ -1026,22 +1026,22 @@ export default function ServiceApplicationsManagement() {
 
               {/* Description */}
               <div className="space-y-1">
-                <label className="text-xs text-slate-400 font-bold uppercase tracking-wider">Card Description / instructions</label>
+                <label className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">Card Description / instructions</label>
                 <textarea
                   required
                   placeholder="Inform the users what files are needed, eligibility criteria, government agency, processing time, fee, state, etc..."
                   value={formData.description}
                   onChange={e => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full px-4 py-3.5 bg-slate-900/40 border border-slate-700 rounded-xl text-slate-200 outline-none focus:border-blue-500 h-28 resize-none text-sm"
+                  className="w-full px-4 py-3.5 bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-200 outline-none focus:border-blue-500 h-28 resize-none text-sm"
                 />
               </div>
 
               {/* Modal Footer Controls */}
-              <div className="flex justify-end gap-2 pt-4 border-t border-slate-700/50">
+              <div className="flex justify-end gap-2 pt-4 border-t border-slate-200 dark:border-slate-700/50">
                 <button
                   type="button"
                   onClick={() => setIsEditModalOpen(false)}
-                  className="px-5 py-2.5 text-slate-450 hover:text-white font-bold transition-colors text-sm"
+                  className="px-5 py-2.5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-bold transition-colors text-sm"
                 >
                   Cancel
                 </button>

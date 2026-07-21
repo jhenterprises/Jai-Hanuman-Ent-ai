@@ -35,14 +35,14 @@ const ForgotPassword = () => {
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="glass rounded-[2.5rem] p-8 md:p-10 space-y-8 relative"
+        className="glass bg-white dark:bg-slate-900/40 rounded-[2.5rem] p-8 md:p-10 space-y-8 border border-slate-200/50 dark:border-white/5 relative"
       >
         <div className="text-center space-y-2">
           <div className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl shadow-blue-500/10 overflow-hidden border border-slate-200 dark:border-white/10">
             <img src={config.logo_url || "/logo.svg"} alt="JH Logo" className="w-full h-full object-contain p-2" />
           </div>
           <h2 className="text-3xl font-black text-slate-900 dark:text-white">Reset Password</h2>
-          <p className="text-slate-600 dark:text-slate-500">Enter your registered email or phone to receive a reset link</p>
+          <p className="text-slate-600 dark:text-slate-400">Enter your registered email or phone to receive a reset link</p>
         </div>
 
         {status === 'success' ? (
@@ -86,15 +86,15 @@ const ForgotPassword = () => {
             )}
 
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-slate-500 ml-1">Email or Phone</label>
+              <label className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 ml-1">Email or Phone</label>
               <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400" size={18} />
                 <input 
                   type="text" 
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-white/10 rounded-2xl py-4 pl-12 pr-4 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors"
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-white/10 rounded-2xl py-4 pl-12 pr-4 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors"
                   placeholder="name@example.com"
                   disabled={status === 'loading'}
                 />

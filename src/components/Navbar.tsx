@@ -11,9 +11,9 @@ const Navbar = () => {
   const { config } = useConfig();
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    logout();
-    navigate('/');
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login?loggedOut=true', { replace: true });
   };
 
   return (

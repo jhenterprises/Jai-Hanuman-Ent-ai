@@ -195,10 +195,10 @@ const DocumentManager: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 rounded-2xl overflow-hidden shadow-sm border border-slate-200">
+    <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-900/40 rounded-2xl overflow-hidden shadow-sm border border-slate-200 dark:border-white/5">
       
       {/* Top Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 sm:p-6 bg-white border-b border-slate-200 gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 sm:p-6 bg-white dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800 gap-4">
         
         {/* Breadcrumbs */}
         <div className="flex items-center space-x-1 overflow-x-auto pb-2 sm:pb-0 scrollbar-hide">
@@ -208,8 +208,8 @@ const DocumentManager: React.FC = () => {
                 onClick={() => handleBreadcrumbClick(item.id, idx)}
                 className={`flex-none px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                   idx === folderPath.length - 1 
-                    ? 'bg-blue-50 text-blue-700' 
-                    : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
+                    ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400' 
+                    : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-200'
                 }`}
               >
                 {item.name}
@@ -230,12 +230,12 @@ const DocumentManager: React.FC = () => {
               placeholder="Search files & folders..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 pr-4 py-2 w-full sm:w-64 bg-slate-100 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500 transition-all"
+              className="pl-10 pr-4 py-2 w-full sm:w-64 bg-slate-100 dark:bg-slate-800 border-none rounded-xl text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-blue-500 transition-all"
             />
           </div>
           <button 
              onClick={() => setCreateFolderModal(true)}
-             className="p-2 sm:px-4 sm:py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-xl font-medium text-sm transition-colors flex items-center space-x-2"
+             className="p-2 sm:px-4 sm:py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl font-medium text-sm transition-colors flex items-center space-x-2"
           >
              <FolderPlusIcon className="w-5 h-5" />
              <span className="hidden sm:inline">New Folder</span>
@@ -263,25 +263,25 @@ const DocumentManager: React.FC = () => {
             {/* Folders */}
             {displayedFolders.length > 0 && (
               <section>
-                <h3 className="text-sm font-semibold text-slate-900 mb-4 px-1">Folders</h3>
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-4 px-1">Folders</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                   {displayedFolders.map(folder => (
                     <motion.div
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                       key={folder.id}
-                      className="group p-4 bg-white border border-slate-200 rounded-2xl hover:border-blue-300 hover:shadow-md cursor-pointer transition-all flex items-center justify-between"
+                      className="group p-4 bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/50 rounded-2xl hover:border-blue-300 dark:hover:border-blue-500 hover:shadow-md cursor-pointer transition-all flex items-center justify-between"
                       >
                          <div className="flex items-center space-x-4 overflow-hidden" onClick={() => handleFolderClick(folder)}>
-                            <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-500 flex items-center justify-center flex-none">
+                            <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-500/10 text-blue-500 dark:text-blue-400 flex items-center justify-center flex-none">
                               <FolderIcon className="w-6 h-6" fill="currentColor" />
                             </div>
                             <div className="truncate">
-                              <p className="font-medium text-slate-900 truncate">{folder.name}</p>
-                              <p className="text-xs text-slate-500">{folder.createdAt ? format(folder.createdAt.toDate(), 'MMM d, yyyy') : ''}</p>
+                              <p className="font-medium text-slate-900 dark:text-white truncate">{folder.name}</p>
+                              <p className="text-xs text-slate-500 dark:text-slate-400">{folder.createdAt ? format(folder.createdAt.toDate(), 'MMM d, yyyy') : ''}</p>
                             </div>
                          </div>
-                         <button onClick={(e) => { e.stopPropagation(); handleDeleteFolder(folder.id); }} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                         <button onClick={(e) => { e.stopPropagation(); handleDeleteFolder(folder.id); }} className="p-2 text-slate-400 dark:text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
                             <TrashIcon className="w-4 h-4" />
                          </button>
                     </motion.div>
@@ -294,42 +294,42 @@ const DocumentManager: React.FC = () => {
             {(displayedFiles.length > 0 || displayedFolders.length === 0) && (
               <section>
                 <div className="flex items-center justify-between mb-4 px-1">
-                    <h3 className="text-sm font-semibold text-slate-900">Files</h3>
+                    <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Files</h3>
                     {displayedFiles.length > 0 && (
-                       <button onClick={downloadFolderAsZip} className="text-xs font-medium text-blue-600 hover:text-blue-800 flex items-center gap-1 bg-blue-50 px-2 py-1 rounded-md">
+                       <button onClick={downloadFolderAsZip} className="text-xs font-medium text-blue-600 hover:text-blue-800 flex items-center gap-1 bg-blue-50 dark:bg-blue-500/10 px-2 py-1 rounded-md">
                           <FileArchiveIcon className="w-4 h-4"/> Download All ZIP
                        </button>
                     )}
                 </div>
                 
                 {displayedFiles.length === 0 ? (
-                   <div className="flex flex-col items-center justify-center p-12 border-2 border-dashed border-slate-200 rounded-3xl bg-slate-50">
-                        <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-sm mb-4">
+                   <div className="flex flex-col items-center justify-center p-12 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-3xl bg-slate-50 dark:bg-slate-900/20">
+                        <div className="w-20 h-20 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center shadow-sm mb-4">
                             <UploadCloudIcon className="w-10 h-10 text-slate-400" />
                         </div>
-                        <h4 className="text-lg font-semibold text-slate-900 mb-1">No files here</h4>
-                        <p className="text-sm text-slate-500 mb-6 text-center max-w-sm">
+                        <h4 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">No files here</h4>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 text-center max-w-sm">
                             Drag and drop files to upload, or click the Upload button to browse from your computer.
                         </p>
                         <button 
                             onClick={() => setUploadModalOpen(true)}
-                            className="px-6 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 hover:text-blue-600 transition-colors font-medium text-sm shadow-sm"
+                            className="px-6 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-750 hover:text-blue-600 dark:hover:text-blue-400 transition-colors font-medium text-sm shadow-sm"
                         >
                             Select Files
                         </button>
                    </div>
                 ) : (
-                    <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-                       <ul className="divide-y divide-slate-100">
+                    <div className="bg-white dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/50 rounded-2xl overflow-hidden shadow-sm">
+                       <ul className="divide-y divide-slate-100 dark:divide-slate-800">
                            {displayedFiles.map(file => (
-                               <li key={file.id} className="group flex items-center justify-between p-4 hover:bg-slate-50 transition-colors">
+                               <li key={file.id} className="group flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
                                   <div className="flex items-center space-x-4 cursor-pointer flex-1 overflow-hidden" onClick={() => setPreviewFile(file)}>
-                                     <div className="p-3 bg-slate-100 rounded-xl group-hover:bg-white group-hover:shadow-sm transition-all">
+                                     <div className="p-3 bg-slate-100 dark:bg-slate-800 rounded-xl group-hover:bg-white dark:group-hover:bg-slate-700 group-hover:shadow-sm transition-all">
                                          {getFileIcon(file.fileType)}
                                      </div>
                                      <div className="flex-1 truncate">
-                                         <p className="font-medium text-slate-900 truncate">{file.fileName}</p>
-                                         <div className="flex items-center space-x-2 text-xs text-slate-500 mt-1">
+                                         <p className="font-medium text-slate-900 dark:text-white truncate">{file.fileName}</p>
+                                         <div className="flex items-center space-x-2 text-xs text-slate-500 dark:text-slate-400 mt-1">
                                              <span>{(file.size / 1024 / 1024).toFixed(2)} MB</span>
                                              <span>•</span>
                                              <span>{file.createdAt ? format(file.createdAt.toDate(), 'MMM d, yyyy') : ''}</span>
@@ -337,10 +337,10 @@ const DocumentManager: React.FC = () => {
                                      </div>
                                   </div>
                                   <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                     <button onClick={() => downloadFile(file.downloadURL, file.fileName)} className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg" title="Download">
+                                     <button onClick={() => downloadFile(file.downloadURL, file.fileName)} className="p-2 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg" title="Download">
                                          <DownloadIcon className="w-5 h-5" />
                                      </button>
-                                     <button onClick={() => handleDeleteFile(file.id, file.storagePath)} className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg" title="Delete">
+                                     <button onClick={() => handleDeleteFile(file.id, file.storagePath)} className="p-2 text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg" title="Delete">
                                          <TrashIcon className="w-5 h-5" />
                                      </button>
                                   </div>
@@ -374,26 +374,26 @@ const DocumentManager: React.FC = () => {
             <motion.div 
                initial={{ opacity: 0, scale: 0.95 }}
                animate={{ opacity: 1, scale: 1 }}
-               className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-xl"
+               className="bg-white dark:bg-slate-800 rounded-3xl p-6 w-full max-w-sm shadow-xl"
             >
-                <div className="flex items-center justify-center w-12 h-12 bg-blue-50 text-blue-600 rounded-full mb-4">
+                <div className="flex items-center justify-center w-12 h-12 bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-full mb-4">
                     <FolderPlusIcon className="w-6 h-6" />
                 </div>
-                <h3 className="text-xl font-bold text-slate-900 mb-2">Create new folder</h3>
-                <p className="text-sm text-slate-500 mb-4">Enter a name for the new folder here.</p>
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Create new folder</h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Enter a name for the new folder here.</p>
                 
                 <input 
                    autoFocus
                    type="text" 
                    value={newFolderName}
                    onChange={e => setNewFolderName(e.target.value)}
-                   className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl mb-6 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none"
+                   className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl mb-6 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none text-slate-900 dark:text-white"
                    placeholder="Folder name"
                    onKeyDown={e => e.key === 'Enter' && handleCreateFolder()}
-                />
+                 />
                 
                 <div className="flex gap-3">
-                    <button onClick={() => setCreateFolderModal(false)} className="flex-1 px-4 py-2.5 text-slate-600 font-medium hover:bg-slate-100 rounded-xl transition-colors">
+                    <button onClick={() => setCreateFolderModal(false)} className="flex-1 px-4 py-2.5 text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-colors">
                         Cancel
                     </button>
                     <button onClick={handleCreateFolder} disabled={!newFolderName.trim()} className="flex-1 px-4 py-2.5 bg-blue-600 text-white font-medium hover:bg-blue-700 disabled:opacity-50 rounded-xl transition-colors shadow-sm">

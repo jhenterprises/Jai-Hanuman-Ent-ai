@@ -21,10 +21,6 @@ const DEFAULT_CONFIG = {
 ## Passport Services
 - **Required Documents**: Age proof, Address proof, Matric Certificate.
 - **Workflow**: Choose Passport application form under "Apply for Services", input passport slot booking info, upload document, and follow up in "My Applications".
-
-## Bill Payments & Recharges
-- **Features**: Mobile & DTH Recharge, Electricity, Gas, Water bills.
-- **Workflow**: Instantly deducts funds from your Wallet. You must have a positive Wallet Balance to perform recharges or bills.
 `,
   enableServiceSpecificGuidance: true,
   customResponses: {
@@ -35,7 +31,7 @@ const DEFAULT_CONFIG = {
   },
   enableMultilingual: true,
   enableWelcomeMessage: true,
-  welcomeMessage: 'Hello! Welcome back to JH Digital Seva Kendra. I am your internal service Copilot. Ask me how to apply for PAN, Aadhaar, Voter ID, Passport, Recharge, or track your application status.'
+  welcomeMessage: 'Hello! Welcome back to JH Digital Seva Kendra. I am your internal service Copilot. Ask me how to apply for PAN, Aadhaar, Voter ID, Passport, or track your application status.'
 };
 
 // Tool definition for status checking
@@ -54,13 +50,58 @@ const checkApplicationStatus = {
   }
 };
 
+// Helper function to call generateContent with fallback models in case of 503 UNAVAILABLE or high demand spikes.
+async function generateContentWithFallback(ai: any, params: {
+  contents: any[];
+  config: any;
+}) {
+  const models = ["gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-flash-latest"];
+  let lastError: any = null;
+
+  for (const model of models) {
+    try {
+      logger.info(`Attempting generateContent with model: ${model}`);
+      const response = await ai.models.generateContent({
+        model,
+        contents: params.contents,
+        config: params.config
+      });
+      return response;
+    } catch (error: any) {
+      lastError = error;
+      const errorStr = (error.message || String(error) || '').toLowerCase();
+      logger.warn(`Model ${model} failed: ${errorStr}`);
+      
+      // Continue to try the next model if it's a high demand, quota, or temporary server error.
+      if (
+        errorStr.includes('503') || 
+        errorStr.includes('unavailable') || 
+        errorStr.includes('high demand') || 
+        errorStr.includes('congestion') ||
+        errorStr.includes('429') ||
+        errorStr.includes('limit') ||
+        errorStr.includes('quota') ||
+        errorStr.includes('temp')
+      ) {
+        continue;
+      }
+      
+      // If it's another error, try fallback anyway as a safety measure.
+      continue;
+    }
+  }
+
+  throw lastError;
+}
+
 router.post('/chat', async (req, res) => {
+  const chatHistory: any[] = req.body.history || [];
+  const user = req.body.user;
+  
   try {
     if (!process.env.GEMINI_API_KEY) {
       return res.status(500).json({ error: 'GEMINI_API_KEY is not configured on the server.' });
     }
-
-    const { history, user } = req.body;
 
     // Fetch AI Copilot Configurations out of Firestore settings collection
     let aiConfig = { ...DEFAULT_CONFIG };
@@ -85,7 +126,7 @@ router.post('/chat', async (req, res) => {
     if (!aiConfig.enabled) {
       return res.json({ 
         text: "The AI Copilot has been disabled by the portal administrator.", 
-        history: history.concat([{ role: 'model', parts: [{ text: "The AI Copilot has been disabled by the portal administrator." }] }]) 
+        history: chatHistory.concat([{ role: 'model', parts: [{ text: "The AI Copilot has been disabled by the portal administrator." }] }]) 
       });
     }
 
@@ -191,32 +232,27 @@ If the status remains unchanged, please contact support.
 
 ---
 Customer:
-How can I recharge my mobile?
+How do I apply for a PAN Card?
 
 AI:
-To recharge your mobile:
+To apply for a PAN Card:
 
-1. Open Recharge Services.
-2. Select Mobile Recharge.
-3. Enter Mobile Number.
-4. Select Operator.
-5. Enter Amount.
-6. Click Recharge Now.
+1. Log in to your account.
+2. Go to "Digital Services".
+3. Select "PAN Card".
+4. Fill out the application form with your demographic details.
+5. Upload the required documents (Aadhaar, Photo, and Signature).
+6. Click Submit.
 
-The transaction receipt will be available in Transaction History.
+The application fee will be deducted from your Wallet Balance, and your application will be reviewed.
 ---
 
 ---
 Customer:
-AEPS service not working.
+What is the processing time for services?
 
 AI:
-AEPS service is currently unavailable.
-
-Status:
-Coming Soon / Under Maintenance
-
-Please check again later.
+Processing times vary depending on the service. Demographic updates usually take 3-5 business days, while passport applications and PAN cards may take up to 7-15 business days. You can track the status in real-time under "My Applications".
 ---
 
 ---
@@ -296,9 +332,8 @@ ${aiConfig.knowledgeBase}
       tools: [{ functionDeclarations: [checkApplicationStatus] }]
     };
 
-    let response = await ai.models.generateContent({
-      model: "gemini-3.5-flash", 
-      contents: history,
+    let response = await generateContentWithFallback(ai, {
+      contents: chatHistory,
       config
     });
 
@@ -326,8 +361,8 @@ ${aiConfig.knowledgeBase}
         }
 
         // Return to the model with the tool response.
-        history.push(response.candidates?.[0]?.content);
-        history.push({
+        chatHistory.push(response.candidates?.[0]?.content);
+        chatHistory.push({
           role: "user",
           parts: [{
             functionResponse: {
@@ -338,22 +373,33 @@ ${aiConfig.knowledgeBase}
         });
 
         // Call again with the tool response
-        response = await ai.models.generateContent({
-          model: "gemini-3.5-flash",
-          contents: history,
+        response = await generateContentWithFallback(ai, {
+          contents: chatHistory,
           config
         });
       }
     }
 
-    res.json({ text: response.text, history: history.concat([{role: 'model', parts: [{text: response.text}]}]) });
+    res.json({ text: response.text, history: chatHistory.concat([{role: 'model', parts: [{text: response.text}]}]) });
   } catch (error: any) {
     logger.error('Gemini chat error: ', error);
-    let userFriendlyMessage = error.message || 'Internal Server Error';
-    if (userFriendlyMessage.toLowerCase().includes('quota') || userFriendlyMessage.toLowerCase().includes('429') || userFriendlyMessage.toLowerCase().includes('exhausted') || userFriendlyMessage.toLowerCase().includes('limit')) {
+    
+    let userFriendlyMessage = "I apologize, but my core AI engine is currently experiencing extremely high demand or temporary network congestion. Please try again in a few moments, or check your services in the portal!";
+    const errorStr = (error.message || '').toLowerCase();
+    
+    if (errorStr.includes('quota') || errorStr.includes('429') || errorStr.includes('exhausted') || errorStr.includes('limit')) {
       userFriendlyMessage = "The AI assistant has temporarily reached its message limit or is experiencing heavy traffic. Please wait a moment and try again.";
+    } else if (errorStr.includes('503') || errorStr.includes('unavailable') || errorStr.includes('high demand') || errorStr.includes('temp')) {
+      userFriendlyMessage = "I apologize, but my core AI engine is currently experiencing extremely high demand or temporary network congestion. Please try again in a few moments, or check your services in the portal!";
     }
-    res.status(500).json({ error: userFriendlyMessage });
+
+    // Instead of failing the entire HTTP call and causing an ugly alert/error toast,
+    // we return a gracefully handled 200 response with the friendly message.
+    // This keeps the chat window responsive and lets the user know the system is alive.
+    res.json({ 
+      text: userFriendlyMessage, 
+      history: chatHistory.concat([{ role: 'model', parts: [{ text: userFriendlyMessage }] }]) 
+    });
   }
 });
 
