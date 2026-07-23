@@ -20,7 +20,7 @@ const DEFAULT_SETTINGS = {
   front_bg_image: '',
   back_bg_color: '#0f172a',
   back_bg_image: '',
-  company_logo: '',
+  company_logo: '/logo.png',
   company_name: 'JH DIGITAL SEVA KENDRA',
   company_tagline: 'OFFICIAL IDENTITY CARD',
   text_color: '#ffffff',
@@ -189,8 +189,8 @@ const IDCardSettings = () => {
         style={{ backgroundColor: settings.header_bg_color, borderColor: `${settings.border_color}33` }}
       >
         <div className="flex flex-col items-center gap-2">
-          {settings.company_logo && (
-            <img src={settings.company_logo} alt="Logo" className="h-10 w-10 object-contain mb-1" />
+          {(settings.company_logo || '/logo.png') && (
+            <img src={settings.company_logo || '/logo.png'} alt="Logo" className="h-10 w-10 object-contain mb-1" />
           )}
           <h1 
             style={{ color: settings.accent_color, fontSize: '18px', fontWeight: 900, letterSpacing: '1px' }}

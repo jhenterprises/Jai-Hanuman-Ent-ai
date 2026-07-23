@@ -27,6 +27,9 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (docSnap.exists()) {
         console.log('Config received via snapshot');
         let data = docSnap.data();
+        if (!data.logo_url) {
+          data.logo_url = '/logo.png';
+        }
         setConfig(data);
       } else {
         console.log('Config document does not exist, using defaults');
@@ -35,7 +38,7 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           theme_color: '#3b82f6',
           secondary_color: '#64748b',
           header_bg_color: '#1e293b',
-          logo_url: '/logo.svg',
+          logo_url: '/logo.png',
           pvc_title: 'JH Digital Seva Kendra',
           pvc_footer: 'OFFICIAL IDENTITY CARD'
         });
@@ -59,7 +62,7 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           theme_color: '#3b82f6',
           secondary_color: '#64748b',
           header_bg_color: '#1e293b',
-          logo_url: '/logo.svg',
+          logo_url: '/logo.png',
           pvc_title: 'JH Digital Seva Kendra',
           pvc_footer: 'OFFICIAL IDENTITY CARD'
         });
