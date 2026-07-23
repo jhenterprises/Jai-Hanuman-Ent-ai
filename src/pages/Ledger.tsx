@@ -574,7 +574,7 @@ const Ledger = () => {
       });
     };
 
-    const logoUrl = config.logo_url || "/logo.svg";
+    const logoUrl = config.logo_url && config.logo_url !== '/logo.svg' ? config.logo_url : "/logo.png";
     
     try {
       const img = await loadImage(logoUrl);

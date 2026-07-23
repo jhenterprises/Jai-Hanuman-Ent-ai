@@ -38,8 +38,13 @@ const PublicNavbar = () => {
     <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${scrolled ? 'bg-white/60 dark:bg-slate-950/60 backdrop-blur-xl border-b border-black/5 dark:border-white/5 py-3' : 'bg-transparent py-6'}`}>
       <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2 group">
-          <div className="w-12 h-12 bg-white p-1 rounded-2xl flex items-center justify-center shadow-2xl shadow-blue-600/10 group-hover:scale-110 transition-all duration-500 overflow-hidden">
-            <img src={config.logo_url || "/logo.svg"} alt="JH Logo" className="w-full h-full object-contain" />
+          <div className="w-12 h-12 bg-white p-1 rounded-2xl flex items-center justify-center shadow-2xl shadow-blue-600/10 group-hover:scale-110 transition-all duration-500 overflow-hidden border border-slate-100 dark:border-slate-800">
+            <img 
+              src={config.logo_url && config.logo_url !== '/logo.svg' ? config.logo_url : '/logo_emblem.png'} 
+              alt="JH Logo" 
+              className="w-full h-full object-contain" 
+              onError={(e) => { (e.target as HTMLImageElement).src = '/logo_emblem.png'; }}
+            />
           </div>
           <div className="flex flex-col">
             <span className="font-black text-xl leading-tight tracking-tighter text-slate-900 dark:text-white group-hover:text-blue-400 transition-colors">

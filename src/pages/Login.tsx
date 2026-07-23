@@ -86,8 +86,13 @@ const Login = ({ type = 'user' }: { type?: 'user' | 'admin' }) => {
           
           <div className="relative z-10 space-y-8">
             <div className="flex items-center gap-4 bg-slate-50 dark:bg-white/5 w-fit pr-6 pl-2 py-2 rounded-2xl border border-slate-150 dark:border-white/10 backdrop-blur-sm shadow-xl">
-              <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-lg p-2">
-                <img src={config.logo_url || "/logo.svg"} alt="Logo" className="w-full h-full object-contain" />
+              <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-lg p-1.5 border border-slate-100">
+                <img 
+                  src={config.logo_url && config.logo_url !== '/logo.svg' ? config.logo_url : '/logo_emblem.png'} 
+                  alt="Logo" 
+                  className="w-full h-full object-contain" 
+                  onError={(e) => { (e.target as HTMLImageElement).src = '/logo_emblem.png'; }}
+                />
               </div>
               <span className="text-2xl font-bold text-slate-800 dark:text-white tracking-tight">JH Digital Seva</span>
             </div>

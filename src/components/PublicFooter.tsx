@@ -12,7 +12,12 @@ const PublicFooter = () => {
           <div className="col-span-1 md:col-span-2">
             <div className="flex items-center gap-2 mb-6">
               <div className="w-10 h-10 bg-white p-1 rounded-xl flex items-center justify-center shadow-lg overflow-hidden border border-slate-200 dark:border-white/5">
-                <img src={config.logo_url || "/logo.svg"} alt="JH Logo" className="w-full h-full object-contain" />
+                <img 
+                  src={config.logo_url && config.logo_url !== '/logo.svg' ? config.logo_url : '/logo_emblem.png'} 
+                  alt="JH Logo" 
+                  className="w-full h-full object-contain" 
+                  onError={(e) => { (e.target as HTMLImageElement).src = '/logo_emblem.png'; }}
+                />
               </div>
               <div className="flex flex-col">
                 <span className="font-bold text-lg leading-tight tracking-tight text-slate-900 dark:text-white">

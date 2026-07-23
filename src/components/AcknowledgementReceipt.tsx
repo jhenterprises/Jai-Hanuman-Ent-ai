@@ -68,10 +68,11 @@ const AcknowledgementReceipt: React.FC<AcknowledgementReceiptProps> = ({ applica
       >
         <div style={{ backgroundColor: '#ffffff', width: '60pt', height: '60pt' }} className="rounded-2xl shadow-sm flex items-center justify-center p-1 border border-slate-200 overflow-hidden">
           <img 
-            src={config.logo_url || "/logo.svg"} 
+            src={config.logo_url && config.logo_url !== '/logo.svg' ? config.logo_url : '/logo.png'} 
             alt="JH Logo" 
             style={{ width: '100%', height: '100%', objectFit: 'contain' }}
             {...( (config.logo_url && config.logo_url.startsWith('http')) ? { crossOrigin: "anonymous" } : {} )}
+            onError={(e) => { (e.target as HTMLImageElement).src = '/logo.png'; }}
           />
         </div>
         <div>

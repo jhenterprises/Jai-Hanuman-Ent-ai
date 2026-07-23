@@ -79,8 +79,13 @@ const ResetPassword = () => {
         className="glass bg-white dark:bg-slate-900/40 border border-slate-200/50 dark:border-white/5 rounded-[2.5rem] p-8 md:p-10 space-y-8 relative"
       >
         <div className="text-center space-y-2">
-          <div className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl shadow-blue-500/10 overflow-hidden border border-slate-200 dark:border-white/10">
-            <img src={config.logo_url || "/logo.svg"} alt="JH Logo" className="w-full h-full object-contain p-2" />
+          <div className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl shadow-blue-500/10 overflow-hidden border border-slate-200 dark:border-white/10 p-2">
+            <img 
+              src={config.logo_url && config.logo_url !== '/logo.svg' ? config.logo_url : '/logo.png'} 
+              alt="JH Logo" 
+              className="w-full h-full object-contain" 
+              onError={(e) => { (e.target as HTMLImageElement).src = '/logo.png'; }}
+            />
           </div>
           <h2 className="text-3xl font-black text-slate-900 dark:text-white">New Password</h2>
           <p className="text-slate-600 dark:text-slate-400">Set a strong password for your account</p>

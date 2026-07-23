@@ -27,7 +27,7 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (docSnap.exists()) {
         console.log('Config received via snapshot');
         let data = docSnap.data();
-        if (!data.logo_url) {
+        if (!data.logo_url || data.logo_url === '/logo.svg') {
           data.logo_url = '/logo.png';
         }
         setConfig(data);

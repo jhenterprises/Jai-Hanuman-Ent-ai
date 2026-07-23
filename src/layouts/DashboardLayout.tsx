@@ -157,7 +157,12 @@ const DashboardLayout = () => {
         <div className="flex items-center justify-between h-16 px-6 border-b border-slate-200/50 dark:border-slate-700/50 flex-shrink-0">
           <Link to="/app" className="flex items-center gap-2">
             <div className="w-8 h-8 bg-white p-0.5 rounded-lg flex items-center justify-center shadow-lg overflow-hidden border border-slate-200/50">
-              <img src={config.logo_url || "/logo.svg"} alt="JH Logo" className="w-full h-full object-contain" />
+              <img 
+                src={config.logo_url && config.logo_url !== '/logo.svg' ? config.logo_url : '/logo_emblem.png'} 
+                alt="JH Logo" 
+                className="w-full h-full object-contain" 
+                onError={(e) => { (e.target as HTMLImageElement).src = '/logo_emblem.png'; }}
+              />
             </div>
             <div className="flex flex-col">
               <span className="font-bold text-sm leading-tight tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-gold-400">
